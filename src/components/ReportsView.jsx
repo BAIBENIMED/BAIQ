@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { exportFinancialWorkbook } from '../utils/excelExporter';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
+import { generateGeminiReport } from '../utils/aiEngine';
 
 /* ═══════════════════════════════════════════════════════════
-   FINANALYZE — Rapport Financier Complet avec Solvabilité & Altman Z''
+   BAIQ — Rapport Financier Complet avec Diagnostic IA Gemini
    ═══════════════════════════════════════════════════════════ */
 
 const KpiRow = ({ label, value, sub, ok }) => (
@@ -15,7 +17,39 @@ const KpiRow = ({ label, value, sub, ok }) => (
   </div>
 );
 
-export function ReportsView({ data, fmt }) {
+export function ReportsView({ data, fmt, geminiKey = '' }) {
+  const [reportType, setReportType] = useState('audit_diagnostic');
+  const [geminiReportText, setGeminiReportText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [geminiError, setGeminiError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
+
+  const effectiveKey = geminiKey || localKey;
+
+  const handleGenerateGeminiReport = async () => {
+    if (!effectiveKey) {
+      setGeminiError("Veuillez saisir votre clé API Google Gemini pour lancer la génération.");
+      return;
+    }
+    setIsGenerating(true);
+    setGeminiError('');
+    try {
+      const result = await generateGeminiReport(data, reportType, effectiveKey);
+      setGeminiReportText(result);
+    } catch (err) {
+      setGeminiError(err?.message || "Erreur lors de la génération du rapport avec Gemini.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyReport = () => {
+    if (!geminiReportText) return;
+    navigator.clipboard.writeText(geminiReportText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   /* ── Garde — données manquantes ── */
   if (!data) return (
@@ -286,6 +320,185 @@ export function ReportsView({ data, fmt }) {
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
             Imprimer / Exporter PDF
           </button>
+        </div>
+      </div>
+
+      {/* ── SECTION IA GOOGLE GEMINI : GÉNÉRATION DE RAPPORTS & DIAGNOSTICS ── */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(124, 58, 237, 0.3)', boxShadow: '0 8px 30px rgba(124, 58, 237, 0.08)' }}>
+        <div style={{
+          padding: '16px 24px',
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+          color: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 14
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.2)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#c4b5fd' }}>auto_awesome</span>
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>Générateur de Rapports &amp; Diagnostics avec Google Gemini IA</h3>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: 'rgba(196, 181, 253, 0.25)', color: '#e9d5ff', border: '1px solid rgba(196, 181, 253, 0.4)' }}>
+                  IA Générative SCF
+                </span>
+              </div>
+              <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#c7d2fe' }}>
+                Générez des analyses stratégiques, plans d'action chiffrés et diagnostics bancaires complets en 1 clic.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {geminiReportText && (
+              <>
+                <button
+                  onClick={handleCopyReport}
+                  className="btn"
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{copied ? 'check' : 'content_copy'}</span>
+                  {copied ? 'Copié !' : 'Copier'}
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="btn"
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>print</span>
+                  Imprimer
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleGenerateGeminiReport}
+              disabled={isGenerating}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '9px 18px',
+                fontSize: '0.84rem',
+                fontWeight: 900,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                opacity: isGenerating ? 0.7 : 1
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{isGenerating ? 'hourglass_top' : 'bolt'}</span>
+              {isGenerating ? 'Génération en cours...' : geminiReportText ? 'Régénérer le rapport' : 'Générer avec Gemini'}
+            </button>
+          </div>
+        </div>
+
+        {/* Barre de sélection du type de rapport */}
+        <div style={{ padding: '10px 24px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[
+              { id: 'audit_diagnostic', label: '📊 Audit & Diagnostic Complet', desc: 'Synthèse managériale, équilibre, rentabilité & risques' },
+              { id: 'recommendations_plan', label: '🎯 Plan d\'Action & Recommandations', desc: 'Actions chiffrées 0-30j, 1-3m, 3-12m & KPIs' },
+              { id: 'banque_credit', label: '🏦 Note d\'Analyse Bancaire', desc: 'Dossier crédit, solvabilité, garanties & avis comité' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setReportType(tab.id)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 7,
+                  border: `1px solid ${reportType === tab.id ? '#6366f1' : 'var(--border)'}`,
+                  background: reportType === tab.id ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface)',
+                  color: reportType === tab.id ? '#6366f1' : 'var(--text-muted)',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title={tab.desc}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Saisie rapide clé Gemini si absente */}
+          {!effectiveKey && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 800 }}>⚠️ Clé Gemini requise :</span>
+              <input
+                type="password"
+                placeholder="Coller clé AI Studio..."
+                value={localKey}
+                onChange={e => {
+                  setLocalKey(e.target.value);
+                  localStorage.setItem('finanalyze_gemini_key', e.target.value);
+                }}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: '0.74rem', width: 170, outline: 'none' }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Message d'erreur éventuel */}
+        {geminiError && (
+          <div style={{ padding: '12px 24px', background: '#fee2e2', borderBottom: '1px solid #fca5a5', color: '#b91c1c', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
+            <span>{geminiError}</span>
+          </div>
+        )}
+
+        {/* Contenu du rapport généré ou état d'attente */}
+        <div style={{ padding: '24px' }}>
+          {isGenerating ? (
+            <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', border: '4px solid #e0e7ff', borderTopColor: '#6366f1', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+              <h4 style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text)', margin: '0 0 6px' }}>
+                Gemini analyse votre balance et vos états financiers...
+              </h4>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
+                Diagnostic de l'équilibre financier (FRNG/BFR/TN), calcul des marges SCF et formulation des recommandations prioritaires.
+              </p>
+              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+          ) : geminiReportText ? (
+            <div style={{
+              background: 'var(--surface-alt)',
+              borderRadius: 10,
+              padding: '24px',
+              border: '1px solid var(--border)',
+              lineHeight: 1.7,
+              fontSize: '0.86rem',
+              color: 'var(--text)',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'Inter, system-ui, sans-serif'
+            }}>
+              {geminiReportText}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px dashed var(--border)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#818cf8', display: 'block', marginBottom: 10 }}>psychology</span>
+              <h4 style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text)', margin: '0 0 4px' }}>
+                Prêt pour l'analyse financière augmentée par IA
+              </h4>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 540, margin: '0 auto 16px' }}>
+                Cliquez sur <strong>"Générer avec Gemini"</strong> pour obtenir un audit exécutif sur-mesure, un plan de redressement chiffré et des recommandations stratégiques basées sur les normes SCF Algérie.
+              </p>
+              <button
+                onClick={handleGenerateGeminiReport}
+                className="btn btn-primary"
+                style={{ borderRadius: 8, padding: '8px 20px', fontSize: '0.82rem', fontWeight: 800 }}
+              >
+                Lancer le diagnostic Gemini
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

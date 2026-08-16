@@ -432,3 +432,139 @@ ${analysisResult.faiblesses.map(f => `- ${f.titre} [${f.cat}] — Sévérité: $
 Référentiel : SCF Algérie (Loi 07-11) + Benchmarks sectoriels Algérie. Devise : DZD.
 `;
 }
+
+/* ─── Génération de Rapports et Diagnostics avec Google Gemini ─── */
+export async function generateGeminiReport(data, reportType = 'audit_diagnostic', geminiKey = '') {
+  if (!geminiKey) {
+    throw new Error("Clé API Google Gemini non configurée. Veuillez renseigner votre clé API dans les Paramètres ou les variables d'environnement.");
+  }
+  if (!data) {
+    throw new Error("Aucune donnée financière disponible pour générer le rapport.");
+  }
+
+  const analysis = runAIAnalysis(data);
+  const context  = buildGeminiContext(data, analysis);
+
+  let promptFocus = '';
+  if (reportType === 'audit_diagnostic') {
+    promptFocus = `
+## MISSION : GÉNÉRATION DU RAPPORT D'AUDIT & DIAGNOSTIC FINANCIER COMPLET (SCF ALGÉRIE)
+Rédige un rapport d'audit et de diagnostic financier approfondi, professionnel et directement exploitable par la direction générale.
+
+Structure obligatoire de ton rapport :
+# 📊 RAPPORT D'AUDIT & DIAGNOSTIC FINANCIER EXÉCUTIF
+**Date d'émission** : ${new Date().toLocaleDateString('fr-FR')} | **Référentiel** : Système Comptable Financier (SCF Algérie - Loi 07-11)
+
+### 1. SYNTHÈSE MANAGÉRIALE & NOTATION GLOBALE
+- Évaluation globale de la santé financière (Note /100, Niveau de risque, zone Altman Z'')
+- Résumé exécutif des performances en 3 points clés
+
+### 2. DIAGNOSTIC DE L'ÉQUILIBRE FINANCIER STRUCTUREL
+- Analyse croisée FRNG / BFR / Trésorerie Nette (Couverture du cycle d'exploitation, autonomie)
+- Analyse des délais de rotation (DSO Clients, DPO Fournisseurs, Rotation des stocks)
+- Risque de liquidité à court terme
+
+### 3. DIAGNOSTIC DE LA RENTABILITÉ & FORMATION DU RÉSULTAT (SIG SCF)
+- Performance commerciale (CA, Valeur Ajoutée, Poids des charges de personnel)
+- Rentabilité opérationnelle (EBE, Résultat d'Exploitation)
+- Capacité d'Autofinancement (CAF) et marge nette
+
+### 4. MATRICE DES FORCES, RISQUES & VULNÉRABILITÉS
+- Tableau récapitulatif synthétique : Indicateur | Constat | Impact | Degré de vigilance
+
+### 5. PLAN DE RECOMMANDATIONS STRATÉGIQUES PRIORITAIRES
+- 3 à 5 actions concrètes à mener immédiatement (Trésorerie, Négociation fournisseurs, Recouvrement créances, Réduction des coûts)
+`;
+  } else if (reportType === 'recommendations_plan') {
+    promptFocus = `
+## MISSION : PLAN D'ACTION OPÉRATIONNEL & RECOMMANDATIONS STRATÉGIQUES
+Rédige un plan d'action opérationnel détaillé et quantifié pour optimiser la situation financière, sécuriser la trésorerie et booster la rentabilité de l'entreprise.
+
+Structure obligatoire :
+# 🎯 PLAN D'ACTION & RECOMMANDATIONS OPÉRATIONNELLES
+**Entreprise** : ${data?.profil?.nomEntreprise || 'Entité'} | **Secteur** : ${analysis?.secteur?.label || 'Général'}
+
+### 1. ACTIONS D'URGENCE IMMÉDIATES (0 à 30 JOURS)
+- Mesures de choc sur la trésorerie et la liquidité
+- Actions de déblocage du cash (Recouvrement créances clients, réduction des stocks dormants)
+
+### 2. ACTIONS DE COURT TERME (1 à 3 MOIS)
+- Renégociation des conditions fournisseurs (DPO) et optimisation des approvisionnements
+- Rationalisation des charges d'exploitation et des frais généraux
+
+### 3. ACTIONS DE MOYEN TERME & STRATÉGIE (3 à 12 MOIS)
+- Restructuration du haut de bilan (consolidation du FRNG, refinancement ou renforcement des fonds propres)
+- Politique d'investissement et rentabilisation des actifs
+
+### 4. TABLEAU DE BORD DE SUIVI & INDICATEURS CLÉS (KPIs)
+- Les 5 KPIs essentiels à surveiller chaque semaine / mois avec les seuils d'alerte.
+`;
+  } else if (reportType === 'banque_credit') {
+    promptFocus = `
+## MISSION : NOTE D'ANALYSE FINANCIÈRE POUR DOSSIER DE CRÉDIT BANCAIRE
+Rédige une note d'analyse financière rigoureuse destinée à un comité de crédit bancaire ou à des investisseurs, évaluant la solvabilité et la capacité d'endettement.
+
+Structure obligatoire :
+# 🏦 NOTE D'ANALYSE BANCAIRE & CAPACITÉ D'ENDETTEMENT
+**Objet** : Évaluation de la solvabilité, du risque de crédit et de la capacité de remboursement
+
+### 1. PROFIL DE RISQUE & SCORE DE DÉFAILLANCE
+- Score Altman Z'' et Rating de Solvabilité
+- Solidité des capitaux propres et autonomie financière
+
+### 2. CAPACITÉ DE REMBOURSEMENT & COUVERTURE DES DETTES
+- Capacité d'Autofinancement (CAF) estimée
+- Ratio Dettes Financières / CAF et Capacité de remboursement annuelle
+- Couverture des charges financières par l'EBE
+
+### 3. GARANTIES & QUALITÉ DES ACTIFS
+- Actifs immobilisés nets (VNC), stocks et liquidités mobilisables
+
+### 4. AVIS MOTIVÉ DU COMITÉ FINANCIER
+- Avis global (Favorable / Favorable sous conditions / Réservé)
+- Conditions et covenants recommandés pour sécuriser tout concours financier
+`;
+  }
+
+  const fullPrompt = `${context}\n\n${promptFocus}\n\n---\nRègles de rédaction : Rédige en français professionnel, très structuré, avec des titres markdown (###), des tableaux comparatifs en markdown et des puces précises en chiffrant les montants en DZD (Dinars Algériens).`;
+
+  // Essai de modèles récents avec fallback
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+  let lastError = null;
+
+  for (const modelName of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 3500,
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.error?.message || `Erreur HTTP ${response.status}`);
+      }
+
+      const json = await response.json();
+      const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (generatedText && generatedText.trim().length > 50) {
+        return generatedText;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn(`Tentative Gemini avec ${modelName} a échoué :`, err.message);
+    }
+  }
+
+  throw lastError || new Error("Impossible de générer le rapport avec l'API Gemini.");
+}
+

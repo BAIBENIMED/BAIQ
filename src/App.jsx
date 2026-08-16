@@ -421,7 +421,7 @@ export default function App() {
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'whatif')   return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
-    if (tab === 'reports')  return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} />;
+    if (tab === 'reports')  return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} />;
     if (tab === 'ai')       return <AIView data={activeData} geminiKey={geminiKey} />;
     if (tab === 'settings') return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} />;
 
