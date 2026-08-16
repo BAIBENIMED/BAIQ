@@ -25,8 +25,8 @@ export function ReportsView({ data, fmt, geminiKey = '' }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
 
-  // Identifiant unique du dossier / balance courante
-  const dossierId = data ? `dossier_${data?.profil?.nomEntreprise || 'entite'}_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}` : 'default';
+  // Identifiant unique du dossier / balance courante (anonyme)
+  const dossierId = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}` : 'default';
 
   // Rapport sauvegardé pour ce dossier
   const [savedReports, setSavedReports] = useState(() => {
@@ -514,7 +514,7 @@ export function ReportsView({ data, fmt, geminiKey = '' }) {
                 <div style={{ padding: '14px 16px', background: '#fffbeb', borderRadius: 10, border: '1px solid #fde68a', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 22, marginTop: 1 }}>info</span>
                   <div style={{ fontSize: '0.82rem', color: '#92400e', lineHeight: 1.55 }}>
-                    <strong>Attention :</strong> Cette action va consommer <strong>1 appel IA</strong> pour votre dossier <em>"{data?.profil?.nomEntreprise || 'Balance en cours'}"</em>.
+                    <strong>Attention :</strong> Cette action va consommer <strong>1 appel IA</strong> pour cette balance comptable.
                     <br />
                     Une fois généré, le rapport restera sauvegardé et consultable sans consommer d'appel supplémentaire.
                   </div>

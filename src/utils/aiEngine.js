@@ -398,8 +398,8 @@ export function buildGeminiContext(data, analysisResult) {
 
   return `Tu es un expert-comptable et analyste financier spécialisé dans le Système Comptable Financier algérien (SCF, Loi 07-11). Analyse les données financières suivantes en tenant compte du secteur d'activité spécifié.
 
-## PROFIL ET SECTEUR D'ACTIVITÉ
-- Entreprise : ${p.nomEntreprise || 'Non spécifié'}
+## CADRE D'ANALYSE & SECTEUR D'ACTIVITÉ
+- Entité : Dossier comptable (Données financières anonymisées)
 - Forme Juridique : ${p.formeJuridique || 'Non spécifiée'}
 - Secteur : ${sec.label || 'Général'}
 - Description secteur : ${sec.description || ''}
@@ -482,7 +482,7 @@ Rédige un plan d'action opérationnel détaillé et quantifié pour optimiser l
 
 Structure obligatoire :
 # 🎯 PLAN D'ACTION & RECOMMANDATIONS OPÉRATIONNELLES
-**Entreprise** : ${data?.profil?.nomEntreprise || 'Entité'} | **Secteur** : ${analysis?.secteur?.label || 'Général'}
+**Secteur d'Activité** : ${analysis?.secteur?.label || 'Général'} | **Cadre** : Données financières anonymisées
 
 ### 1. ACTIONS D'URGENCE IMMÉDIATES (0 à 30 JOURS)
 - Mesures de choc sur la trésorerie et la liquidité
