@@ -19,15 +19,33 @@ const KpiRow = ({ label, value, sub, ok }) => (
 
 export function ReportsView({ data, fmt, geminiKey = '' }) {
   const [reportType, setReportType] = useState('audit_diagnostic');
-  const [geminiReportText, setGeminiReportText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [geminiError, setGeminiError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
+
+  // Identifiant unique du dossier / balance courante
+  const dossierId = data ? `dossier_${data?.profil?.nomEntreprise || 'entite'}_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}` : 'default';
+
+  // Rapport sauvegardé pour ce dossier
+  const [savedReports, setSavedReports] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('baiq_saved_ai_reports') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const currentReportEntry = savedReports[dossierId] || null;
+  const geminiReportText   = currentReportEntry?.text || '';
+  const hasUsedQuota       = Boolean(currentReportEntry);
 
   const effectiveKey = geminiKey || localKey;
 
-  const handleGenerateGeminiReport = async () => {
+  // Lancement de la génération après confirmation
+  const executeGeneration = async () => {
+    setShowConfirmModal(false);
     if (!effectiveKey) {
       setGeminiError("Veuillez saisir votre clé API Google Gemini pour lancer la génération.");
       return;
@@ -36,12 +54,29 @@ export function ReportsView({ data, fmt, geminiKey = '' }) {
     setGeminiError('');
     try {
       const result = await generateGeminiReport(data, reportType, effectiveKey);
-      setGeminiReportText(result);
+      const updated = {
+        ...savedReports,
+        [dossierId]: {
+          text: result,
+          type: reportType,
+          date: new Date().toISOString()
+        }
+      };
+      setSavedReports(updated);
+      localStorage.setItem('baiq_saved_ai_reports', JSON.stringify(updated));
     } catch (err) {
       setGeminiError(err?.message || "Erreur lors de la génération du rapport avec Gemini.");
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Réinitialiser le quota pour ce dossier si l'utilisateur le demande explicitement
+  const handleResetQuota = () => {
+    const updated = { ...savedReports };
+    delete updated[dossierId];
+    setSavedReports(updated);
+    localStorage.setItem('baiq_saved_ai_reports', JSON.stringify(updated));
   };
 
   const handleCopyReport = () => {
@@ -353,6 +388,23 @@ export function ReportsView({ data, fmt, geminiKey = '' }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Badge Quota */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 6,
+              background: hasUsedQuota ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+              border: `1px solid ${hasUsedQuota ? '#d97706' : '#059669'}`,
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              color: hasUsedQuota ? '#fde68a' : '#6ee7b7'
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{hasUsedQuota ? 'lock' : 'hourglass_bottom'}</span>
+              <span>{hasUsedQuota ? 'Quota utilisé (1/1)' : 'Quota : 1 rapport dispo'}</span>
+            </div>
+
             {geminiReportText && (
               <>
                 <button
@@ -373,31 +425,139 @@ export function ReportsView({ data, fmt, geminiKey = '' }) {
                 </button>
               </>
             )}
-            <button
-              onClick={handleGenerateGeminiReport}
-              disabled={isGenerating}
-              className="btn"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 8,
-                padding: '9px 18px',
-                fontSize: '0.84rem',
-                fontWeight: 900,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                cursor: isGenerating ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                opacity: isGenerating ? 0.7 : 1
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{isGenerating ? 'hourglass_top' : 'bolt'}</span>
-              {isGenerating ? 'Génération en cours...' : geminiReportText ? 'Régénérer le rapport' : 'Générer avec Gemini'}
-            </button>
+
+            {hasUsedQuota ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  className="btn"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 8,
+                    padding: '8px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer'
+                  }}
+                  title="Débloquer et régénérer un nouveau rapport pour ce dossier"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f59e0b' }}>lock_open</span>
+                  Débloquer &amp; Régénérer
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                disabled={isGenerating}
+                className="btn"
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '9px 18px',
+                  fontSize: '0.84rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: isGenerating ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                  opacity: isGenerating ? 0.7 : 1
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{isGenerating ? 'hourglass_top' : 'bolt'}</span>
+                {isGenerating ? 'Génération en cours...' : 'Générer avec Gemini'}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* ── MODAL D'AVERTISSEMENT ET DE CONFIRMATION DU QUOTA ── */}
+        {showConfirmModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.82)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}>
+            <div style={{
+              width: '100%',
+              maxWidth: 520,
+              background: 'var(--surface)',
+              borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ padding: '18px 24px', background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(245, 158, 11, 0.25)', border: '1px solid #f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#f59e0b', fontSize: 20 }}>warning</span>
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>Confirmation de Génération IA</h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#cbd5e1' }}>Limite stricte : 1 rapport par dossier importé</p>
+                </div>
+              </div>
+
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ padding: '14px 16px', background: '#fffbeb', borderRadius: 10, border: '1px solid #fde68a', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 22, marginTop: 1 }}>info</span>
+                  <div style={{ fontSize: '0.82rem', color: '#92400e', lineHeight: 1.55 }}>
+                    <strong>Attention :</strong> Cette action va consommer <strong>1 appel IA</strong> pour votre dossier <em>"{data?.profil?.nomEntreprise || 'Balance en cours'}"</em>.
+                    <br />
+                    Une fois généré, le rapport restera sauvegardé et consultable sans consommer d'appel supplémentaire.
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 16px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px solid var(--border)', fontSize: '0.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Type de rapport :</span>
+                    <strong style={{ color: 'var(--primary)' }}>
+                      {reportType === 'audit_diagnostic' ? '📊 Audit & Diagnostic Complet' :
+                       reportType === 'recommendations_plan' ? '🎯 Plan d\'Action Opérationnel' : '🏦 Note d\'Analyse Bancaire'}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Comptes analysés :</span>
+                    <strong>{data?.rows?.length || 0} comptes</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Chiffre d'Affaires :</span>
+                    <strong className="mono">{fmt(data?.sig?.chiffreAffaires || 0)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px 24px', background: 'var(--surface-alt)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="btn"
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={executeGeneration}
+                  className="btn btn-primary"
+                  style={{ padding: '8px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)' }}
+                >
+                  Confirmer &amp; Générer (Consommer 1 crédit)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Barre de sélection du type de rapport */}
         <div style={{ padding: '10px 24px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
