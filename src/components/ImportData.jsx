@@ -28,7 +28,9 @@ export function ImportData({ onDataImported }) {
   const [fileN1, setFileN1] = useState(null);
   const [parsedN, setParsedN] = useState(null);
   const [parsedN1, setParsedN1] = useState(null);
-  const [previewTarget, setPreviewTarget] = useState('N'); // 'N' ou 'N-1'
+  const [errorN, setErrorN] = useState(null);
+  const [errorN1, setErrorN1] = useState(null);
+  const [previewTarget, setPreviewTarget] = useState(null); // null, 'N' ou 'N-1'
 
   const saveDossierToStorage = (payloadData) => {
     const dDate = new Date().toLocaleDateString('fr-FR');
@@ -67,22 +69,36 @@ export function ImportData({ onDataImported }) {
 
   // ── Handlers Fichiers ──
   const handleFileN = async (f) => {
+    if (!f) return;
     setFileN(f);
+    setErrorN(null);
     try {
       const data = await parseFile(f);
+      if (!data || data.length === 0) {
+        throw new Error("Aucune ligne de compte valide trouvée dans ce fichier.");
+      }
       setParsedN(data);
     } catch (err) {
       console.error(`Erreur Fichier N: ${err.message}`);
+      setErrorN(err.message || "Erreur de lecture du fichier.");
+      setParsedN(null);
     }
   };
 
   const handleFileN1 = async (f) => {
+    if (!f) return;
     setFileN1(f);
+    setErrorN1(null);
     try {
       const data = await parseFile(f);
+      if (!data || data.length === 0) {
+        throw new Error("Aucune ligne de compte valide trouvée dans le fichier N-1.");
+      }
       setParsedN1(data);
     } catch (err) {
       console.error(`Erreur Fichier N-1: ${err.message}`);
+      setErrorN1(err.message || "Erreur de lecture du fichier N-1.");
+      setParsedN1(null);
     }
   };
 
@@ -361,10 +377,17 @@ export function ImportData({ onDataImported }) {
               <input
                 type="file"
                 id="file-upload-n"
-                className="hidden"
+                style={{ display: 'none' }}
                 accept=".csv, .xlsx, .xls"
                 onChange={(e) => e.target.files?.[0] && handleFileN(e.target.files[0])}
               />
+
+              {errorN && (
+                <div style={{ padding: '10px 14px', background: '#fee2e2', borderRadius: 10, border: '1px solid #fca5a5', color: '#b91c1c', fontSize: '0.8rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>error</span>
+                  <span>{errorN}</span>
+                </div>
+              )}
 
               {!fileN ? (
                 <div onClick={() => document.getElementById('file-upload-n').click()} style={{ cursor: 'pointer', padding: '24px 20px' }}>
@@ -381,24 +404,26 @@ export function ImportData({ onDataImported }) {
                 </div>
               ) : (
                 <div style={{ padding: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #86efac', marginBottom: 14 }}>
-                    <File size={28} className="text-emerald-600" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', padding: 16, borderRadius: 12, border: `1px solid ${parsedN ? '#86efac' : '#fca5a5'}`, marginBottom: 14 }}>
+                    <File size={28} className={parsedN ? "text-emerald-600" : "text-rose-600"} />
                     <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }} className="truncate">{fileN.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700 }}>
-                        {parsedN ? `✅ ${parsedN.length} lignes valides importées` : 'Chargement...'}
+                      <div style={{ fontSize: '0.75rem', color: parsedN ? '#059669' : '#dc2626', fontWeight: 700 }}>
+                        {parsedN ? `✅ ${parsedN.length} lignes valides importées` : errorN || 'Erreur d\'import'}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10 }}>
+                    {parsedN && (
+                      <button
+                        onClick={() => setPreviewTarget('N')}
+                        style={{ flex: 1, padding: '10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}
+                      >
+                        👁 Contrôler &amp; Prévisualiser la Balance N
+                      </button>
+                    )}
                     <button
-                      onClick={() => setPreviewTarget('N')}
-                      style={{ flex: 1, padding: '10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}
-                    >
-                      👁 Contrôler &amp; Prévisualiser la Balance N
-                    </button>
-                    <button
-                      onClick={() => { setFileN(null); setParsedN(null); }}
+                      onClick={() => { setFileN(null); setParsedN(null); setErrorN(null); }}
                       style={{ padding: '10px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 10, cursor: 'pointer', color: '#dc2626', fontSize: '0.82rem', fontWeight: 700 }}
                     >
                       Changer
