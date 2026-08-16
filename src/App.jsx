@@ -35,6 +35,7 @@ const NAV = [
 export default function App() {
   const [tab, setTab]       = useState('import');
   const [data, setData]     = useState(null);
+  const [cur, setCur]       = useState('DZD');
   const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   
