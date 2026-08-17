@@ -416,12 +416,14 @@ export function auditBalanceAccounts(rows = []) {
     if (deb === 0 && cred === 0) {
       if (r.solde !== undefined) {
         const s = safeNum(r.solde);
-        if (s > 0) deb = s;
-        else if (s < 0) cred = -s;
+        if (s > 0.001) deb = s;
+        else if (s < -0.001) cred = -s;
       }
+      // Fallback sur mouvements UNIQUEMENT si les deux sont positifs
+      // (certains exports ont des mouvements crédit en négatif — ne pas utiliser)
       if (deb === 0 && cred === 0) {
-        const md = safeNum(r.mouvementDebit);
-        const mc = safeNum(r.mouvementCredit);
+        const md = Math.max(0, safeNum(r.mouvementDebit));
+        const mc = Math.max(0, safeNum(r.mouvementCredit));
         if (md > mc) deb = md - mc;
         else if (mc > md) cred = mc - md;
         else if (md > 0 || mc > 0) {
