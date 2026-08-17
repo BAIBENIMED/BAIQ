@@ -1267,33 +1267,40 @@ export const parseFile = async (file) => {
               if (debitCols.length >= 3) colMap.mouvDebitIdx = debitCols[1];
               if (creditCols.length >= 3) colMap.mouvCreditIdx = creditCols[1];
             } else {
-              // Filtrer les colonnes qui contiennent réellement des données (ignorer colonnes blanches/vides)
-              const activeNonEmptyCols = [];
-              const maxCols = Math.max(...data.slice(i, i + 20).map(r => (r || []).length));
+              // Fallback : scanner les lignes de DONNÉES réelles (pas l'en-tête) pour trouver les colonnes numériques non-vides
+              const dataStartRow = i + (nextRow.length > 0 ? 2 : 1); // sauter les lignes d'en-tête
+              const activeNumericCols = [];
+              const maxCols = Math.max(...data.slice(dataStartRow, dataStartRow + 5).map(r => (r || []).length), 0);
+              
               for (let col = libelleIdx + 1; col < maxCols; col++) {
-                let hasData = false;
-                for (let r = i; r < Math.min(data.length, i + 30); r++) {
+                // Vérifier que cette colonne contient des nombres dans les premières lignes de données
+                let hasNumericData = false;
+                for (let r = dataStartRow; r < Math.min(data.length, dataStartRow + 20); r++) {
                   const val = data[r]?.[col];
-                  if (val !== undefined && val !== null && String(val).trim() !== '') {
-                    hasData = true;
-                    break;
+                  if (val !== undefined && val !== null && val !== '') {
+                    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[\s]/g, '').replace(',', '.'));
+                    if (!isNaN(num)) {
+                      hasNumericData = true;
+                      break;
+                    }
                   }
                 }
-                if (hasData) activeNonEmptyCols.push(col);
+                if (hasNumericData) activeNumericCols.push(col);
               }
 
-              if (activeNonEmptyCols.length >= 2) {
-                // Les deux dernières colonnes actives sont toujours le Solde Fin Débit et Crédit
-                colMap.soldeFinDebitIdx  = activeNonEmptyCols[activeNonEmptyCols.length - 2];
-                colMap.soldeFinCreditIdx = activeNonEmptyCols[activeNonEmptyCols.length - 1];
-                if (activeNonEmptyCols.length >= 6) {
-                  colMap.soldeDebutDebitIdx  = activeNonEmptyCols[0];
-                  colMap.soldeDebutCreditIdx = activeNonEmptyCols[1];
-                  colMap.mouvDebitIdx        = activeNonEmptyCols[2];
-                  colMap.mouvCreditIdx       = activeNonEmptyCols[3];
-                } else if (activeNonEmptyCols.length >= 4) {
-                  colMap.mouvDebitIdx  = activeNonEmptyCols[0];
-                  colMap.mouvCreditIdx = activeNonEmptyCols[1];
+              if (activeNumericCols.length >= 2) {
+                // Logique : colonnes par paires (Débit/Crédit) — les 2 dernières = Solde Fin
+                const n = activeNumericCols.length;
+                colMap.soldeFinDebitIdx  = activeNumericCols[n - 2];
+                colMap.soldeFinCreditIdx = activeNumericCols[n - 1];
+                if (n >= 6) {
+                  colMap.soldeDebutDebitIdx  = activeNumericCols[0];
+                  colMap.soldeDebutCreditIdx = activeNumericCols[1];
+                  colMap.mouvDebitIdx        = activeNumericCols[2];
+                  colMap.mouvCreditIdx       = activeNumericCols[3];
+                } else if (n >= 4) {
+                  colMap.mouvDebitIdx  = activeNumericCols[0];
+                  colMap.mouvCreditIdx = activeNumericCols[1];
                 }
               }
             }
