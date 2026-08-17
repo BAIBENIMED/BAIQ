@@ -38,6 +38,7 @@ export default function App() {
   const [cur, setCur]       = useState('DZD');
   const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
+  const [showContactModal, setShowContactModal] = useState(false);
   
   /* ── Moteur de Simulation ── */
   const [simulationEntries, setSimulationEntries] = useState([]);
@@ -409,7 +410,7 @@ export default function App() {
         ];
   }, [activeData]);
 
-  const screenTitle = NAV.find(n => n.id === tab)?.label.toUpperCase() || 'BAIQ — Financial Intelligence';
+  const screenTitle = NAV.find(n => n.id === tab)?.label.toUpperCase() || 'BAIQ — BALANCE AND FINANCIAL ANALYTICS';
 
 
   /* ────────────────── RENDER ────────────────── */
@@ -822,7 +823,7 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                 <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.06em', lineHeight: 1 }}>BAIQ</span>
               </div>
-              <div style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', marginTop: 1, lineHeight: 1 }}>Financial Intelligence</div>
+              <div style={{ fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)', marginTop: 2, lineHeight: 1 }}>Balance and Financial Analytics</div>
             </div>
           </div>
           <div style={{ marginTop: 6, fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-sub)', letterSpacing: '0.06em', opacity: 0.7 }}>Comptabilité · Finance · IA — SCF Algérie</div>
@@ -855,10 +856,18 @@ export default function App() {
             );
           })}
         </nav>
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
           <button className={`nav-item ${tab==='settings'?'active':''}`} onClick={() => setTab('settings')}>
             <span className="material-symbols-outlined">settings</span>
             Paramètres
+          </button>
+          <button 
+            className="nav-item" 
+            onClick={() => setShowContactModal(true)}
+            style={{ color: 'var(--primary)', fontWeight: 800, background: 'rgba(37, 99, 235, 0.06)', borderRadius: 8 }}
+          >
+            <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>support_agent</span>
+            Contact
           </button>
         </div>
       </aside>
@@ -963,6 +972,94 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {/* ── MODALE DE CONTACT & ASSISTANCE ── */}
+      {showContactModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(5px)',
+          zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 500, background: 'var(--surface)', borderRadius: 16,
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)', overflow: 'hidden', border: '1px solid var(--border)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '18px 24px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#60a5fa' }}>support_agent</span>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Contact &amp; Assistance</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>BAIQ — Balance and Financial Analytics</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowContactModal(false)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#fff', padding: 6, cursor: 'pointer' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: 'var(--surface-alt)', padding: 14, borderRadius: 10, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Plateforme &amp; Support Technique</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text)' }}>Assistance Comptable &amp; Financière SCF</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>Besoin d'une démonstration, d'une règle d'audit spécifique ou d'un support technique ?</div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <a
+                  href="mailto:contact@baiq.ai"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+                    textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                >
+                  <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 22 }}>mail</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>EMAIL CONTACT</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>contact@baiq.ai</div>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--text-muted)' }}>arrow_forward</span>
+                </a>
+
+                <div
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 22 }}>verified</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXPÉRIENCE &amp; R&amp;D</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Moteur d'Audit &amp; IA SCF Algérie</div>
+                  </div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#059669' }}>v2.5</span>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', paddingTop: 8 }}>
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="btn btn-primary"
+                  style={{ width: '100%', padding: '10px', borderRadius: 10, fontWeight: 800 }}
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
