@@ -1239,10 +1239,47 @@ export const parseFile = async (file) => {
 
           // Si détection par mots-clés a réussi pour Solde Fin → utiliser
           if (soldeFinDebitIdx !== -1 && soldeFinCreditIdx !== -1) {
-            colMap.soldeDebutDebitIdx  = soldeDebutDebitIdx;
-            colMap.soldeDebutCreditIdx = soldeDebutCreditIdx;
-            colMap.mouvDebitIdx        = mouvDebitIdx;
-            colMap.mouvCreditIdx       = mouvCreditIdx;
+            // Si Solde Début ou Mouvement n'ont pas été trouvés par mots-clés,
+            // on les déduit positionellement : les colonnes numériques avant soldeFinDebitIdx
+            if (soldeDebutDebitIdx === -1 || mouvDebitIdx === -1) {
+              // Collecter toutes les colonnes numériques ENTRE libelle et soldeFinDebitIdx
+              const dataStartRow2 = i + (nextRow.length > 0 ? 2 : 1);
+              const priorNumericCols = [];
+              for (let col = libelleIdx + 1; col < soldeFinDebitIdx; col++) {
+                let hasNumeric = false;
+                for (let r = dataStartRow2; r < Math.min(data.length, dataStartRow2 + 15); r++) {
+                  const val = data[r]?.[col];
+                  if (val !== undefined && val !== null && val !== '') {
+                    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[\s]/g, '').replace(',', '.'));
+                    if (!isNaN(num)) { hasNumeric = true; break; }
+                  }
+                }
+                if (hasNumeric) priorNumericCols.push(col);
+              }
+              // priorNumericCols = [SolDebDeb, SolDebCred, MouvDeb, MouvCred] ou sous-ensemble
+              const pn = priorNumericCols.length;
+              if (pn >= 4 && soldeDebutDebitIdx === -1) {
+                soldeDebutDebitIdx  = priorNumericCols[pn - 4];
+                soldeDebutCreditIdx = priorNumericCols[pn - 3];
+                mouvDebitIdx        = priorNumericCols[pn - 2];
+                mouvCreditIdx       = priorNumericCols[pn - 1];
+              } else if (pn === 3 && soldeDebutDebitIdx === -1) {
+                soldeDebutDebitIdx  = priorNumericCols[0];
+                mouvDebitIdx        = priorNumericCols[1];
+                mouvCreditIdx       = priorNumericCols[2];
+              } else if (pn === 2) {
+                if (mouvDebitIdx === -1) {
+                  mouvDebitIdx  = priorNumericCols[0];
+                  mouvCreditIdx = priorNumericCols[1];
+                }
+              } else if (pn === 1 && mouvDebitIdx === -1) {
+                mouvDebitIdx = priorNumericCols[0];
+              }
+            }
+            colMap.soldeDebutDebitIdx  = soldeDebutDebitIdx  !== -1 ? soldeDebutDebitIdx  : undefined;
+            colMap.soldeDebutCreditIdx = soldeDebutCreditIdx !== -1 ? soldeDebutCreditIdx : undefined;
+            colMap.mouvDebitIdx        = mouvDebitIdx        !== -1 ? mouvDebitIdx        : undefined;
+            colMap.mouvCreditIdx       = mouvCreditIdx       !== -1 ? mouvCreditIdx       : undefined;
             colMap.soldePeriodeDebitIdx  = soldePeriodeDebitIdx;
             colMap.soldePeriodeCreditIdx = soldePeriodeCreditIdx;
             colMap.soldeFinDebitIdx    = soldeFinDebitIdx;
@@ -1332,7 +1369,7 @@ export const parseFile = async (file) => {
             return parseFloat(String(val).replace(/\s/g, '').replace(',', '.')) || 0;
           };
 
-          const getCol = (idx) => idx !== -1 ? parseNumber(row[idx]) : 0;
+          const getCol = (idx) => (idx !== undefined && idx !== null && idx !== -1) ? parseNumber(row[idx]) : 0;
 
           const soldeDebutDebit  = getCol(colMap.soldeDebutDebitIdx);
           const soldeDebutCredit = getCol(colMap.soldeDebutCreditIdx);
