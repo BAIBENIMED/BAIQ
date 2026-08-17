@@ -504,17 +504,16 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
   };
 
   // Ensemble des comptes déjà liés dans une jointure enregistrée
-  const joinedSrcComptes = new Set(jointures.flatMap(j => j.sources.map(s => String(s.compte))));
-  const joinedTgtComptes = new Set(jointures.flatMap(j => j.cibles.map(c => String(c.compte))));
+  const joinedSrcMap = new Map(jointures.flatMap(j => j.sources.map(s => [String(s.compte), j.id])));
+  const joinedTgtMap = new Map(jointures.flatMap(j => j.cibles.map(c => [String(c.compte), j.id])));
 
-  // Filtrage : comptes avec mouvement + non encore liés dans une jointure
-  const filterAccounts = (accounts, focus, isSource) =>
+  const joinedSrcComptes = new Set(joinedSrcMap.keys());
+  const joinedTgtComptes = new Set(joinedTgtMap.keys());
+
+  // Filtrage : comptes avec mouvement
+  const filterAccounts = (accounts, focus) =>
     (accounts || []).filter(a => {
       const cStr = String(a.compte);
-      // Ne plus afficher dans le bloc du haut si déjà sélectionné/lié dans une jointure
-      if (isSource && joinedSrcComptes.has(cStr)) return false;
-      if (!isSource && joinedTgtComptes.has(cStr)) return false;
-
       if (!showZeroInModal && getFocusAmount(a, focus) < 0.001) return false;
       if (filterText) {
         const q = filterText.toLowerCase();
@@ -524,8 +523,8 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
       return true;
     });
 
-  const srcAccounts = filterAccounts(rule.sourceAccounts, rule.sourceFocus, true);
-  const tgtAccounts = filterAccounts(rule.cibleAccounts,  rule.cibleFocus,  false);
+  const srcAccounts = filterAccounts(rule.sourceAccounts, rule.sourceFocus);
+  const tgtAccounts = filterAccounts(rule.cibleAccounts,  rule.cibleFocus);
 
   const sumSrc = srcAccounts.reduce((s, a) => s + getFocusAmount(a, rule.sourceFocus), 0);
   const sumTgt = tgtAccounts.reduce((s, a) => s + getFocusAmount(a, rule.cibleFocus),  0);
@@ -767,8 +766,18 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                         style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
                       />
                     </td>
-                    <td className="mono" style={{ padding: '5px 8px', fontWeight: 800, color: codeColor, fontSize: '0.74rem' }}>
-                      {a.compte}
+                    <td className="mono" style={{ padding: '5px 8px', fontWeight: 800, color: codeColor, fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{a.compte}</span>
+                        {(isSource ? joinedSrcMap.has(String(a.compte)) : joinedTgtMap.has(String(a.compte))) && (
+                          <span style={{
+                            fontSize: '0.56rem', fontWeight: 900, padding: '1px 4px', borderRadius: 3,
+                            background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid #059669'
+                          }}>
+                            ✓ #{isSource ? joinedSrcMap.get(String(a.compte)) : joinedTgtMap.get(String(a.compte))}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{
                       padding: '5px 8px',
@@ -1026,107 +1035,115 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
           </div>
         </div>
 
-        {/* ══ TABLES SOURCE & CIBLE — AGRANDIES & MAXIMISÉES ══ */}
+        {/* ══ CORPS SCROLLABLE DU MODAL CONTENANT TOUTES LES TABLES ══ */}
         <div style={{
-          flex: '1 1 0%',
-          minHeight: 280,
-          overflow: 'hidden',
-          padding: '8px 16px',
-          display: hasCible && layoutMode === 'sideBySide' ? 'grid' : 'flex',
-          gridTemplateColumns: hasCible && layoutMode === 'sideBySide' ? '1fr 1fr' : '1fr',
-          flexDirection: 'column',
-          gap: 12
-        }}>
-          <AccountTable
-            accounts={srcAccounts} focus={rule.sourceFocus} sumTotal={sumSrc}
-            colLabel={srcColLabel} label={rule.sourceLabel} totalVal={rule.sourceVal}
-            isSource={true} checked={checkedSrc} onToggle={toggleSrc}
-          />
-          {hasCible && (
-            <AccountTable
-              accounts={tgtAccounts} focus={rule.cibleFocus} sumTotal={sumTgt}
-              colLabel={tgtColLabel} label={rule.cibleLabel} totalVal={rule.cibleVal}
-              isSource={false} checked={checkedTgt} onToggle={toggleTgt}
-            />
-          )}
-        </div>
-
-        {/* ══ TABLEAU DES JOINTURES INCRÉMENTÉES — AGRANDI & CONFORTABLE ══ */}
-        <div style={{
-          borderTop: '2px solid var(--border)',
-          background: '#090d16',
-          padding: '10px 18px',
-          flex: jointures.length > 0 ? '1 1 0%' : '0 0 auto',
-          minHeight: jointures.length > 0 ? 280 : 50,
-          maxHeight: jointures.length > 0 ? '48vh' : 80,
+          flex: '1 1 auto',
           overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '12px 18px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 8,
-          boxShadow: '0 -4px 20px rgba(0,0,0,0.35)'
+          gap: 14
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#38bdf8' }}>join_inner</span>
-              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Tableau des Jointures & Rapprochements ({jointures.length})
-              </span>
-            </div>
-
-            {jointures.length > 0 && (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 5, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
-                  Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmtN(totalJointuresSrc)} DA</strong>
-                </span>
-                <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
-                  Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmtN(totalJointuresTgt)} DA</strong>
-                </span>
-                <span style={{
-                  fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
-                  background: resteSrcNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                  border: `1px solid ${resteSrcNonPointe > 1 ? '#dc2626' : '#059669'}`,
-                  color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
-                }}>
-                  Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteSrcNonPointe)} DA</strong>
-                </span>
-                <button
-                  onClick={() => { setJointures([]); setNextJointureId(1); }}
-                  style={{
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid #475569', color: '#cbd5e1',
-                    borderRadius: 5, padding: '3px 8px', fontSize: '0.70rem', cursor: 'pointer', fontWeight: 800,
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#f87171'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#cbd5e1'; }}
-                >
-                  Réinitialiser
-                </button>
-              </div>
+          {/* ══ 1. TABLES SOURCE & CIBLE ══ */}
+          <div style={{
+            height: layoutMode === 'sideBySide' ? 320 : 600,
+            minHeight: 260,
+            display: hasCible && layoutMode === 'sideBySide' ? 'grid' : 'flex',
+            gridTemplateColumns: hasCible && layoutMode === 'sideBySide' ? '1fr 1fr' : '1fr',
+            flexDirection: 'column',
+            gap: 12,
+            flexShrink: 0
+          }}>
+            <AccountTable
+              accounts={srcAccounts} focus={rule.sourceFocus} sumTotal={sumSrc}
+              colLabel={srcColLabel} label={rule.sourceLabel} totalVal={rule.sourceVal}
+              isSource={true} checked={checkedSrc} onToggle={toggleSrc}
+            />
+            {hasCible && (
+              <AccountTable
+                accounts={tgtAccounts} focus={rule.cibleFocus} sumTotal={sumTgt}
+                colLabel={tgtColLabel} label={rule.cibleLabel} totalVal={rule.cibleVal}
+                isSource={false} checked={checkedTgt} onToggle={toggleTgt}
+              />
             )}
           </div>
 
-          {jointures.length === 0 ? (
-            <div style={{
-              padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: 8,
-              border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.76rem'
-            }}>
-              💡 Cliquez sur <strong>« ⚡ Jointure Automatique (SCF) »</strong> ci-dessus pour pointer automatiquement, ou cochez des comptes pour une jointure manuelle.
+          {/* ══ 2. TABLEAU DES JOINTURES & RAPPROCHEMENTS ══ */}
+          <div style={{
+            border: '1px solid var(--border)',
+            background: '#090d16',
+            borderRadius: 10,
+            padding: '12px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            minHeight: 220,
+            flexShrink: 0,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#38bdf8' }}>join_inner</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Tableau des Jointures & Rapprochements ({jointures.length})
+                </span>
+              </div>
+
+              {jointures.length > 0 && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 5, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
+                    Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmtN(totalJointuresSrc)} DA</strong>
+                  </span>
+                  <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
+                    Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmtN(totalJointuresTgt)} DA</strong>
+                  </span>
+                  <span style={{
+                    fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
+                    background: resteSrcNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    border: `1px solid ${resteSrcNonPointe > 1 ? '#dc2626' : '#059669'}`,
+                    color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
+                  }}>
+                    Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteSrcNonPointe)} DA</strong>
+                  </span>
+                  <button
+                    onClick={() => { setJointures([]); setNextJointureId(1); }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid #475569', color: '#cbd5e1',
+                      borderRadius: 5, padding: '3px 8px', fontSize: '0.70rem', cursor: 'pointer', fontWeight: 800,
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#f87171'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#cbd5e1'; }}
+                  >
+                    Réinitialiser
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed' }}>
-                <thead>
-                  <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
-                    <th style={{ width: '70px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
-                    <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
-                    <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
-                    <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
-                    <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
-                    <th style={{ width: '11%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
-                    <th style={{ width: '85px', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.70rem' }}>STATUT</th>
-                    <th style={{ width: '40px', padding: '7px 6px', textAlign: 'center' }}></th>
-                  </tr>
-                </thead>
+
+            {jointures.length === 0 ? (
+              <div style={{
+                padding: '16px 20px', background: 'rgba(255,255,255,0.03)', borderRadius: 8,
+                border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem'
+              }}>
+                💡 Cliquez sur <strong>« ⚡ Jointure Automatique (SCF) »</strong> ci-dessus pour rapprocher automatiquement vos comptes, ou cochez des comptes pour une jointure manuelle.
+              </div>
+            ) : (
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed' }}>
+                  <thead>
+                    <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
+                      <th style={{ width: '70px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
+                      <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
+                      <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
+                      <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
+                      <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
+                      <th style={{ width: '11%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
+                      <th style={{ width: '85px', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.70rem' }}>STATUT</th>
+                      <th style={{ width: '40px', padding: '7px 6px', textAlign: 'center' }}></th>
+                    </tr>
+                  </thead>
                 <tbody>
                   {jointures.map((j) => (
                     <tr key={j.id} style={{ borderBottom: '1px solid #1e293b', background: 'rgba(255,255,255,0.02)' }}>
@@ -1243,6 +1260,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             </div>
           )}
         </div>
+      </div>
 
         {/* ══ FOOTER — compact ══ */}
         <div style={{
