@@ -950,7 +950,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
 
       {/* ── Pied de rapport ── */}
       <div style={{ padding: '14px 20px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-        <span>📋 Rapport généré par <strong>FINANALYZE</strong> — Référentiel SCF Algérie (Système Comptable Financier)</span>
+        <span>📋 Rapport généré par <strong>BAIQ — Balance and Financial Analytics</strong> — Référentiel SCF Algérie (Système Comptable Financier)</span>
         <span className="mono" style={{ color: 'var(--text-sub)' }}>{new Date().toLocaleDateString('fr-DZ', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </div>
 

@@ -31,7 +31,7 @@ export function AIView({ data, geminiKey }) {
     if (data && analysis) {
       return [{
         role: 'assistant',
-        text: `**Bonjour ! Je suis votre Assistant IA Financier FINANALYZE.**\n\nJ'ai analysé vos données comptables. Voici un résumé rapide :\n\n${analysis.resume}\n\n💡 Posez-moi n'importe quelle question sur votre situation financière : *"Pourquoi mon BFR est élevé ?"*, *"Comment améliorer ma marge ?"*, *"Quel est le risque principal ?"*...`,
+        text: `**Bonjour ! Je suis votre Assistant IA Financier BAIQ.**\n\nJ'ai analysé vos données comptables. Voici un résumé rapide :\n\n${analysis.resume}\n\n💡 Posez-moi n'importe quelle question sur votre situation financière : *"Pourquoi mon BFR est élevé ?"*, *"Comment améliorer ma marge ?"*, *"Quel est le risque principal ?"*...`,
         time: new Date()
       }];
     }
@@ -129,7 +129,7 @@ export function AIView({ data, geminiKey }) {
   };
 
   const exportAISynthesis = () => {
-    let content = `FINANALYZE — SYNTHÈSE DU DIAGNOSTIC & ASSISTANT IA\n`;
+    let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nSYNTHÈSE DU DIAGNOSTIC & ASSISTANT IA\n`;
     content += `Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
     content += `Dossier: Dossier Financier Anonyme\n`;
     content += `Score Global: ${analysis?.scoreGlobal || 'N/A'}/100 — ${analysis?.niveau?.label || ''}\n\n`;
@@ -162,7 +162,7 @@ export function AIView({ data, geminiKey }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Synthese_IA_FINANALYZE_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `Synthese_IA_BAIQ_${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -215,7 +215,7 @@ export function AIView({ data, geminiKey }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.7rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>IA FINANALYZE</span>
+            <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.7rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>IA BAIQ</span>
             Assistant IA Financier
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>

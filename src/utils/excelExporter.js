@@ -21,7 +21,7 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
      FEUILLE 1 : SYNTHÈSE & PROFIL D'ENTREPRISE
      ────────────────────────────────────────────────────────── */
   const ws1Data = [
-    ['FINANALYZE — RAPPORT DE SYNTHÈSE FINANCIÈRE SCF (ALGÉRIE)'],
+    ['BAIQ — BALANCE AND FINANCIAL ANALYTICS — RAPPORT DE SYNTHÈSE FINANCIÈRE SCF (ALGÉRIE)'],
     ['Généré le', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
     [],
     ['1. PROFIL DE L\'ENTREPRISE'],
