@@ -740,141 +740,24 @@ export function auditCrossAccountMovements(rows = []) {
   const getDebitCharge = (sums) => sums.mouvDeb > 0 ? sums.mouvDeb : Math.max(0, sums.finDeb - sums.initDeb) || sums.finDeb;
   const getCreditProduit = (sums) => sums.mouvCred > 0 ? sums.mouvCred : Math.max(0, sums.finCred - sums.initCred) || sums.finCred;
 
-  // A. Amortissements des Immobilisations : Débit 681xx (TOUS les sous-comptes) vs Crédit 28x
-  //    Règle SCF : Dotation aux amortissements = augmentation du compte d'amortissement 28x
-  //    Comptes 681x concernés : 6811, 6812, 6813, 6814, 6815, 6816, 6818, 681...
-  const c681_all = getSums('681');           // TOUS les 681x sans exception
-  const c28 = getSums('28');                 // TOUS les 28x (amortissements au bilan)
-  const dotationAmortCharge = getDebitCharge(c681_all);
-  const dotationAmortAttendue = getCreditAugmentation(c28);
-  const ecartAmort = safeNum(Math.abs(dotationAmortAttendue - dotationAmortCharge));
-  const isZeroAmort = dotationAmortCharge === 0 && dotationAmortAttendue === 0;
-
-  // Sous-totaux par nature pour le détail
-  const c6811 = getSums('6811');
-  const c6812 = getSums('6812');
-  const c6813 = getSums('6813');
-  const c6814 = getSums('6814');
-  const c6815 = getSums('6815');
-  const c6816 = getSums('6816');
-  const c6818 = getSums('6818');
-
-  const c281 = getSums('281');
-  const c282 = getSums('282');
-  const c283 = getSums('283');
-  const c284 = getSums('284');
-  const c285 = getSums('285');
-
-  regles.push({
-    id: 'dotations_681_vs_28',
-    cycle: 'Dotations & Amortissements',
-    titre: 'Dotations Amortissements : Débit 681 (tous sous-comptes) vs Crédit 28 (contrepartie bilan)',
-    sourceLabel: 'Débit 681x — Dotations aux amortissements',
-    sourceVal: dotationAmortCharge,
-    sourceAccounts: c681_all.accounts,
-    sourceFocus: 'DEBIT',
-    cibleLabel: 'Crédit 28x — Amortissements au bilan',
-    cibleVal: dotationAmortAttendue,
-    cibleAccounts: c28.accounts,
-    cibleFocus: 'CREDIT',
-    ecart: ecartAmort,
-    details: [
-      { label: '6811 — Amort. Immo. incorporelles', val: getDebitCharge(c6811) },
-      { label: '6812 — Amort. Immo. corporelles', val: getDebitCharge(c6812) },
-      { label: '6813 — Amort. Immo. en concession', val: getDebitCharge(c6813) },
-      { label: '6814 — Amort. Droits réels immobiliers', val: getDebitCharge(c6814) },
-      { label: '6815 — Amort. Immo. financières', val: getDebitCharge(c6815) },
-      { label: '6816 — Pertes de valeur Immo.', val: getDebitCharge(c6816) },
-      { label: '6818 — Autres dotations amort.', val: getDebitCharge(c6818) },
-      { label: '─────────────────', val: null },
-      { label: '281 — Amort. Immo. incorp. (bilan)', val: getCreditAugmentation(c281) },
-      { label: '282 — Amort. Immo. corp. (bilan)', val: getCreditAugmentation(c282) },
-      { label: '283 — Amort. Immo. en concession (bilan)', val: getCreditAugmentation(c283) },
-      { label: '284 — Amort. Droits réels immo. (bilan)', val: getCreditAugmentation(c284) },
-      { label: '285 — Amort. Immo. financières (bilan)', val: getCreditAugmentation(c285) },
-    ],
-    statut: isZeroAmort ? 'NON_MOUVEMENTE' : ecartAmort < 1 ? 'CONFORME' : ecartAmort < 1000 ? 'TOLERANCE' : 'ANOMALIE',
-    explication: isZeroAmort
-      ? 'Aucune dotation aux amortissements (681x) ni augmentation des amortissements au bilan (28x) sur la période.'
-      : ecartAmort < 1
-      ? 'Égalité parfaite (SCF) : La totalité des dotations aux amortissements de l\'exercice (Débit 681x) est rigoureusement égale à l\'augmentation des amortissements cumulés au bilan (Crédit 28x).'
-      : `Écart de ${fmtDA(ecartAmort)} entre les dotations (Débit 681x : ${fmtDA(dotationAmortCharge)}) et l'augmentation au bilan (Crédit 28x : ${fmtDA(dotationAmortAttendue)}). Vérifier les imputations sous-comptes 681x/28x.`
-  });
-
-  // B. Pertes de valeur / Dépréciations d'actifs : Débit 685 / 686 / 6816 vs Crédit (29, 39, 49, 59)
-  const c685 = getSums(['685', '686', '6816', '6817']);
+  // ── 3. CYCLE DOTATIONS AUX AMORTISSEMENTS, DÉPRÉCIATIONS & PROVISIONS (SCF) ──
+  // Règle consolidée unique : Total Débit 68 vs Total Augmentations Provisions & Amortissements (28 + 29 + 39 + 49 + 59 + 15)
+  const c68Total = getSums('68');
+  const c28 = getSums('28');
   const c29 = getSums('29');
   const c39 = getSums('39');
   const c49 = getSums('49');
   const c59 = getSums('59');
+  const c15 = getSums('15');
+
+  const dotationAmortAttendue = getCreditAugmentation(c28);
   const totalPertesValeurCred = safeNum(
     getCreditAugmentation(c29) +
     getCreditAugmentation(c39) +
     getCreditAugmentation(c49) +
     getCreditAugmentation(c59)
   );
-  const dotationDeprecCharge = getDebitCharge(c685);
-  const ecartDeprec = safeNum(Math.abs(dotationDeprecCharge - totalPertesValeurCred));
-  const isZeroDeprec = dotationDeprecCharge === 0 && totalPertesValeurCred === 0;
-
-  regles.push({
-    id: 'dotations_pertes_valeur_685_29_39_49_59',
-    cycle: 'Pertes de Valeur & Dépréciations',
-    titre: 'Pertes de Valeur sur Actifs : Débit 685 vs Crédit (29 + 39 + 49 + 59)',
-    sourceLabel: 'Débit 685 (Dotations Dépréciations)',
-    sourceVal: dotationDeprecCharge,
-    sourceAccounts: c685.accounts,
-    sourceFocus: 'DEBIT',
-    cibleLabel: 'Crédit 29+39+49+59 (Dépréciations)',
-    cibleVal: totalPertesValeurCred,
-    cibleAccounts: [...c29.accounts, ...c39.accounts, ...c49.accounts, ...c59.accounts],
-    cibleFocus: 'CREDIT',
-    ecart: ecartDeprec,
-    details: [
-      { label: 'Dépréciations Immo (29)', val: getCreditAugmentation(c29) },
-      { label: 'Dépréciations Stocks (39)', val: getCreditAugmentation(c39) },
-      { label: 'Dépréciations Créances Clients (49)', val: getCreditAugmentation(c49) },
-      { label: 'Dépréciations Financières (59)', val: getCreditAugmentation(c59) },
-    ],
-    statut: isZeroDeprec ? 'NON_MOUVEMENTE' : ecartDeprec < 1 ? 'CONFORME' : ecartDeprec < 1000 ? 'TOLERANCE' : 'ANOMALIE',
-    explication: isZeroDeprec
-      ? 'Aucune dotation aux pertes de valeur sur actifs (29/39/49/59) enregistrée sur la période.'
-      : ecartDeprec < 1
-      ? 'Égalité parfaite (SCF) : Toutes les dotations aux dépréciations d\'actifs (685) sont fidèlement enregistrées au bilan (Crédit 29, 39, 49, 59).'
-      : `Écart de ${fmtDA(ecartDeprec)} : Différence entre les dotations aux dépréciations au compte 685 et les mouvements de provisions au bilan.`
-  });
-
-  // C. Provisions pour Risques et Charges (6815 Non courants + 6855 Courants + 687 Financiers vs 15)
-  const c68Prov = getSums(['6815', '6855', '687']);
-  const c15 = getSums('15');
-  const dotationProvCharge = getDebitCharge(c68Prov);
   const dotationProvAttendue = getCreditAugmentation(c15);
-  const ecartProv = safeNum(Math.abs(dotationProvCharge - dotationProvAttendue));
-  const isZeroProv = dotationProvCharge === 0 && dotationProvAttendue === 0;
-
-  regles.push({
-    id: 'dotations_provisions_15',
-    cycle: 'Provisions pour Risques & Charges',
-    titre: '3. Provisions pour Risques & Charges : Dotations Débit 6815/6855/687 vs Crédit Compte 15',
-    sourceLabel: 'Débit 68 (Dotations Prov.)',
-    sourceVal: dotationProvCharge,
-    sourceAccounts: c68Prov.accounts,
-    sourceFocus: 'DEBIT',
-    cibleLabel: 'Crédit 15 (Provisions Risques)',
-    cibleVal: dotationProvAttendue,
-    cibleAccounts: c15.accounts,
-    cibleFocus: 'CREDIT',
-    ecart: ecartProv,
-    statut: isZeroProv ? 'NON_MOUVEMENTE' : ecartProv < 1 ? 'CONFORME' : ecartProv < 1000 ? 'TOLERANCE' : 'ANOMALIE',
-    explication: isZeroProv
-      ? 'Aucune dotation pour risques et charges (15) constatée sur la période.'
-      : ecartProv < 1
-      ? 'Égalité parfaite : Les dotations pour risques et charges correspondent rigoureusement aux dotations du compte 15.'
-      : `Écart de ${fmtDA(ecartProv)} : Décalage sur les provisions pour risques et charges.`
-  });
-
-  // D. Synthèse Globale Compte 68 vs Total Augmentations (28 + 29 + 39 + 49 + 59 + 15)
-  const c68Total = getSums('68');
   const totalGlobalProvisionsCred = safeNum(dotationAmortAttendue + totalPertesValeurCred + dotationProvAttendue);
   const total68Debit = getDebitCharge(c68Total);
   const ecart68Total = safeNum(Math.abs(total68Debit - totalGlobalProvisionsCred));
@@ -882,23 +765,31 @@ export function auditCrossAccountMovements(rows = []) {
 
   regles.push({
     id: 'dotations_68_global',
-    cycle: 'Synthèse Dotations & Provisions',
-    titre: '4. Synthèse Globale : Total Débit 68 vs Total Crédit (28 + 29 + 39 + 49 + 59 + 15)',
+    cycle: 'Dotations & Provisions',
+    titre: 'Dotations de l\'Exercice : Total Débit 68 vs Total Crédit Provisions & Amortissements (28 + 29 + 39 + 49 + 59 + 15)',
     sourceLabel: 'Total Débit 68 (Toutes dotations)',
     sourceVal: total68Debit,
     sourceAccounts: c68Total.accounts,
     sourceFocus: 'DEBIT',
-    cibleLabel: 'Total Crédit Provisions & Amort.',
+    cibleLabel: 'Total Crédit (28 + 29 + 39 + 49 + 59 + 15)',
     cibleVal: totalGlobalProvisionsCred,
     cibleAccounts: [...c28.accounts, ...c29.accounts, ...c39.accounts, ...c49.accounts, ...c59.accounts, ...c15.accounts],
     cibleFocus: 'CREDIT',
     ecart: ecart68Total,
+    details: [
+      { label: 'Amortissements Immobilisations (Crédit 28)', val: dotationAmortAttendue },
+      { label: 'Dépréciations Immo (Crédit 29)', val: getCreditAugmentation(c29) },
+      { label: 'Dépréciations Stocks (Crédit 39)', val: getCreditAugmentation(c39) },
+      { label: 'Dépréciations Créances Clients (Crédit 49)', val: getCreditAugmentation(c49) },
+      { label: 'Dépréciations Financières (Crédit 59)', val: getCreditAugmentation(c59) },
+      { label: 'Provisions pour Risques & Charges (Crédit 15)', val: dotationProvAttendue },
+    ],
     statut: isZero68Global ? 'NON_MOUVEMENTE' : ecart68Total < 1 ? 'CONFORME' : ecart68Total < 1000 ? 'TOLERANCE' : 'ANOMALIE',
     explication: isZero68Global
       ? 'Aucune dotation globale (68) ni provision enregistrée sur l\'exercice.'
       : ecart68Total < 1
-      ? 'Équilibre comptable global vérifié : La totalité des dotations (68) est intégralement justifiée par les comptes d\'amortissements (28), dépréciations (29, 39, 49, 59) et provisions (15).'
-      : `Écart global de ${fmtDA(ecart68Total)} sur le cycle des dotations.`
+      ? 'Équilibre comptable global vérifié (SCF) : La totalité des dotations de l\'exercice (Débit 68) est intégralement et fidèlement justifiée par les comptes d\'amortissements (28), dépréciations (29, 39, 49, 59) et provisions pour risques (15).'
+      : `Écart global de ${fmtDA(ecart68Total)} entre le total des dotations (Débit 68 : ${fmtDA(total68Debit)}) et les augmentations de provisions/amortissements au bilan (Crédit 28+29+39+49+59+15 : ${fmtDA(totalGlobalProvisionsCred)}).`
   });
 
   // ── 4. CYCLE REPRISES SUR PROVISIONS & PERTES DE VALEUR (Crédit 78 vs Débit 29, 39, 49, 59, 15) ──
