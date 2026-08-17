@@ -17,13 +17,16 @@ const KpiRow = ({ label, value, sub, ok }) => (
   </div>
 );
 
-export function ReportsView({ data, fmt, geminiKey = '' }) {
+export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '' }) {
+  const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => (v || 0).toLocaleString('fr-FR') + ' DZD');
   const [reportType, setReportType] = useState('audit_diagnostic');
   const [isGenerating, setIsGenerating] = useState(false);
   const [geminiError, setGeminiError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
+
+  const handleGenerateGeminiReport = () => setShowConfirmModal(true);
 
   // Identifiant unique du dossier / balance courante (anonyme)
   const dossierId = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}` : 'default';
