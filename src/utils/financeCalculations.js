@@ -1186,28 +1186,48 @@ export const parseFile = async (file) => {
             );
           };
 
-          // Structure avec 2 lignes d'en-tête : les sous-colonnes (débit/crédit) sont sur la 2ème ligne
-          // On cherche d'abord en combinant les 2 lignes, sinon on utilise la position
+          // Recherche ciblée des colonnes
+          // 1. Solde Début / Initial
+          let soldeDebutDebitIdx  = findColIdx(['début', 'débit']);
+          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['debut', 'debit']);
+          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['initial', 'debit']);
+          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['ouv', 'debit']);
+          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['solde', 'débit'], ['fin', 'clôture', 'cloture', 'periode', 'période', 'mouv']);
 
-          // Chercher les indices de chaque groupe de colonnes
-          let soldeDebutDebitIdx  = findColIdx(['solde', 'début', 'débit']);
-          let soldeDebutCreditIdx = findColIdx(['solde', 'début', 'crédit']);
-          let mouvDebitIdx        = findColIdx(['mouvement', 'débit']);
-          let mouvCreditIdx       = findColIdx(['mouvement', 'crédit']);
+          let soldeDebutCreditIdx = findColIdx(['début', 'crédit']);
+          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['debut', 'credit']);
+          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['initial', 'credit']);
+          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['ouv', 'credit']);
+          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['solde', 'crédit'], ['fin', 'clôture', 'cloture', 'periode', 'période', 'mouv']);
+
+          // 2. Mouvements de la période
+          let mouvDebitIdx  = findColIdx(['mouvement', 'débit']);
+          if (mouvDebitIdx === -1) mouvDebitIdx = findColIdx(['mouv', 'debit']);
+          if (mouvDebitIdx === -1) mouvDebitIdx = findColIdx(['flux', 'debit']);
+
+          let mouvCreditIdx = findColIdx(['mouvement', 'crédit']);
+          if (mouvCreditIdx === -1) mouvCreditIdx = findColIdx(['mouv', 'credit']);
+          if (mouvCreditIdx === -1) mouvCreditIdx = findColIdx(['flux', 'credit']);
+
+          // 3. Solde Période (à identifier pour l'exclure formellement des soldes finaux)
           let soldePeriodeDebitIdx  = findColIdx(['période', 'débit']);
-          let soldePeriodeCreditIdx = findColIdx(['période', 'crédit']);
-          let soldeFinDebitIdx    = findColIdx(['fin', 'débit']);
-          let soldeFinCreditIdx   = findColIdx(['fin', 'crédit']);
+          if (soldePeriodeDebitIdx === -1) soldePeriodeDebitIdx = findColIdx(['periode', 'debit']);
 
-          // Essayer aussi les variantes sans accent
-          if (soldeDebutDebitIdx  === -1) soldeDebutDebitIdx  = findColIdx(['solde', 'debut', 'debit']);
-          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['solde', 'debut', 'credit']);
-          if (mouvDebitIdx        === -1) mouvDebitIdx        = findColIdx(['mouv', 'debit']);
-          if (mouvCreditIdx       === -1) mouvCreditIdx       = findColIdx(['mouv', 'credit']);
-          if (soldePeriodeDebitIdx  === -1) soldePeriodeDebitIdx  = findColIdx(['periode', 'debit']);
+          let soldePeriodeCreditIdx = findColIdx(['période', 'crédit']);
           if (soldePeriodeCreditIdx === -1) soldePeriodeCreditIdx = findColIdx(['periode', 'credit']);
-          if (soldeFinDebitIdx    === -1) soldeFinDebitIdx    = findColIdx(['fin', 'debit']);
-          if (soldeFinCreditIdx   === -1) soldeFinCreditIdx   = findColIdx(['fin', 'credit']);
+
+          // 4. Solde Fin / Clôture / Final (PRIORITÉ ABSOLUE pour les calculs et l'audit)
+          let soldeFinDebitIdx  = findColIdx(['fin', 'débit'], ['periode', 'période']);
+          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['fin', 'debit'], ['periode', 'période']);
+          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['clôture', 'débit'], ['periode', 'période']);
+          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['cloture', 'debit'], ['periode', 'période']);
+          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['final', 'debit'], ['periode', 'période']);
+
+          let soldeFinCreditIdx = findColIdx(['fin', 'crédit'], ['periode', 'période']);
+          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['fin', 'credit'], ['periode', 'période']);
+          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['clôture', 'crédit'], ['periode', 'période']);
+          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['cloture', 'credit'], ['periode', 'période']);
+          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['final', 'credit'], ['periode', 'période']);
 
           // Si détection par mots-clés a réussi pour Solde Fin → utiliser
           if (soldeFinDebitIdx !== -1 && soldeFinCreditIdx !== -1) {
@@ -1215,28 +1235,47 @@ export const parseFile = async (file) => {
             colMap.soldeDebutCreditIdx = soldeDebutCreditIdx;
             colMap.mouvDebitIdx        = mouvDebitIdx;
             colMap.mouvCreditIdx       = mouvCreditIdx;
-            colMap.soldePeriodeDebitIdx  = soldePeriodeDebitIdx;   // peut être -1 si absent
-            colMap.soldePeriodeCreditIdx = soldePeriodeCreditIdx;  // peut être -1 si absent
+            colMap.soldePeriodeDebitIdx  = soldePeriodeDebitIdx;
+            colMap.soldePeriodeCreditIdx = soldePeriodeCreditIdx;
             colMap.soldeFinDebitIdx    = soldeFinDebitIdx;
             colMap.soldeFinCreditIdx   = soldeFinCreditIdx;
           } else {
-            // Fallback : structure connue. Détecter si 8 ou 10 colonnes selon la présence de "période"
-            const hasPeriode = combined.some(t => t.includes('période') || t.includes('periode'));
-            const base = compteIdx + 2; // après Compte et Libellé
-            colMap.soldeDebutDebitIdx  = base;
-            colMap.soldeDebutCreditIdx = base + 1;
-            colMap.mouvDebitIdx        = base + 2;
-            colMap.mouvCreditIdx       = base + 3;
-            if (hasPeriode) {
-              colMap.soldePeriodeDebitIdx  = base + 4;
-              colMap.soldePeriodeCreditIdx = base + 5;
-              colMap.soldeFinDebitIdx      = base + 6;
-              colMap.soldeFinCreditIdx     = base + 7;
+            // Fallback basé sur l'ordre des colonnes : Solde Fin est toujours les 2 dernières colonnes de droite
+            const debitCols = [];
+            const creditCols = [];
+            combined.forEach((t, idx) => {
+              if (idx <= compteIdx) return;
+              if (t.includes('débit') || t.includes('debit')) debitCols.push(idx);
+              if (t.includes('crédit') || t.includes('credit')) creditCols.push(idx);
+            });
+
+            if (debitCols.length >= 1 && creditCols.length >= 1) {
+              // Le Solde Fin est la dernière colonne Débit et la dernière colonne Crédit
+              colMap.soldeFinDebitIdx  = debitCols[debitCols.length - 1];
+              colMap.soldeFinCreditIdx = creditCols[creditCols.length - 1];
+              
+              if (debitCols.length >= 2) colMap.soldeDebutDebitIdx = debitCols[0];
+              if (creditCols.length >= 2) colMap.soldeDebutCreditIdx = creditCols[0];
+              if (debitCols.length >= 3) colMap.mouvDebitIdx = debitCols[1];
+              if (creditCols.length >= 3) colMap.mouvCreditIdx = creditCols[1];
             } else {
-              colMap.soldePeriodeDebitIdx  = -1;
-              colMap.soldePeriodeCreditIdx = -1;
-              colMap.soldeFinDebitIdx      = base + 4;
-              colMap.soldeFinCreditIdx     = base + 5;
+              const hasPeriode = combined.some(t => t.includes('période') || t.includes('periode'));
+              const base = compteIdx + 2;
+              colMap.soldeDebutDebitIdx  = base;
+              colMap.soldeDebutCreditIdx = base + 1;
+              colMap.mouvDebitIdx        = base + 2;
+              colMap.mouvCreditIdx       = base + 3;
+              if (hasPeriode) {
+                colMap.soldePeriodeDebitIdx  = base + 4;
+                colMap.soldePeriodeCreditIdx = base + 5;
+                colMap.soldeFinDebitIdx      = base + 6;
+                colMap.soldeFinCreditIdx     = base + 7;
+              } else {
+                colMap.soldePeriodeDebitIdx  = -1;
+                colMap.soldePeriodeCreditIdx = -1;
+                colMap.soldeFinDebitIdx      = base + 4;
+                colMap.soldeFinCreditIdx     = base + 5;
+              }
             }
           }
 
