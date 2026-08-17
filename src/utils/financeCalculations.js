@@ -1185,163 +1185,165 @@ export const parseFile = async (file) => {
           if (libelleIdx === -1) libelleIdx = compteIdx + 1;
           colMap.libelle = libelleIdx;
 
-          // Détecter TOUTES les colonnes de solde et débit/crédit
-          const findColIdx = (keywords, excludeKeywords = []) => {
-            return combined.findIndex((t, idx) => 
-              idx > compteIdx &&
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // DÉTECTION ROBUSTE DES COLONNES — supporte :
+          //   • En-tête sur 1 ligne  : "Compte | Libellé | Sol.Deb.D | Sol.Deb.C | Mouv.D | Mouv.C | Sol.Fin.D | Sol.Fin.C"
+          //   • En-tête sur 2 lignes avec cellules fusionnées (le plus courant en Algérie) :
+          //       Ligne 1 : "Compte | Libellé | Solde Début | [vide] | Mouvement | [vide] | Solde Fin | [vide]"
+          //       Ligne 2 : "[vide]  | [vide]  | Débit       | Crédit | Débit     | Crédit | Débit     | Crédit"
+          //   • Colonnes vides / spacers intermédiaires ignorées
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+          // Helpers
+          const r1 = rowText;   // ligne 1 (en-tête principal)
+          const r2 = nextRow;   // ligne 2 (sous-colonnes Débit/Crédit) ou vide
+          const maxWidth = Math.max(r1.length, r2.length, 20);
+
+          // Retourne vrai si le texte contient l'un des mots-clés
+          const has = (t, ...kws) => kws.some(kw => t.includes(kw));
+
+          // Trouver un groupe dans la ligne 1 (ex: "solde début", "mouvement", "solde fin")
+          const findGroupCol = (...kws) => {
+            const idx = r1.findIndex((t, c) => c > libelleIdx && kws.every(kw => t.includes(kw)));
+            if (idx !== -1) return idx;
+            // Aussi chercher sans accent
+            const noAccent = str => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return r1.findIndex((t, c) => c > libelleIdx && kws.every(kw => noAccent(t).includes(noAccent(kw))));
+          };
+
+          // Pour un groupe à la colonne startCol, trouver la sous-colonne "débit" et "crédit" dans r2
+          const findSubCol = (startCol, keyword, maxLook = 5) => {
+            for (let c = startCol; c < Math.min(startCol + maxLook, maxWidth); c++) {
+              if (has(r2[c] || '', keyword)) return c;
+            }
+            return -1;
+          };
+
+          // ── ÉTAPE 1 : Trouver les groupes dans la ligne 1 ─────────────────
+          let debutGroupCol   = findGroupCol('début');
+          if (debutGroupCol  === -1) debutGroupCol  = findGroupCol('debut');
+          if (debutGroupCol  === -1) debutGroupCol  = findGroupCol('initial');
+          if (debutGroupCol  === -1) debutGroupCol  = findGroupCol('ouverture');
+
+          let mouvGroupCol    = findGroupCol('mouvement');
+          if (mouvGroupCol   === -1) mouvGroupCol   = findGroupCol('mouv');
+          if (mouvGroupCol   === -1) mouvGroupCol   = findGroupCol('flux');
+
+          let periodeGroupCol = findGroupCol('période');
+          if (periodeGroupCol === -1) periodeGroupCol = findGroupCol('periode');
+
+          let finGroupCol     = findGroupCol('fin');
+          if (finGroupCol    === -1) finGroupCol    = findGroupCol('clôture');
+          if (finGroupCol    === -1) finGroupCol    = findGroupCol('cloture');
+          if (finGroupCol    === -1) finGroupCol    = findGroupCol('final');
+
+          // ── ÉTAPE 2 : Trouver Débit et Crédit dans r2 pour chaque groupe ──
+          let soldeDebutDebitIdx = -1, soldeDebutCreditIdx = -1;
+          let mouvDebitIdx = -1, mouvCreditIdx = -1;
+          let soldePeriodeDebitIdx = -1, soldePeriodeCreditIdx = -1;
+          let soldeFinDebitIdx = -1, soldeFinCreditIdx = -1;
+
+          if (debutGroupCol !== -1 && r2.length > 0) {
+            soldeDebutDebitIdx  = findSubCol(debutGroupCol, 'débit') !== -1 ? findSubCol(debutGroupCol, 'débit') : findSubCol(debutGroupCol, 'debit');
+            soldeDebutCreditIdx = soldeDebutDebitIdx !== -1 ? findSubCol(soldeDebutDebitIdx + 1, 'crédit') !== -1 ? findSubCol(soldeDebutDebitIdx + 1, 'crédit') : findSubCol(soldeDebutDebitIdx + 1, 'credit') : -1;
+            if (soldeDebutCreditIdx === -1 && soldeDebutDebitIdx !== -1) soldeDebutCreditIdx = soldeDebutDebitIdx + 1;
+          }
+
+          if (mouvGroupCol !== -1 && r2.length > 0) {
+            mouvDebitIdx  = findSubCol(mouvGroupCol, 'débit') !== -1 ? findSubCol(mouvGroupCol, 'débit') : findSubCol(mouvGroupCol, 'debit');
+            mouvCreditIdx = mouvDebitIdx !== -1 ? findSubCol(mouvDebitIdx + 1, 'crédit') !== -1 ? findSubCol(mouvDebitIdx + 1, 'crédit') : findSubCol(mouvDebitIdx + 1, 'credit') : -1;
+            if (mouvCreditIdx === -1 && mouvDebitIdx !== -1) mouvCreditIdx = mouvDebitIdx + 1;
+          }
+
+          if (periodeGroupCol !== -1 && r2.length > 0) {
+            soldePeriodeDebitIdx  = findSubCol(periodeGroupCol, 'débit') !== -1 ? findSubCol(periodeGroupCol, 'débit') : findSubCol(periodeGroupCol, 'debit');
+            soldePeriodeCreditIdx = soldePeriodeDebitIdx !== -1 ? soldePeriodeDebitIdx + 1 : -1;
+          }
+
+          if (finGroupCol !== -1 && r2.length > 0) {
+            soldeFinDebitIdx  = findSubCol(finGroupCol, 'débit') !== -1 ? findSubCol(finGroupCol, 'débit') : findSubCol(finGroupCol, 'debit');
+            soldeFinCreditIdx = soldeFinDebitIdx !== -1 ? findSubCol(soldeFinDebitIdx + 1, 'crédit') !== -1 ? findSubCol(soldeFinDebitIdx + 1, 'crédit') : findSubCol(soldeFinDebitIdx + 1, 'credit') : -1;
+            if (soldeFinCreditIdx === -1 && soldeFinDebitIdx !== -1) soldeFinCreditIdx = soldeFinDebitIdx + 1;
+          }
+
+          // ── ÉTAPE 3 : Fallback sur combined (en-tête 1 ligne) si r2 vide ou non trouvé ──
+          const findCombined = (keywords, excludeKeywords = []) =>
+            combined.findIndex((t, idx) =>
+              idx > libelleIdx &&
               keywords.every(kw => t.includes(kw)) &&
               excludeKeywords.every(ex => !t.includes(ex))
             );
-          };
 
-          // Recherche ciblée des colonnes
-          // 1. Solde Début / Initial
-          let soldeDebutDebitIdx  = findColIdx(['début', 'débit']);
-          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['debut', 'debit']);
-          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['initial', 'debit']);
-          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['ouv', 'debit']);
-          if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx = findColIdx(['solde', 'débit'], ['fin', 'clôture', 'cloture', 'periode', 'période', 'mouv']);
+          if (soldeDebutDebitIdx === -1) {
+            soldeDebutDebitIdx  = findCombined(['début', 'débit']);
+            if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx  = findCombined(['debut', 'debit']);
+            if (soldeDebutDebitIdx === -1) soldeDebutDebitIdx  = findCombined(['initial', 'debit']);
+          }
+          if (soldeDebutCreditIdx === -1) {
+            soldeDebutCreditIdx = findCombined(['début', 'crédit']);
+            if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findCombined(['debut', 'credit']);
+            if (soldeDebutCreditIdx === -1 && soldeDebutDebitIdx !== -1) soldeDebutCreditIdx = soldeDebutDebitIdx + 1;
+          }
 
-          let soldeDebutCreditIdx = findColIdx(['début', 'crédit']);
-          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['debut', 'credit']);
-          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['initial', 'credit']);
-          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['ouv', 'credit']);
-          if (soldeDebutCreditIdx === -1) soldeDebutCreditIdx = findColIdx(['solde', 'crédit'], ['fin', 'clôture', 'cloture', 'periode', 'période', 'mouv']);
+          if (mouvDebitIdx === -1) {
+            mouvDebitIdx  = findCombined(['mouvement', 'débit']);
+            if (mouvDebitIdx === -1) mouvDebitIdx = findCombined(['mouv', 'debit']);
+          }
+          if (mouvCreditIdx === -1) {
+            mouvCreditIdx = findCombined(['mouvement', 'crédit']);
+            if (mouvCreditIdx === -1) mouvCreditIdx = findCombined(['mouv', 'credit']);
+            if (mouvCreditIdx === -1 && mouvDebitIdx !== -1) mouvCreditIdx = mouvDebitIdx + 1;
+          }
 
-          // 2. Mouvements de la période
-          let mouvDebitIdx  = findColIdx(['mouvement', 'débit']);
-          if (mouvDebitIdx === -1) mouvDebitIdx = findColIdx(['mouv', 'debit']);
-          if (mouvDebitIdx === -1) mouvDebitIdx = findColIdx(['flux', 'debit']);
+          if (soldePeriodeDebitIdx === -1)  soldePeriodeDebitIdx  = findCombined(['période', 'débit']) !== -1 ? findCombined(['période', 'débit']) : findCombined(['periode', 'debit']);
+          if (soldePeriodeCreditIdx === -1) soldePeriodeCreditIdx = soldePeriodeDebitIdx !== -1 ? soldePeriodeDebitIdx + 1 : -1;
 
-          let mouvCreditIdx = findColIdx(['mouvement', 'crédit']);
-          if (mouvCreditIdx === -1) mouvCreditIdx = findColIdx(['mouv', 'credit']);
-          if (mouvCreditIdx === -1) mouvCreditIdx = findColIdx(['flux', 'credit']);
+          if (soldeFinDebitIdx === -1) {
+            soldeFinDebitIdx  = findCombined(['fin', 'débit'], ['periode', 'période']);
+            if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findCombined(['fin', 'debit'], ['periode', 'période']);
+            if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findCombined(['clôture', 'débit']);
+            if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findCombined(['cloture', 'debit']);
+          }
+          if (soldeFinCreditIdx === -1) {
+            soldeFinCreditIdx = findCombined(['fin', 'crédit'], ['periode', 'période']);
+            if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findCombined(['fin', 'credit'], ['periode', 'période']);
+            if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findCombined(['clôture', 'crédit']);
+            if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findCombined(['cloture', 'credit']);
+            if (soldeFinCreditIdx === -1 && soldeFinDebitIdx !== -1) soldeFinCreditIdx = soldeFinDebitIdx + 1;
+          }
 
-          // 3. Solde Période (à identifier pour l'exclure formellement des soldes finaux)
-          let soldePeriodeDebitIdx  = findColIdx(['période', 'débit']);
-          if (soldePeriodeDebitIdx === -1) soldePeriodeDebitIdx = findColIdx(['periode', 'debit']);
-
-          let soldePeriodeCreditIdx = findColIdx(['période', 'crédit']);
-          if (soldePeriodeCreditIdx === -1) soldePeriodeCreditIdx = findColIdx(['periode', 'credit']);
-
-          // 4. Solde Fin / Clôture / Final (PRIORITÉ ABSOLUE pour les calculs et l'audit)
-          let soldeFinDebitIdx  = findColIdx(['fin', 'débit'], ['periode', 'période']);
-          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['fin', 'debit'], ['periode', 'période']);
-          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['clôture', 'débit'], ['periode', 'période']);
-          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['cloture', 'debit'], ['periode', 'période']);
-          if (soldeFinDebitIdx === -1) soldeFinDebitIdx = findColIdx(['final', 'debit'], ['periode', 'période']);
-
-          let soldeFinCreditIdx = findColIdx(['fin', 'crédit'], ['periode', 'période']);
-          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['fin', 'credit'], ['periode', 'période']);
-          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['clôture', 'crédit'], ['periode', 'période']);
-          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['cloture', 'credit'], ['periode', 'période']);
-          if (soldeFinCreditIdx === -1) soldeFinCreditIdx = findColIdx(['final', 'credit'], ['periode', 'période']);
-
-          // Si détection par mots-clés a réussi pour Solde Fin → utiliser
-          if (soldeFinDebitIdx !== -1 && soldeFinCreditIdx !== -1) {
-            // Si Solde Début ou Mouvement n'ont pas été trouvés par mots-clés,
-            // on les déduit positionellement : les colonnes numériques avant soldeFinDebitIdx
-            if (soldeDebutDebitIdx === -1 || mouvDebitIdx === -1) {
-              // Collecter toutes les colonnes numériques ENTRE libelle et soldeFinDebitIdx
-              const dataStartRow2 = i + (nextRow.length > 0 ? 2 : 1);
-              const priorNumericCols = [];
-              for (let col = libelleIdx + 1; col < soldeFinDebitIdx; col++) {
-                let hasNumeric = false;
-                for (let r = dataStartRow2; r < Math.min(data.length, dataStartRow2 + 15); r++) {
-                  const val = data[r]?.[col];
-                  if (val !== undefined && val !== null && val !== '') {
-                    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[\s]/g, '').replace(',', '.'));
-                    if (!isNaN(num)) { hasNumeric = true; break; }
-                  }
+          // ── ÉTAPE 4 : Si rien trouvé, fallback positionnel sur colonnes numériques ──
+          if (soldeFinDebitIdx === -1) {
+            const dataStart = i + (r2.length > 0 ? 2 : 1);
+            const numCols = [];
+            const maxC = Math.max(...data.slice(dataStart, dataStart + 5).map(r => (r || []).length), 0);
+            for (let col = libelleIdx + 1; col < maxC; col++) {
+              for (let r = dataStart; r < Math.min(data.length, dataStart + 15); r++) {
+                const v = data[r]?.[col];
+                if (v !== undefined && v !== null && v !== '') {
+                  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[\s]/g, '').replace(',', '.'));
+                  if (!isNaN(n)) { numCols.push(col); break; }
                 }
-                if (hasNumeric) priorNumericCols.push(col);
-              }
-              // priorNumericCols = [SolDebDeb, SolDebCred, MouvDeb, MouvCred] ou sous-ensemble
-              const pn = priorNumericCols.length;
-              if (pn >= 4 && soldeDebutDebitIdx === -1) {
-                soldeDebutDebitIdx  = priorNumericCols[pn - 4];
-                soldeDebutCreditIdx = priorNumericCols[pn - 3];
-                mouvDebitIdx        = priorNumericCols[pn - 2];
-                mouvCreditIdx       = priorNumericCols[pn - 1];
-              } else if (pn === 3 && soldeDebutDebitIdx === -1) {
-                soldeDebutDebitIdx  = priorNumericCols[0];
-                mouvDebitIdx        = priorNumericCols[1];
-                mouvCreditIdx       = priorNumericCols[2];
-              } else if (pn === 2) {
-                if (mouvDebitIdx === -1) {
-                  mouvDebitIdx  = priorNumericCols[0];
-                  mouvCreditIdx = priorNumericCols[1];
-                }
-              } else if (pn === 1 && mouvDebitIdx === -1) {
-                mouvDebitIdx = priorNumericCols[0];
               }
             }
-            colMap.soldeDebutDebitIdx  = soldeDebutDebitIdx  !== -1 ? soldeDebutDebitIdx  : undefined;
-            colMap.soldeDebutCreditIdx = soldeDebutCreditIdx !== -1 ? soldeDebutCreditIdx : undefined;
-            colMap.mouvDebitIdx        = mouvDebitIdx        !== -1 ? mouvDebitIdx        : undefined;
-            colMap.mouvCreditIdx       = mouvCreditIdx       !== -1 ? mouvCreditIdx       : undefined;
-            colMap.soldePeriodeDebitIdx  = soldePeriodeDebitIdx;
-            colMap.soldePeriodeCreditIdx = soldePeriodeCreditIdx;
-            colMap.soldeFinDebitIdx    = soldeFinDebitIdx;
-            colMap.soldeFinCreditIdx   = soldeFinCreditIdx;
-          } else {
-            // Fallback intelligent : filtrer TOUTES les colonnes vides intermédiaires ou de début
-            const debitCols = [];
-            const creditCols = [];
-            combined.forEach((t, idx) => {
-              if (idx <= libelleIdx) return;
-              if (t.includes('débit') || t.includes('debit')) debitCols.push(idx);
-              if (t.includes('crédit') || t.includes('credit')) creditCols.push(idx);
-            });
-
-            if (debitCols.length >= 1 && creditCols.length >= 1) {
-              // Le Solde Fin est la dernière colonne Débit et la dernière colonne Crédit non-vides
-              colMap.soldeFinDebitIdx  = debitCols[debitCols.length - 1];
-              colMap.soldeFinCreditIdx = creditCols[creditCols.length - 1];
-              
-              if (debitCols.length >= 2) colMap.soldeDebutDebitIdx = debitCols[0];
-              if (creditCols.length >= 2) colMap.soldeDebutCreditIdx = creditCols[0];
-              if (debitCols.length >= 3) colMap.mouvDebitIdx = debitCols[1];
-              if (creditCols.length >= 3) colMap.mouvCreditIdx = creditCols[1];
-            } else {
-              // Fallback : scanner les lignes de DONNÉES réelles (pas l'en-tête) pour trouver les colonnes numériques non-vides
-              const dataStartRow = i + (nextRow.length > 0 ? 2 : 1); // sauter les lignes d'en-tête
-              const activeNumericCols = [];
-              const maxCols = Math.max(...data.slice(dataStartRow, dataStartRow + 5).map(r => (r || []).length), 0);
-              
-              for (let col = libelleIdx + 1; col < maxCols; col++) {
-                // Vérifier que cette colonne contient des nombres dans les premières lignes de données
-                let hasNumericData = false;
-                for (let r = dataStartRow; r < Math.min(data.length, dataStartRow + 20); r++) {
-                  const val = data[r]?.[col];
-                  if (val !== undefined && val !== null && val !== '') {
-                    const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[\s]/g, '').replace(',', '.'));
-                    if (!isNaN(num)) {
-                      hasNumericData = true;
-                      break;
-                    }
-                  }
-                }
-                if (hasNumericData) activeNumericCols.push(col);
-              }
-
-              if (activeNumericCols.length >= 2) {
-                // Logique : colonnes par paires (Débit/Crédit) — les 2 dernières = Solde Fin
-                const n = activeNumericCols.length;
-                colMap.soldeFinDebitIdx  = activeNumericCols[n - 2];
-                colMap.soldeFinCreditIdx = activeNumericCols[n - 1];
-                if (n >= 6) {
-                  colMap.soldeDebutDebitIdx  = activeNumericCols[0];
-                  colMap.soldeDebutCreditIdx = activeNumericCols[1];
-                  colMap.mouvDebitIdx        = activeNumericCols[2];
-                  colMap.mouvCreditIdx       = activeNumericCols[3];
-                } else if (n >= 4) {
-                  colMap.mouvDebitIdx  = activeNumericCols[0];
-                  colMap.mouvCreditIdx = activeNumericCols[1];
-                }
-              }
+            const nc = numCols.length;
+            if (nc >= 2) {
+              soldeFinDebitIdx  = numCols[nc - 2];
+              soldeFinCreditIdx = numCols[nc - 1];
+              if (nc >= 6) { soldeDebutDebitIdx = numCols[0]; soldeDebutCreditIdx = numCols[1]; mouvDebitIdx = numCols[2]; mouvCreditIdx = numCols[3]; }
+              else if (nc >= 4) { mouvDebitIdx = numCols[0]; mouvCreditIdx = numCols[1]; }
             }
           }
+
+          // ── STOCKER dans colMap ────────────────────────────────────────────
+          colMap.soldeDebutDebitIdx  = soldeDebutDebitIdx  !== -1 ? soldeDebutDebitIdx  : undefined;
+          colMap.soldeDebutCreditIdx = soldeDebutCreditIdx !== -1 ? soldeDebutCreditIdx : undefined;
+          colMap.mouvDebitIdx        = mouvDebitIdx        !== -1 ? mouvDebitIdx        : undefined;
+          colMap.mouvCreditIdx       = mouvCreditIdx       !== -1 ? mouvCreditIdx       : undefined;
+          colMap.soldePeriodeDebitIdx  = soldePeriodeDebitIdx  !== -1 ? soldePeriodeDebitIdx  : undefined;
+          colMap.soldePeriodeCreditIdx = soldePeriodeCreditIdx !== -1 ? soldePeriodeCreditIdx : undefined;
+          colMap.soldeFinDebitIdx    = soldeFinDebitIdx    !== -1 ? soldeFinDebitIdx    : undefined;
+          colMap.soldeFinCreditIdx   = soldeFinCreditIdx   !== -1 ? soldeFinCreditIdx   : undefined;
 
           // Si l'en-tête était sur 2 lignes, sauter la 2ème ligne aussi
           if (nextRow.length > 0 && (nextRow.some(t => t.includes('débit') || t.includes('debit') || t.includes('crédit') || t.includes('credit')))) {
