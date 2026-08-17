@@ -1663,3 +1663,203 @@ export const calculateRatios = (bilan, sig, rows) => {
     chiffreAffaires: ca
   };
 };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * MOTEUR DE JOINTURE AUTOMATIQUE & INTELLIGENTE DES COMPTES (SCF Algérie)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Réconcilie automatiquement les comptes sources et cibles dans les flux croisés
+ * selon la symétrie des racines et sous-comptes SCF, les montants et les libellés.
+ *
+ * Exemples supportés :
+ * - 681513 ↔ 281513 (suffixe 1513)
+ * - 681511 ↔ 281511 (suffixe 1511)
+ * - 681040 ↔ 280400 (motif 04 / 040)
+ * - 381001 ↔ 310001 (suffixe 001)
+ * - 380005 ↔ 300005 (suffixe 0005)
+ * - Rapprochement par montant unique (±1 DA)
+ * - Rapprochement par similarité de libellé
+ */
+export function autoMatchAccounts(sourceAccounts = [], targetAccounts = [], sourceFocus = 'DEBIT', targetFocus = 'CREDIT') {
+  const getFocusAmount = (a, focus) => {
+    if (!a) return 0;
+    const md = Math.abs(a.mouvDeb || 0);
+    const mc = Math.abs(a.mouvCred || 0);
+    const fd = Math.abs(a.finDeb || 0);
+    const fc = Math.abs(a.finCred || 0);
+    const sf = a.soldeFin || 0;
+    if (focus === 'DEBIT') {
+      if (md > 0) return md;
+      if (fd > 0) return fd;
+      if (sf > 0) return sf;
+      return Math.max(md, mc, fd, Math.abs(sf));
+    }
+    if (focus === 'CREDIT') {
+      if (mc > 0) return mc;
+      if (fc > 0) return fc;
+      if (sf < 0) return -sf;
+      return Math.max(md, mc, fc, Math.abs(sf));
+    }
+    if (focus === 'FIN') return Math.abs(sf);
+    if (focus === 'VAR') return Math.abs(sf - (a.soldeInit || 0));
+    return Math.max(md, mc, fd, fc, Math.abs(sf));
+  };
+
+  const cleanNum = (str) => String(str || '').replace(/[^0-9]/g, '');
+
+  const extractSignificantSuffix = (accountNum) => {
+    const raw = cleanNum(accountNum);
+    if (raw.length <= 2) return raw;
+    const prefixes = [
+      '6815', '6811', '6812', '6813', '6814', '6816', '6818', '681', '685', '687', '680', '68',
+      '2815', '2811', '2812', '2813', '2814', '2818', '281', '280', '28', '29', '39', '49', '59', '15',
+      '380', '381', '382', '387', '38', '30', '31', '32', '600', '601', '602', '603', '781', '785', '78'
+    ];
+    for (const p of prefixes) {
+      if (raw.startsWith(p) && raw.length > p.length) {
+        return raw.substring(p.length);
+      }
+    }
+    return raw.slice(-4);
+  };
+
+  const cleanText = (str) => {
+    return String(str || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\b(amort|amortissement|amortissements|dotation|dotations|materiel|materiels|compte|achats|achat|stock|stocks|consommation|conso|de|du|des|la|le|les|et|en|sur|pour)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const textSimilarity = (s1, s2) => {
+    const w1 = new Set(cleanText(s1).split(' ').filter(w => w.length >= 3));
+    const w2 = new Set(cleanText(s2).split(' ').filter(w => w.length >= 3));
+    if (w1.size === 0 || w2.size === 0) return 0;
+    const intersection = new Set([...w1].filter(x => w2.has(x)));
+    return (2 * intersection.size) / (w1.size + w2.size);
+  };
+
+  const matched = [];
+  const usedSrc = new Set();
+  const usedTgt = new Set();
+
+  const srcList = (sourceAccounts || []).map(a => ({ ...a, amt: getFocusAmount(a, sourceFocus), cleanAcc: cleanNum(a.compte), suffix: extractSignificantSuffix(a.compte) }));
+  const tgtList = (targetAccounts || []).map(a => ({ ...a, amt: getFocusAmount(a, targetFocus), cleanAcc: cleanNum(a.compte), suffix: extractSignificantSuffix(a.compte) }));
+
+  let matchId = 1;
+
+  // ── PASSE 1 : Suffixe Exact + Montant Égal (Score 100%) ──
+  for (const s of srcList) {
+    if (usedSrc.has(s.compte) || s.amt < 0.001) continue;
+    for (const t of tgtList) {
+      if (usedTgt.has(t.compte) || t.amt < 0.001) continue;
+      const isSuffixEqual = s.suffix && t.suffix && (s.suffix === t.suffix || s.suffix.replace(/^0+/, '') === t.suffix.replace(/^0+/, ''));
+      const isAmountEqual = Math.abs(s.amt - t.amt) < 1.0;
+      if (isSuffixEqual && isAmountEqual) {
+        usedSrc.add(s.compte);
+        usedTgt.add(t.compte);
+        matched.push({
+          id: matchId++,
+          confiance: 100,
+          methode: 'Suffixe identique & Montant exact (100%)',
+          badgeColor: '#059669',
+          sources: [s],
+          cibles: [t],
+          totalSource: s.amt,
+          totalCible: t.amt,
+          ecart: Math.abs(s.amt - t.amt)
+        });
+        break;
+      }
+    }
+  }
+
+  // ── PASSE 2 : Suffixe Exact (Symétrie de numéro de compte) (Score 90%) ──
+  for (const s of srcList) {
+    if (usedSrc.has(s.compte) || s.amt < 0.001) continue;
+    for (const t of tgtList) {
+      if (usedTgt.has(t.compte) || t.amt < 0.001) continue;
+      const isSuffixEqual = s.suffix && t.suffix && (s.suffix === t.suffix || s.suffix.replace(/^0+/, '') === t.suffix.replace(/^0+/, ''));
+      if (isSuffixEqual && s.suffix.replace(/^0+/, '').length >= 2) {
+        usedSrc.add(s.compte);
+        usedTgt.add(t.compte);
+        matched.push({
+          id: matchId++,
+          confiance: 90,
+          methode: 'Symétrie de sous-compte SCF (90%)',
+          badgeColor: '#2563eb',
+          sources: [s],
+          cibles: [t],
+          totalSource: s.amt,
+          totalCible: t.amt,
+          ecart: Math.abs(s.amt - t.amt)
+        });
+        break;
+      }
+    }
+  }
+
+  // ── PASSE 3 : Montant Unique Identique (Score 85%) ──
+  for (const s of srcList) {
+    if (usedSrc.has(s.compte) || s.amt < 0.5) continue;
+    const candidates = tgtList.filter(t => !usedTgt.has(t.compte) && Math.abs(t.amt - s.amt) < 1.0);
+    if (candidates.length === 1) {
+      const t = candidates[0];
+      usedSrc.add(s.compte);
+      usedTgt.add(t.compte);
+      matched.push({
+        id: matchId++,
+        confiance: 85,
+        methode: 'Montant miroir unique (85%)',
+        badgeColor: '#7c3aed',
+        sources: [s],
+        cibles: [t],
+        totalSource: s.amt,
+        totalCible: t.amt,
+        ecart: Math.abs(s.amt - t.amt)
+      });
+    }
+  }
+
+  // ── PASSE 4 : Similarité d'Intitulé (Score 75%) ──
+  for (const s of srcList) {
+    if (usedSrc.has(s.compte) || s.amt < 0.5) continue;
+    let bestTgt = null;
+    let bestSim = 0;
+    for (const t of tgtList) {
+      if (usedTgt.has(t.compte) || t.amt < 0.5) continue;
+      const sim = textSimilarity(s.libelle, t.libelle);
+      if (sim > bestSim && sim >= 0.5) {
+        bestSim = sim;
+        bestTgt = t;
+      }
+    }
+    if (bestTgt) {
+      usedSrc.add(s.compte);
+      usedTgt.add(bestTgt.compte);
+      matched.push({
+        id: matchId++,
+        confiance: 75,
+        methode: 'Intitulé équivalent (75%)',
+        badgeColor: '#d97706',
+        sources: [s],
+        cibles: [bestTgt],
+        totalSource: s.amt,
+        totalCible: bestTgt.amt,
+        ecart: Math.abs(s.amt - bestTgt.amt)
+      });
+    }
+  }
+
+  const unmatchedSources = srcList.filter(s => !usedSrc.has(s.compte) && s.amt > 0.001);
+  const unmatchedCibles  = tgtList.filter(t => !usedTgt.has(t.compte) && t.amt > 0.001);
+
+  return {
+    matchedJointures: matched,
+    unmatchedSources,
+    unmatchedCibles
+  };
+}
+

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { auditBalanceAccounts, auditCrossAccountMovements } from '../utils/financeCalculations';
+import { auditBalanceAccounts, auditCrossAccountMovements, autoMatchAccounts } from '../utils/financeCalculations';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -585,40 +585,29 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
     setJointures(prev => prev.filter(j => j.id !== id));
   };
 
-  // Rapprochement automatique des montants strictement identiques 1 pour 1
-  const autoPairExactMatches = () => {
-    const matchedJointures = [];
-    const usedSrc = new Set(joinedSrcComptes);
-    const usedTgt = new Set(joinedTgtComptes);
-    let currentId = nextJointureId;
+  // ── Rapprochement automatique multi-niveaux SCF (Suffixe, Symétrie, Montant, Intitulé) ──
+  const runSmartAutoMatch = () => {
+    // Collecter les comptes sources et cibles non encore liés dans une jointure
+    const availableSrc = (rule.sourceAccounts || []).filter(a => !joinedSrcComptes.has(String(a.compte)));
+    const availableTgt = (rule.cibleAccounts  || []).filter(a => !joinedTgtComptes.has(String(a.compte)));
 
-    srcAccounts.forEach(src => {
-      if (usedSrc.has(String(src.compte))) return;
-      const srcAmt = getFocusAmount(src, rule.sourceFocus);
-      if (srcAmt < 0.5) return;
+    const result = autoMatchAccounts(availableSrc, availableTgt, rule.sourceFocus, rule.cibleFocus);
+    if (result.matchedJointures && result.matchedJointures.length > 0) {
+      let currentId = nextJointureId;
+      const formattedJointures = result.matchedJointures.map(m => ({
+        id: currentId++,
+        sources: m.sources.map(s => ({ compte: s.compte, libelle: s.libelle, montant: s.amt })),
+        cibles:  m.cibles.map(c => ({ compte: c.compte, libelle: c.libelle, montant: c.amt })),
+        totalSource: m.totalSource,
+        totalCible: m.totalCible,
+        ecart: m.ecart,
+        isEquilibre: m.ecart < 1,
+        methode: m.methode,
+        confiance: m.confiance,
+        badgeColor: m.badgeColor
+      }));
 
-      const tgtMatch = tgtAccounts.find(tgt => 
-        !usedTgt.has(String(tgt.compte)) && 
-        Math.abs(getFocusAmount(tgt, rule.cibleFocus) - srcAmt) < 1
-      );
-
-      if (tgtMatch) {
-        usedSrc.add(String(src.compte));
-        usedTgt.add(String(tgtMatch.compte));
-        matchedJointures.push({
-          id: currentId++,
-          sources: [{ compte: src.compte, libelle: src.libelle, montant: srcAmt }],
-          cibles: [{ compte: tgtMatch.compte, libelle: tgtMatch.libelle, montant: getFocusAmount(tgtMatch, rule.cibleFocus) }],
-          totalSource: srcAmt,
-          totalCible: getFocusAmount(tgtMatch, rule.cibleFocus),
-          ecart: 0,
-          isEquilibre: true
-        });
-      }
-    });
-
-    if (matchedJointures.length > 0) {
-      setJointures(prev => [...prev, ...matchedJointures]);
+      setJointures(prev => [...prev, ...formattedJointures]);
       setNextJointureId(currentId);
       clearSelection();
     }
@@ -940,15 +929,18 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
 
             {hasCible && (
               <button
-                onClick={autoPairExactMatches}
+                onClick={runSmartAutoMatch}
                 style={{
-                  padding: '4px 10px', borderRadius: 6, border: '1px solid #3b82f6', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
-                  fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                  padding: '5px 12px', borderRadius: 6, border: '1px solid #3b82f6',
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.35) 100%)',
+                  color: '#93c5fd', fontSize: '0.73rem', fontWeight: 900, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
                 }}
-                title="Détecter et lier automatiquement les comptes de montants identiques"
+                title="Rapprochement automatique intelligent (symétrie de racines SCF, suffixes 68x/28x, montants et libellés)"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
-                Jointure auto (montants égaux)
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#60a5fa' }}>auto_fix_high</span>
+                <span>⚡ Jointure Automatique (SCF)</span>
               </button>
             )}
 
@@ -1134,12 +1126,25 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                   {jointures.map((j) => (
                     <tr key={j.id} style={{ borderBottom: '1px solid #1e293b', background: 'rgba(255,255,255,0.02)' }}>
                       <td style={{ padding: '6px 6px', verticalAlign: 'top' }}>
-                        <span style={{
-                          fontSize: '0.68rem', fontWeight: 900, padding: '2px 6px', borderRadius: 4,
-                          background: '#1e3a8a', color: '#93c5fd', border: '1px solid #3b82f6', display: 'inline-block'
-                        }}>
-                          #{j.id}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                          <span style={{
+                            fontSize: '0.68rem', fontWeight: 900, padding: '2px 6px', borderRadius: 4,
+                            background: '#1e3a8a', color: '#93c5fd', border: '1px solid #3b82f6', display: 'inline-block'
+                          }}>
+                            #{j.id}
+                          </span>
+                          {j.methode && (
+                            <span style={{
+                              fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: 3,
+                              background: j.badgeColor ? `${j.badgeColor}25` : 'rgba(59, 130, 246, 0.15)',
+                              color: j.badgeColor || '#60a5fa',
+                              border: `1px solid ${j.badgeColor ? `${j.badgeColor}50` : 'rgba(59, 130, 246, 0.3)'}`,
+                              whiteSpace: 'nowrap'
+                            }} title={j.methode}>
+                              {j.confiance ? `${j.confiance}%` : 'Auto'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       {/* Source accounts — multi-lignes */}
                       <td style={{ padding: '6px 6px', verticalAlign: 'top' }}>
