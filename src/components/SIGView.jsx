@@ -188,7 +188,7 @@ export function SIGView({ data, rows, formatCurrency }) {
       rows: [
         { label: 'Degré de levier opérationnel (VA / Résultat opérat.)', val: dol !== null ? ratio(dol, 2) + 'x' : 'N/A', norme: '1 – 5x', ok: dol !== null && dol >= 1 && dol <= 5, detail: 'Amplification du résultat selon la variation du CA' },
         { label: 'Part charges fixes implicites (Dotations / Charges tot.)', val: fluxChargesTotal > 0 ? pct(safe(dotam, fluxChargesTotal)) : 'N/A', norme: 'Analyt.', ok: null, detail: 'Représentation des charges de structure' },
-        { label: 'Taux d\'IS effectif (Impôts / RCAI)', val: data.rcai > 0 ? pct(safe(impots, data.rcai)) : 'N/A', norme: '≈ 19 %', ok: data.rcai <= 0 ? null : safe(impots, data.rcai) <= 0.26, detail: 'Pression fiscale effective sur le résultat avant impôt (IBS Algérie 19 %)' },
+        { label: 'Taux d\'IBS effectif (Impôts / RCAI)', val: data.rcai > 0 ? pct(safe(impots, data.rcai)) : 'N/A', norme: '≈ 19 %', ok: data.rcai <= 0 ? null : safe(impots, data.rcai) <= 0.26, detail: 'Pression fiscale effective sur le résultat avant impôt (IBS Algérie 19 %)' },
         { label: 'CAF estimée (EBE ± corrections)', val: fmt(cafBrute), norme: '> 0', ok: cafBrute > 0, detail: 'Ressources générées en interne pour autofinancer investissements et dettes' },
       ]
     },

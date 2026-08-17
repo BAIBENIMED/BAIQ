@@ -767,7 +767,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             { label: '− Charges financières (66)', value: fmt(s.chargesFinancieres), indent: 1, negative: true },
             { label: '= Résultat Financier', value: fmt(s.resultatFinancier), indent: 0, bold: true },
             { label: '= RCAI', value: fmt(s.rcai), indent: 0, bold: true },
-            { label: '− Impôts sur bénéfices (695/692)', value: fmt(s.impotsBenefices), indent: 1, negative: true },
+            { label: '− Impôts sur bénéfices / IBS (69)', value: fmt(s.impotsBenefices), indent: 1, negative: true },
             { label: '= Résultat Net de l\'exercice', value: fmt(s.resultatNet), indent: 0, bold: true, highlight: true, pct: fmtPct(margeNette) + ' du CA', bigColor: (s.resultatNet||0) >= 0 ? '#059669' : '#dc2626' },
           ].map(({ label, value, indent, bold, highlight, pct, negative, sub, color, bigColor }, i) => (
             <div key={i} style={{
