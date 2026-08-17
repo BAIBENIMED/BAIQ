@@ -809,15 +809,26 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-logo" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '18px 18px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* BAIQ Logo Mark */}
-            <div style={{
-              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-              background: '#000000',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              border: '1px solid #27272a'
-            }}>
-              <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 900, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1 }}>BQ</span>
+             {/* BAIQ Logo Mark */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 10,
+                background: '#000000',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                border: '1px solid #27272a'
+              }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 900, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1 }}>BQ</span>
+              </div>
+              {/* Blue dot — top-right */}
+              <span style={{
+                position: 'absolute', top: -3, right: -3,
+                width: 9, height: 9, borderRadius: '50%',
+                background: '#2563eb',
+                border: '2px solid var(--surface)',
+                boxShadow: '0 0 6px rgba(37,99,235,0.7)',
+                display: 'block'
+              }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
