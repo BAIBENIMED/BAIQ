@@ -1051,48 +1051,53 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
           )}
         </div>
 
-        {/* ══ TABLEAU DES JOINTURES INCRÉMENTÉES — COMPACT EN BAS ══ */}
+        {/* ══ TABLEAU DES JOINTURES INCRÉMENTÉES — AGRANDI & CONFORTABLE ══ */}
         <div style={{
           borderTop: '2px solid var(--border)',
           background: '#090d16',
-          padding: '8px 16px',
-          flexShrink: 0,
-          maxHeight: 175,
+          padding: '10px 18px',
+          flex: jointures.length > 0 ? '1 1 0%' : '0 0 auto',
+          minHeight: jointures.length > 0 ? 280 : 50,
+          maxHeight: jointures.length > 0 ? '48vh' : 80,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 6
+          gap: 8,
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.35)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#38bdf8' }}>join_inner</span>
-              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Tableau des Jointures ({jointures.length})
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#38bdf8' }}>join_inner</span>
+              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Tableau des Jointures & Rapprochements ({jointures.length})
               </span>
             </div>
 
             {jointures.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
-                  Pointé Source : <strong className="mono" style={{ color: '#60a5fa' }}>{fmtN(totalJointuresSrc)} DA</strong>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 5, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
+                  Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmtN(totalJointuresSrc)} DA</strong>
                 </span>
-                <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
-                  Pointé Cible : <strong className="mono" style={{ color: '#34d399' }}>{fmtN(totalJointuresTgt)} DA</strong>
+                <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
+                  Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmtN(totalJointuresTgt)} DA</strong>
                 </span>
                 <span style={{
-                  fontSize: '0.68rem', padding: '2px 6px', borderRadius: 4,
+                  fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
                   background: resteSrcNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                   border: `1px solid ${resteSrcNonPointe > 1 ? '#dc2626' : '#059669'}`,
                   color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
                 }}>
-                  Reste Source : <strong className="mono">{fmtN(resteSrcNonPointe)} DA</strong>
+                  Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteSrcNonPointe)} DA</strong>
                 </span>
                 <button
                   onClick={() => { setJointures([]); setNextJointureId(1); }}
                   style={{
-                    background: 'transparent', border: '1px solid #475569', color: '#94a3b8',
-                    borderRadius: 4, padding: '2px 6px', fontSize: '0.66rem', cursor: 'pointer', fontWeight: 800
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid #475569', color: '#cbd5e1',
+                    borderRadius: 5, padding: '3px 8px', fontSize: '0.70rem', cursor: 'pointer', fontWeight: 800,
+                    transition: 'all 0.15s'
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#f87171'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#cbd5e1'; }}
                 >
                   Réinitialiser
                 </button>
@@ -1102,24 +1107,24 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
 
           {jointures.length === 0 ? (
             <div style={{
-              padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6,
-              border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem'
+              padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: 8,
+              border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.76rem'
             }}>
-              💡 Cochez 1 ou plusieurs comptes <strong>Source</strong> et <strong>Cible</strong>, puis cliquez sur <strong>« Créer Jointure #1 »</strong>.
+              💡 Cliquez sur <strong>« ⚡ Jointure Automatique (SCF) »</strong> ci-dessus pour pointer automatiquement, ou cochez des comptes pour une jointure manuelle.
             </div>
           ) : (
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', tableLayout: 'fixed' }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed' }}>
                 <thead>
-                  <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left' }}>
-                    <th style={{ width: '60px', padding: '5px 6px', fontWeight: 800, fontSize: '0.66rem' }}>JOINTURE</th>
-                    <th style={{ width: '27%', padding: '5px 6px', fontWeight: 800, fontSize: '0.66rem', color: '#93c5fd' }}>SOURCE COCHÉE</th>
-                    <th style={{ width: '13%', padding: '5px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.66rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
-                    <th style={{ width: '27%', padding: '5px 6px', fontWeight: 800, fontSize: '0.66rem', color: '#6ee7b7' }}>CONTREPARTIE COCHÉE</th>
-                    <th style={{ width: '13%', padding: '5px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.66rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
-                    <th style={{ width: '11%', padding: '5px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.66rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
-                    <th style={{ width: '80px', padding: '5px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.66rem' }}>STATUT</th>
-                    <th style={{ width: '36px', padding: '5px 4px', textAlign: 'center' }}></th>
+                  <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
+                    <th style={{ width: '70px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
+                    <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
+                    <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
+                    <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
+                    <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
+                    <th style={{ width: '11%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
+                    <th style={{ width: '85px', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.70rem' }}>STATUT</th>
+                    <th style={{ width: '40px', padding: '7px 6px', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1147,16 +1152,16 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                         </div>
                       </td>
                       {/* Source accounts — multi-lignes */}
-                      <td style={{ padding: '6px 6px', verticalAlign: 'top' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <td style={{ padding: '8px 8px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {j.sources.map((s, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-                              <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.74rem', flexShrink: 0 }}>{s.compte}</strong>
-                              <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.7rem' }} title={s.libelle}>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                              <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.80rem', flexShrink: 0 }}>{s.compte}</strong>
+                              <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.74rem' }} title={s.libelle}>
                                 {s.libelle ? `(${s.libelle})` : ''}
                               </span>
                               {j.sources.length > 1 && (
-                                <span className="mono" style={{ color: '#94a3b8', fontSize: '0.66rem', marginLeft: 'auto', flexShrink: 0 }}>
+                                <span className="mono" style={{ color: '#94a3b8', fontSize: '0.70rem', marginLeft: 'auto', flexShrink: 0 }}>
                                   {fmtN(s.montant)}
                                 </span>
                               )}
@@ -1164,20 +1169,20 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           ))}
                         </div>
                       </td>
-                      <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#60a5fa', fontSize: '0.78rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#60a5fa', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                         {fmtN(j.totalSource)}
                       </td>
                       {/* Target accounts — multi-lignes */}
-                      <td style={{ padding: '6px 6px', verticalAlign: 'top' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <td style={{ padding: '8px 8px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {j.cibles.map((c, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-                              <strong className="mono" style={{ color: '#34d399', fontSize: '0.74rem', flexShrink: 0 }}>{c.compte}</strong>
-                              <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.7rem' }} title={c.libelle}>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                              <strong className="mono" style={{ color: '#34d399', fontSize: '0.80rem', flexShrink: 0 }}>{c.compte}</strong>
+                              <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.74rem' }} title={c.libelle}>
                                 {c.libelle ? `(${c.libelle})` : ''}
                               </span>
                               {j.cibles.length > 1 && (
-                                <span className="mono" style={{ color: '#94a3b8', fontSize: '0.66rem', marginLeft: 'auto', flexShrink: 0 }}>
+                                <span className="mono" style={{ color: '#94a3b8', fontSize: '0.70rem', marginLeft: 'auto', flexShrink: 0 }}>
                                   {fmtN(c.montant)}
                                 </span>
                               )}
@@ -1185,32 +1190,32 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           ))}
                         </div>
                       </td>
-                      <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.78rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                         {fmtN(j.totalCible)}
                       </td>
                       <td className="mono" style={{
-                        padding: '6px 6px', textAlign: 'right', fontWeight: 900,
-                        color: j.isEquilibre ? '#34d399' : '#f87171', fontSize: '0.78rem', verticalAlign: 'top', whiteSpace: 'nowrap'
+                        padding: '8px 8px', textAlign: 'right', fontWeight: 900,
+                        color: j.isEquilibre ? '#34d399' : '#f87171', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap'
                       }}>
                         {fmtN(j.ecart)}
                       </td>
-                      <td style={{ padding: '6px 6px', textAlign: 'center', verticalAlign: 'top' }}>
+                      <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'top' }}>
                         <span style={{
-                          fontSize: '0.62rem', fontWeight: 800, padding: '2px 5px', borderRadius: 4,
+                          fontSize: '0.68rem', fontWeight: 900, padding: '3px 7px', borderRadius: 4,
                           whiteSpace: 'nowrap', display: 'inline-block',
                           background: j.isEquilibre ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                           color: j.isEquilibre ? '#34d399' : '#f87171',
                           border: `1px solid ${j.isEquilibre ? '#059669' : '#dc2626'}`
                         }}>
-                          {j.isEquilibre ? '✓ OK' : '🔴 Diff'}
+                          {j.isEquilibre ? '✓ ÉQUILIBRÉ' : '🔴 DIFFÉRENCE'}
                         </span>
                       </td>
-                      <td style={{ padding: '6px 4px', textAlign: 'center', verticalAlign: 'top' }}>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'top' }}>
                         <button
                           onClick={() => deleteJointure(j.id)}
                           style={{
                             background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)',
-                            color: '#f87171', cursor: 'pointer', padding: '3px 5px', borderRadius: 4,
+                            color: '#f87171', cursor: 'pointer', padding: '4px 6px', borderRadius: 5,
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.15s'
                           }}
@@ -1218,7 +1223,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.color = '#ffffff'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; e.currentTarget.style.color = '#f87171'; }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                         </button>
                       </td>
                     </tr>
