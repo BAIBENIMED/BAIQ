@@ -740,34 +740,65 @@ export function auditCrossAccountMovements(rows = []) {
   const getDebitCharge = (sums) => sums.mouvDeb > 0 ? sums.mouvDeb : Math.max(0, sums.finDeb - sums.initDeb) || sums.finDeb;
   const getCreditProduit = (sums) => sums.mouvCred > 0 ? sums.mouvCred : Math.max(0, sums.finCred - sums.initCred) || sums.finCred;
 
-  // A. Amortissements des Immobilisations : Débit 681 / 6815xx (hors 685/686/6816) vs Crédit 28
-  //    Inclut tous les sous-comptes : 6815xx, 6811xx, 6812xx, 681xx, 680xx, 682xx, etc.
-  const c68_amort = getSums(['6815', '6811', '6812', '681', '680', '682', '68'], ['685', '686', '6816', '6817']);
-  const c28 = getSums('28');
-  const dotationAmortCharge = getDebitCharge(c68_amort);
+  // A. Amortissements des Immobilisations : Débit 681xx (TOUS les sous-comptes) vs Crédit 28x
+  //    Règle SCF : Dotation aux amortissements = augmentation du compte d'amortissement 28x
+  //    Comptes 681x concernés : 6811, 6812, 6813, 6814, 6815, 6816, 6818, 681...
+  const c681_all = getSums('681');           // TOUS les 681x sans exception
+  const c28 = getSums('28');                 // TOUS les 28x (amortissements au bilan)
+  const dotationAmortCharge = getDebitCharge(c681_all);
   const dotationAmortAttendue = getCreditAugmentation(c28);
   const ecartAmort = safeNum(Math.abs(dotationAmortAttendue - dotationAmortCharge));
   const isZeroAmort = dotationAmortCharge === 0 && dotationAmortAttendue === 0;
 
+  // Sous-totaux par nature pour le détail
+  const c6811 = getSums('6811');
+  const c6812 = getSums('6812');
+  const c6813 = getSums('6813');
+  const c6814 = getSums('6814');
+  const c6815 = getSums('6815');
+  const c6816 = getSums('6816');
+  const c6818 = getSums('6818');
+
+  const c281 = getSums('281');
+  const c282 = getSums('282');
+  const c283 = getSums('283');
+  const c284 = getSums('284');
+  const c285 = getSums('285');
+
   regles.push({
-    id: 'dotations_amortissements_680_681_28',
+    id: 'dotations_681_vs_28',
     cycle: 'Dotations & Amortissements',
-    titre: 'Amortissements Immobilisations : Débit 681 / 6815xx vs Crédit Compte 28',
-    sourceLabel: 'Débit 681 / 6815xx (Dotations Amort. Immo)',
+    titre: 'Dotations Amortissements : Débit 681 (tous sous-comptes) vs Crédit 28 (contrepartie bilan)',
+    sourceLabel: 'Débit 681x — Dotations aux amortissements',
     sourceVal: dotationAmortCharge,
-    sourceAccounts: c68_amort.accounts,
+    sourceAccounts: c681_all.accounts,
     sourceFocus: 'DEBIT',
-    cibleLabel: 'Crédit 28 (Amort. Immobilisations)',
+    cibleLabel: 'Crédit 28x — Amortissements au bilan',
     cibleVal: dotationAmortAttendue,
     cibleAccounts: c28.accounts,
     cibleFocus: 'CREDIT',
     ecart: ecartAmort,
+    details: [
+      { label: '6811 — Amort. Immo. incorporelles', val: getDebitCharge(c6811) },
+      { label: '6812 — Amort. Immo. corporelles', val: getDebitCharge(c6812) },
+      { label: '6813 — Amort. Immo. en concession', val: getDebitCharge(c6813) },
+      { label: '6814 — Amort. Droits réels immobiliers', val: getDebitCharge(c6814) },
+      { label: '6815 — Amort. Immo. financières', val: getDebitCharge(c6815) },
+      { label: '6816 — Pertes de valeur Immo.', val: getDebitCharge(c6816) },
+      { label: '6818 — Autres dotations amort.', val: getDebitCharge(c6818) },
+      { label: '─────────────────', val: null },
+      { label: '281 — Amort. Immo. incorp. (bilan)', val: getCreditAugmentation(c281) },
+      { label: '282 — Amort. Immo. corp. (bilan)', val: getCreditAugmentation(c282) },
+      { label: '283 — Amort. Immo. en concession (bilan)', val: getCreditAugmentation(c283) },
+      { label: '284 — Amort. Droits réels immo. (bilan)', val: getCreditAugmentation(c284) },
+      { label: '285 — Amort. Immo. financières (bilan)', val: getCreditAugmentation(c285) },
+    ],
     statut: isZeroAmort ? 'NON_MOUVEMENTE' : ecartAmort < 1 ? 'CONFORME' : ecartAmort < 1000 ? 'TOLERANCE' : 'ANOMALIE',
     explication: isZeroAmort
-      ? 'Aucune dotation aux amortissements (681/6815xx) ni accroissement d\'amortissement (28) sur la période.'
+      ? 'Aucune dotation aux amortissements (681x) ni augmentation des amortissements au bilan (28x) sur la période.'
       : ecartAmort < 1
-      ? 'Égalité parfaite (SCF) : La dotation aux amortissements de l\'exercice (681/6815xx) est rigoureusement égale à l\'augmentation des amortissements au bilan (Crédit 28).'
-      : `Écart de ${fmtDA(ecartAmort)} : Décalage entre la charge d'amortissement de l'exercice (681/6815xx: ${fmtDA(dotationAmortCharge)}) et l'accroissement du compte 28 (${fmtDA(dotationAmortAttendue)}).`
+      ? 'Égalité parfaite (SCF) : La totalité des dotations aux amortissements de l\'exercice (Débit 681x) est rigoureusement égale à l\'augmentation des amortissements cumulés au bilan (Crédit 28x).'
+      : `Écart de ${fmtDA(ecartAmort)} entre les dotations (Débit 681x : ${fmtDA(dotationAmortCharge)}) et l'augmentation au bilan (Crédit 28x : ${fmtDA(dotationAmortAttendue)}). Vérifier les imputations sous-comptes 681x/28x.`
   });
 
   // B. Pertes de valeur / Dépréciations d'actifs : Débit 685 / 686 / 6816 vs Crédit (29, 39, 49, 59)
