@@ -231,9 +231,9 @@ export default function App() {
     // 455 : Associés - Comptes courants (apports ou retraits autorisés)
     // 467 : Autres comptes de régularisation / créances et dettes transitoires
     // 517 : Autres organismes financiers / comptes spécifiques
-    // 692, 693, 6992 : Impôts différés / ajustements d'imposition
+    // 69x : Impôts sur les résultats (692, 693, 695, 698, 699, etc. - charge ou produit d'impôt différé/régul)
     // 723, 724, 725 : Variation des stocks (déstockage = débiteur, stockage = créditeur)
-    if (['133','134','444','455','467','517','692','693','723','724','725'].includes(p3) || p4 === '6992') {
+    if (p2 === '69' || ['133','134','444','455','467','517','603','723','724','725'].includes(p3) || p4 === '6992') {
       return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
     }
 

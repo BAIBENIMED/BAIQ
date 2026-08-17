@@ -337,6 +337,18 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
           : 'Solde nul (Variation nulle).'
       };
     }
+    // 69 — Impôts sur les bénéfices, impôts différés & assimilés (MIXTE : Débiteur ou Créditeur admis)
+    if (c.startsWith('69')) {
+      return {
+        classe: 6, classeLabel: '6 — Impôts sur les Résultats (IBS / Différés)', nature: 'Impôts sur les bénéfices & impôts différés (Compte 69)', sensAttendu: 'MIXTE',
+        statut: 'CONFORME',
+        diagnostic: isDeb
+          ? 'Charge d\'impôt sur le résultat conforme SCF (IBS dû ou charge d\'impôt différé).'
+          : isCred
+          ? 'Produit d\'impôt conforme SCF (Crédit d\'impôt différé, dégrèvement ou régularisation fiscale).'
+          : 'Solde d\'impôt nul.'
+      };
+    }
     if (c.startsWith('609') || c.startsWith('619') || c.startsWith('629')) {
       return {
         classe: 6, classeLabel: '6 — Rabais obtenus', nature: 'Rabais, remises et ristournes obtenus sur achats & services', sensAttendu: 'CRÉDITEUR',
