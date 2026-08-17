@@ -1175,12 +1175,20 @@ export const parseFile = async (file) => {
 
           // Recherche des colonnes par mots-clés sur l'en-tête combiné
           colMap.compte = compteIdx;
-          colMap.libelle = combined.findIndex(t => t.includes('libell') || t.includes('désignation') || t.includes('designation'));
-          if (colMap.libelle === -1) colMap.libelle = compteIdx + 1;
+          
+          // Recherche intelligente du Libellé (mots-clés ou première colonne non-vide après Compte)
+          let libelleIdx = combined.findIndex((t, idx) => idx > compteIdx && (t.includes('libell') || t.includes('désignation') || t.includes('designation') || t.includes('intitul') || t.includes('nom')));
+          if (libelleIdx === -1) {
+            // Chercher la première colonne non-vide après compteIdx qui n'est pas un en-tête de solde/mouvement
+            libelleIdx = combined.findIndex((t, idx) => idx > compteIdx && t.length > 0 && !t.includes('débit') && !t.includes('debit') && !t.includes('crédit') && !t.includes('credit') && !t.includes('solde') && !t.includes('mouv'));
+          }
+          if (libelleIdx === -1) libelleIdx = compteIdx + 1;
+          colMap.libelle = libelleIdx;
 
           // Détecter TOUTES les colonnes de solde et débit/crédit
           const findColIdx = (keywords, excludeKeywords = []) => {
-            return combined.findIndex(t => 
+            return combined.findIndex((t, idx) => 
+              idx > compteIdx &&
               keywords.every(kw => t.includes(kw)) &&
               excludeKeywords.every(ex => !t.includes(ex))
             );
@@ -1240,17 +1248,17 @@ export const parseFile = async (file) => {
             colMap.soldeFinDebitIdx    = soldeFinDebitIdx;
             colMap.soldeFinCreditIdx   = soldeFinCreditIdx;
           } else {
-            // Fallback basé sur l'ordre des colonnes : Solde Fin est toujours les 2 dernières colonnes de droite
+            // Fallback intelligent : filtrer TOUTES les colonnes vides intermédiaires ou de début
             const debitCols = [];
             const creditCols = [];
             combined.forEach((t, idx) => {
-              if (idx <= compteIdx) return;
+              if (idx <= libelleIdx) return;
               if (t.includes('débit') || t.includes('debit')) debitCols.push(idx);
               if (t.includes('crédit') || t.includes('credit')) creditCols.push(idx);
             });
 
             if (debitCols.length >= 1 && creditCols.length >= 1) {
-              // Le Solde Fin est la dernière colonne Débit et la dernière colonne Crédit
+              // Le Solde Fin est la dernière colonne Débit et la dernière colonne Crédit non-vides
               colMap.soldeFinDebitIdx  = debitCols[debitCols.length - 1];
               colMap.soldeFinCreditIdx = creditCols[creditCols.length - 1];
               
@@ -1259,22 +1267,34 @@ export const parseFile = async (file) => {
               if (debitCols.length >= 3) colMap.mouvDebitIdx = debitCols[1];
               if (creditCols.length >= 3) colMap.mouvCreditIdx = creditCols[1];
             } else {
-              const hasPeriode = combined.some(t => t.includes('période') || t.includes('periode'));
-              const base = compteIdx + 2;
-              colMap.soldeDebutDebitIdx  = base;
-              colMap.soldeDebutCreditIdx = base + 1;
-              colMap.mouvDebitIdx        = base + 2;
-              colMap.mouvCreditIdx       = base + 3;
-              if (hasPeriode) {
-                colMap.soldePeriodeDebitIdx  = base + 4;
-                colMap.soldePeriodeCreditIdx = base + 5;
-                colMap.soldeFinDebitIdx      = base + 6;
-                colMap.soldeFinCreditIdx     = base + 7;
-              } else {
-                colMap.soldePeriodeDebitIdx  = -1;
-                colMap.soldePeriodeCreditIdx = -1;
-                colMap.soldeFinDebitIdx      = base + 4;
-                colMap.soldeFinCreditIdx     = base + 5;
+              // Filtrer les colonnes qui contiennent réellement des données (ignorer colonnes blanches/vides)
+              const activeNonEmptyCols = [];
+              const maxCols = Math.max(...data.slice(i, i + 20).map(r => (r || []).length));
+              for (let col = libelleIdx + 1; col < maxCols; col++) {
+                let hasData = false;
+                for (let r = i; r < Math.min(data.length, i + 30); r++) {
+                  const val = data[r]?.[col];
+                  if (val !== undefined && val !== null && String(val).trim() !== '') {
+                    hasData = true;
+                    break;
+                  }
+                }
+                if (hasData) activeNonEmptyCols.push(col);
+              }
+
+              if (activeNonEmptyCols.length >= 2) {
+                // Les deux dernières colonnes actives sont toujours le Solde Fin Débit et Crédit
+                colMap.soldeFinDebitIdx  = activeNonEmptyCols[activeNonEmptyCols.length - 2];
+                colMap.soldeFinCreditIdx = activeNonEmptyCols[activeNonEmptyCols.length - 1];
+                if (activeNonEmptyCols.length >= 6) {
+                  colMap.soldeDebutDebitIdx  = activeNonEmptyCols[0];
+                  colMap.soldeDebutCreditIdx = activeNonEmptyCols[1];
+                  colMap.mouvDebitIdx        = activeNonEmptyCols[2];
+                  colMap.mouvCreditIdx       = activeNonEmptyCols[3];
+                } else if (activeNonEmptyCols.length >= 4) {
+                  colMap.mouvDebitIdx  = activeNonEmptyCols[0];
+                  colMap.mouvCreditIdx = activeNonEmptyCols[1];
+                }
               }
             }
           }
