@@ -155,19 +155,20 @@ export function CapitauxPropresView({ data, fmt }) {
           </div>
         </div>
 
-        {/* 3. Variation Nette & Résultat Net (N) */}
-        <div className="card" style={{ padding: '16px 20px', background: isPositiveVar ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)', border: `1px solid ${isPositiveVar ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: isPositiveVar ? '#047857' : '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
-            Variation Nette Globale (N)
+        {/* 3. Opérations de l'Exercice (Augmentation Capital + Dividendes N-1) */}
+        <div className="card" style={{ padding: '16px 20px', background: 'rgba(37, 99, 235, 0.05)', border: '1px solid rgba(37, 99, 235, 0.25)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            Opérations de l'Année (Capital &amp; Dividendes)
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: isPositiveVar ? '#059669' : '#dc2626', lineHeight: 1.2 }}>
-            {isPositiveVar ? '+' : ''}{fmtCurrency(kpis.variationNette)}
+          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e40af', lineHeight: 1.2 }}>
+            {kpis.variationOperations >= 0 ? '+' : ''}{fmtCurrency(kpis.variationOperations)}
           </div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isPositiveVar ? '#047857' : '#b91c1c', marginTop: 4 }}>
-            Résultat N : {fmtCurrency(kpis.resultatNetN || kpis.resultatNet)} (à affecter en N+1)
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add_circle</span>
+            Augmentation Capital : {fmtCurrency(kpis.varCapital || 0)} {kpis.dividendesEstimes > 0 ? `• Dividendes : -${fmtCurrency(kpis.dividendesEstimes)}` : '• Dividendes : 0 DA'}
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: isPositiveVar ? '#059669' : '#dc2626' }}>swap_vert</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#1e40af' }}>account_balance</span>
           </div>
         </div>
 

@@ -2123,6 +2123,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const varNette = soldeClotTotal - soldeOuvTotal;
   const pctVar = soldeOuvTotal !== 0 ? (varNette / Math.abs(soldeOuvTotal)) * 100 : 0;
+  const varOperations = (-dividendes) + varCapital + (varRes - affectationReserves) + varEcart + varSubv;
 
   // Liste détaillée des comptes classe 1 mouvementés
   const comptesClasse1 = c1Rows.map(r => {
@@ -2155,6 +2156,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
       totalDebut: soldeOuvTotal,
       totalFin: soldeClotTotal,
       variationNette: varNette,
+      variationOperations: varOperations,
       pctVariation: pctVar,
       resultatNetAnterieur: resNetAnterieur,
       affectationReserves,
