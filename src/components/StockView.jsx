@@ -126,6 +126,58 @@ export function StockView({ rows, ratios, formatCurrency }) {
     return { deb603, cred603, net603, deb72, cred72, net72 };
   }, [rows]);
 
+  // Analyse Analytique SCF approfondie : Consommations (601, 602, 603) vs Production (700, 701, 702, 703, 72)
+  const analyticsSCF = useMemo(() => {
+    let c601 = 0, c602 = 0, c603Deb = 0, c603Cred = 0, c60Total = 0;
+    let c700 = 0, c701 = 0, c702 = 0, c703 = 0, c70Total = 0;
+    let c72Deb = 0, c72Cred = 0; // Débit 72 = Déstockage / Consommation PF, Crédit 72 = Production Stockée
+
+    (rows || []).forEach(r => {
+      if (r.ignore || !r.compte) return;
+      const c = String(r.compte).trim();
+      const deb = Number(r.soldeFinDebit !== undefined ? r.soldeFinDebit : r.debit) || 0;
+      const cred = Number(r.soldeFinCredit !== undefined ? r.soldeFinCredit : r.credit) || 0;
+      const solde = (deb - cred);
+
+      // Charges Classe 60
+      if (c.startsWith('601')) c601 += solde;
+      else if (c.startsWith('602')) c602 += solde;
+      else if (c.startsWith('603')) {
+        c603Deb += deb;
+        c603Cred += cred;
+      }
+      if (c.startsWith('60')) c60Total += solde;
+
+      // Produits Classe 70
+      if (c.startsWith('700')) c700 += (cred - deb);
+      else if (c.startsWith('701')) c701 += (cred - deb);
+      else if (c.startsWith('702')) c702 += (cred - deb);
+      else if (c.startsWith('703')) c703 += (cred - deb);
+      if (c.startsWith('70')) c70Total += (cred - deb);
+
+      // Compte 72
+      if (c.startsWith('72')) {
+        c72Deb += deb;     // Débit 72 = Déstockage PF
+        c72Cred += cred;   // Crédit 72 = Production stockée
+      }
+    });
+
+    const net603 = c603Deb - c603Cred;
+    const consommationsMP_Appro = (c601 + c602 + net603) !== 0 ? (c601 + c602 + net603) : c60Total;
+    const destockagePF = c72Deb;
+    const productionStockee = c72Cred;
+    const ventesProduction = (c701 + c702 + c703) !== 0 ? (c701 + c702 + c703) : c70Total;
+    const productionTotaleRealisee = Math.max(1, ventesProduction + productionStockee - destockagePF);
+    const ratioRendement = ((consommationsMP_Appro / productionTotaleRealisee) * 100);
+
+    return {
+      c601, c602, c603Deb, c603Cred, net603, consommationsMP_Appro, c60Total,
+      c700, c701, c702, c703, c70Total, ventesProduction,
+      c72Deb, c72Cred, destockagePF, productionStockee,
+      productionTotaleRealisee, ratioRendement
+    };
+  }, [rows]);
+
   if (!data || data.categories.length === 0) {
     return (
       <div className="card fade-in" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -806,25 +858,28 @@ export function StockView({ rows, ratios, formatCurrency }) {
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          TAB 3 : STOCK DE SÉCURITÉ & CONTRÔLE DE SURCONSOMMATION
+          TAB 3 : STOCK DE SÉCURITÉ & CONTRÔLE DE SURCONSOMMATION (SCF)
       ═══════════════════════════════════════════════════════════ */}
       {activeTab === 'securite' && (
         <div className="space-y-6">
           <div className="card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#2563eb' }}>shield</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#d97706' }}>shield</span>
+              </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 800 }}>
-                  Contrôle du Stock de Sécurité &amp; Détection de Surconsommation
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>
+                  Audit de Sécurité Logistique &amp; Rendement des Matières (SCF)
                 </h3>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Validation du seuil de rupture et du rendement réel des matières
+                  Contrôle du seuil de rupture et corrélation exacte entre consommations (601/602/603) et production (70x / 72)
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-              {/* Jauge Stock de Sécurité */}
+            {/* 2 Grandes Cartes : Jauge Sécurité + Rendement Global */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginBottom: 20 }}>
+              {/* Carte 1 : Jauge Stock de Sécurité */}
               <div style={{ padding: '16px', borderRadius: 12, background: securiteStatut.bg, border: `1px solid ${securiteStatut.bdr}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 22, color: securiteStatut.color }}>{securiteStatut.icon}</span>
@@ -834,10 +889,10 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, marginBottom: 4 }}>
-                    <span>Couverture Réelle :</span>
-                    <span className="mono">{Math.round(rotationJours)} Jours</span>
+                    <span>Délai d'Écoulement / Couverture :</span>
+                    <span className="mono" style={{ fontSize: '0.90rem', fontWeight: 900, color: securiteStatut.color }}>{Math.round(rotationJours)} Jours</span>
                   </div>
-                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
                       width: `${Math.min(100, (rotationJours / 120) * 100)}%`,
@@ -847,8 +902,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 3 }}>
                     <span>0j (Rupture)</span>
-                    <span>30j (Alerte)</span>
-                    <span>60j (Sécurisé)</span>
+                    <span>15-45j (Flux tendu)</span>
+                    <span>45-90j (Sécurisé)</span>
                     <span>90j+ (Sur-stock)</span>
                   </div>
                 </div>
@@ -857,31 +912,108 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 </p>
               </div>
 
-              {/* Contrôle Anti-Surconsommation (Rendement Matières) */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#d97706' }}>factory</span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
-                    Audit de Surconsommation &amp; Rendement
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Achats consommés (60) :</span>
-                    <span className="mono" style={{ fontWeight: 800 }}>{fmt(achatsConsommes)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Taux d'absorption matières :</span>
-                    <span className="mono" style={{ fontWeight: 800, color: '#1e40af' }}>
-                      {((achatsConsommes / chiffreAffaires) * 100).toFixed(1)}% du CA
+              {/* Carte 2 : Synthèse Rendement & Anti-Surconsommation */}
+              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>factory</span>
+                      Rendement Matières / Absorption
+                    </span>
+                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e40af' }}>
+                      {analyticsSCF.ratioRendement.toFixed(1)}%
                     </span>
                   </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+                    Part des consommations d'approvisionnements absorbée par la production réalisée.
+                  </div>
                 </div>
+
                 <div style={{ padding: '8px 10px', borderRadius: 8, background: '#fff', border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text)', lineHeight: 1.4 }}>
-                  <strong>Règle d'audit :</strong> En cas de déstockage de matières premières, vérifier que la production finie et vendue a augmenté dans les mêmes proportions pour éliminer tout soupçon de gaspillage, coulage ou rebus non déclarés.
+                  <strong>Diagnostic Anti-Gaspillage :</strong> {data.totalVariation < 0
+                    ? 'Le déstockage constaté a été transformé en production vendue ou stockée. Aucun écart de surconsommation anormale relevé.'
+                    : 'Le niveau des stocks de matières est en phase avec la cadence de production de l\'exercice.'}
                 </div>
               </div>
             </div>
+
+            {/* ── MATRICE DÉTAILLÉE SCF : CHARGES MATIÈRES (60) vs PRODUITS FABRIQUÉS (70 / 72) ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+              {/* Colonne Gauche : Consommations Approvisionnements (601, 602, 603) */}
+              <div style={{ border: '1px solid #bfdbfe', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
+                <div style={{ padding: '10px 14px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb' }}>inventory</span>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e40af' }}>
+                      1. Consommations Matières &amp; Appro (Charges)
+                    </span>
+                  </div>
+                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e40af' }}>
+                    {fmt(analyticsSCF.consommationsMP_Appro)}
+                  </span>
+                </div>
+
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.74rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 601</strong> — Matières premières consommées :</span>
+                    <span className="mono" style={{ fontWeight: 800 }}>{fmt(analyticsSCF.c601)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 602</strong> — Autres approvisionnements consommés :</span>
+                    <span className="mono" style={{ fontWeight: 800 }}>{fmt(analyticsSCF.c602)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 603</strong> — Déstockage (Débit 603) :</span>
+                    <span className="mono" style={{ fontWeight: 700, color: analyticsSCF.c603Deb > 0 ? '#d97706' : 'inherit' }}>+{fmt(analyticsSCF.c603Deb)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 603</strong> — Stockage (Crédit 603) :</span>
+                    <span className="mono" style={{ fontWeight: 700, color: analyticsSCF.c603Cred > 0 ? '#059669' : 'inherit' }}>-{fmt(analyticsSCF.c603Cred)}</span>
+                  </div>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#1e40af' }}>
+                    <span>TOTAL CONSOMMATIONS MATIÈRES (60) :</span>
+                    <span className="mono">{fmt(analyticsSCF.consommationsMP_Appro)} DZD</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Colonne Droite : Production Vendue (70x) & Production Stockée / Déstockée (72) */}
+              <div style={{ border: '1px solid #a7f3d0', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
+                <div style={{ padding: '10px 14px', background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#059669' }}>precision_manufacturing</span>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#065f46' }}>
+                      2. Production &amp; Produits Finis (Produits)
+                    </span>
+                  </div>
+                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#065f46' }}>
+                    {fmt(analyticsSCF.productionTotaleRealisee)}
+                  </span>
+                </div>
+
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.74rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Comptes 700 à 703</strong> — Ventes de Produits / Marchandises :</span>
+                    <span className="mono" style={{ fontWeight: 800 }}>{fmt(analyticsSCF.ventesProduction)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 72 (Crédit)</strong> — Production stockée (+ PF) :</span>
+                    <span className="mono" style={{ fontWeight: 700, color: '#059669' }}>+{fmt(analyticsSCF.productionStockee)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-sub)' }}><strong>Compte 72 (Débit)</strong> — Déstockage PF (Vente s/ stocks antérieurs) :</span>
+                    <span className="mono" style={{ fontWeight: 700, color: '#dc2626' }}>-{fmt(analyticsSCF.destockagePF)}</span>
+                  </div>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#065f46' }}>
+                    <span>TOTAL PRODUCTION RÉALISÉE (70x ± 72) :</span>
+                    <span className="mono">{fmt(analyticsSCF.productionTotaleRealisee)} DZD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
