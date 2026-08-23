@@ -139,6 +139,20 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   const chargesFin = sig.chargesFinancieres || 0;
   const couvertureChargesFin = chargesFin > 0 ? Math.max(0, ebe / chargesFin) : 99;
 
+  // ── Score Banque d'Algérie (Sur 20 Points) ──
+  const ratioAutonomie = dettesFinancieresLT > 0 ? capitauxPropres / dettesFinancieresLT : 99;
+  const ratioRentabilite = ebe / (sig.ventesProduction || sig.c70Total || 1);
+  const ratioLiquiditeGen = (bilan.actifCirculant || 0) / Math.max(1, dettesCourtTerme);
+
+  const autonomieScore = ratioAutonomie >= 1.5 ? 5 : ratioAutonomie >= 1.0 ? 4 : ratioAutonomie >= 0.5 ? 2.5 : 1;
+  const rentabiliteScore = ratioRentabilite >= 0.20 ? 5 : ratioRentabilite >= 0.12 ? 4 : ratioRentabilite >= 0.07 ? 2.5 : 1;
+  const liquiditeScore = ratioLiquiditeGen >= 1.5 ? 5 : ratioLiquiditeGen >= 1.2 ? 4 : ratioLiquiditeGen >= 0.9 ? 2.5 : 1;
+  const couvertureScore = couvertureChargesFin >= 5.0 ? 5 : couvertureChargesFin >= 3.0 ? 4 : couvertureChargesFin >= 1.5 ? 2.5 : 1;
+
+  const scoreBA = autonomieScore + rentabiliteScore + liquiditeScore + couvertureScore;
+  const ratingBA = scoreBA >= 16 ? 'Excellent' : scoreBA >= 12 ? 'Favorable' : scoreBA >= 8 ? 'Vigilance' : 'Défavorable';
+  const ratingBAColor = scoreBA >= 16 ? '#059669' : scoreBA >= 12 ? '#2563eb' : scoreBA >= 8 ? '#d97706' : '#dc2626';
+
   // Score global de solvabilité sur 100
   const scoreSolvabilite = Math.max(0, Math.min(100, Math.round(
     (zScore >= 2.6 ? 85 + Math.min(15, (zScore - 2.6) * 10) :
@@ -169,7 +183,16 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       capitauxPropres,
       capaciteEndettementMax,
       couvertureChargesFin,
-      statutCredit: ratioDetteSurEBE <= 3.5 && zScore >= 1.8 ? 'FAVORABLE' : ratioDetteSurEBE <= 5 ? 'VIGILANCE' : 'DÉFAVORABLE'
+      statutCredit: ratioDetteSurEBE <= 3.5 && zScore >= 1.8 ? 'FAVORABLE' : ratioDetteSurEBE <= 5 ? 'VIGILANCE' : 'DÉFAVORABLE',
+      scoreBA,
+      ratingBA,
+      ratingBAColor,
+      detailsBA: {
+        autonomie: { val: ratioAutonomie, score: autonomieScore, label: 'Autonomie Financière (CP / DLT)' },
+        rentabilite: { val: ratioRentabilite * 100, score: rentabiliteScore, label: 'Taux de Marge EBE (EBE / CA)' },
+        liquidite: { val: ratioLiquiditeGen, score: liquiditeScore, label: 'Liquidité Générale (AC / DCT)' },
+        couverture: { val: couvertureChargesFin, score: couvertureScore, label: 'Couverture Intérêts (EBE / Charges Fin)' }
+      }
     }
   };
 }

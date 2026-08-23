@@ -285,6 +285,44 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             ))}
           </div>
         </div>
+
+        {/* ── Score Banque d'Algérie (Dossier d'Éligibilité au Crédit) ── */}
+        <div style={{ marginTop: 20, padding: 18, borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 22, color: solv.bancaire.ratingBAColor }}>assured_workload</span>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>Score Centrale des Risques (Banque d'Algérie)</h4>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>Grille d'évaluation standard pour l'accès aux financements bancaires locaux (Éligibilité)</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-sub)' }}>Score :</span>
+              <span className="mono" style={{ fontSize: '1.25rem', fontWeight: 900, color: solv.bancaire.ratingBAColor }}>
+                {solv.bancaire.scoreBA} / 20
+              </span>
+              <span className="badge" style={{ background: `${solv.bancaire.ratingBAColor}15`, color: solv.bancaire.ratingBAColor, fontWeight: 800 }}>
+                {solv.bancaire.ratingBA}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {Object.entries(solv.bancaire.detailsBA).map(([key, item]) => (
+              <div key={key} style={{ background: 'var(--surface)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <span>{item.label}</span>
+                  <span className="badge" style={{ background: item.score >= 4 ? '#d1fae5' : item.score >= 2.5 ? '#fef3c7' : '#fee2e2', color: item.score >= 4 ? '#065f46' : item.score >= 2.5 ? '#92400e' : '#991b1b', fontSize: '0.62rem' }}>
+                    {item.score} / 5 pts
+                  </span>
+                </div>
+                <div className="mono" style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>
+                  {key === 'rentabilite' ? `${item.val.toFixed(1)}%` : item.val >= 90 ? 'N/A' : item.val.toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Section 1 : Rotation & Délais ── */}
