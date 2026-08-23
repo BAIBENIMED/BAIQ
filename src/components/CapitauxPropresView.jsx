@@ -73,10 +73,10 @@ export function CapitauxPropresView({ data, fmt }) {
   const isPositiveVar = kpis.variationNette >= 0;
 
   return (
-    <div className="fade-in" style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div className="fade-in" style={{ padding: '16px 20px', maxWidth: '100%', margin: '0 auto' }}>
 
       {/* ── HEADER DE LA PAGE ── */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
@@ -86,10 +86,10 @@ export function CapitauxPropresView({ data, fmt }) {
               CLASSE 1 — CAPITAUX PROPRES
             </span>
           </div>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
             Tableau de Variation des Capitaux Propres (TVCP)
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '0.80rem', color: 'var(--text-muted)' }}>
             Mouvements des capitaux propres entre l'ouverture et la clôture selon le Système Comptable Financier algérien (Loi 07-11)
           </p>
         </div>
@@ -99,8 +99,8 @@ export function CapitauxPropresView({ data, fmt }) {
           <button
             onClick={() => window.print()}
             style={{
-              padding: '8px 16px', background: 'var(--surface-alt)', border: '1px solid var(--border)',
-              borderRadius: 8, fontSize: '0.78rem', fontWeight: 800, color: 'var(--text)', cursor: 'pointer',
+              padding: '7px 14px', background: 'var(--surface-alt)', border: '1px solid var(--border)',
+              borderRadius: 8, fontSize: '0.76rem', fontWeight: 800, color: 'var(--text)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6
             }}
           >
@@ -111,7 +111,7 @@ export function CapitauxPropresView({ data, fmt }) {
       </div>
 
       {/* ── CARTES KPIS EN TÊTE ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
         
         {/* 1. Capitaux d'ouverture */}
         <div className="card" style={{ padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
@@ -234,19 +234,20 @@ export function CapitauxPropresView({ data, fmt }) {
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed', minWidth: 1050 }}>
+          <div style={{ overflowX: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.73rem', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                  <th style={{ width: '25%', padding: '10px 14px', textAlign: 'left', fontWeight: 800, fontSize: '0.70rem', letterSpacing: '0.04em' }}>
+                  <th style={{ width: '25%', padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', letterSpacing: '0.04em' }}>
                     RUBRIQUES &amp; NATURE DES VARIATIONS
                   </th>
                   {colonnes.map(col => (
                     <th
                       key={col.key}
                       style={{
-                        padding: '10px 10px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem',
-                        letterSpacing: '0.03em', whiteSpace: 'normal', lineHeight: 1.25,
+                        width: col.isTotal ? '12%' : '10.5%',
+                        padding: '8px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.66rem',
+                        letterSpacing: '0.02em', whiteSpace: 'normal', lineHeight: 1.2,
                         background: col.isTotal ? '#0f172a' : 'transparent',
                         color: col.isTotal ? '#60a5fa' : '#ffffff',
                         borderLeft: '1px solid rgba(255,255,255,0.08)'
@@ -291,14 +292,15 @@ export function CapitauxPropresView({ data, fmt }) {
                     >
                       {/* Libellé de ligne */}
                       <td style={{
-                        padding: '10px 14px', fontWeight: rowFontWeight,
+                        padding: '7px 10px', fontWeight: rowFontWeight,
                         color: isCloture ? '#1e3a8a' : isOuverture ? '#1e40af' : 'var(--text)',
-                        fontSize: isCloture ? '0.82rem' : '0.76rem'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {isCloture && <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>check_circle</span>}
-                          {isOuverture && <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#3b82f6' }}>play_circle</span>}
-                          {row.libelle}
+                        fontSize: isCloture ? '0.78rem' : '0.73rem',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }} title={row.libelle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {isCloture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2563eb', flexShrink: 0 }}>check_circle</span>}
+                          {isOuverture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#3b82f6', flexShrink: 0 }}>play_circle</span>}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.libelle}</span>
                         </div>
                       </td>
 
@@ -313,13 +315,15 @@ export function CapitauxPropresView({ data, fmt }) {
                             key={col.key}
                             className="mono"
                             style={{
-                              padding: '10px 10px', textAlign: 'right',
+                              padding: '7px 6px', textAlign: 'right',
                               fontWeight: isTotalCol || isCloture || isOuverture ? 900 : 700,
-                              fontSize: isCloture || isTotalCol ? '0.80rem' : '0.75rem',
+                              fontSize: isCloture || isTotalCol ? '0.76rem' : '0.72rem',
                               color: isNegative ? '#dc2626' : (isTotalCol ? (isCloture ? '#1e3a8a' : '#1e40af') : 'var(--text)'),
                               background: isTotalCol ? (isCloture ? 'rgba(37, 99, 235, 0.18)' : 'rgba(241, 245, 249, 0.6)') : 'transparent',
                               borderLeft: '1px solid var(--border)',
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}
                           >
                             {fmtN(val)}

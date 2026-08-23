@@ -2018,15 +2018,15 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
     }
   }
 
-  // Définition des colonnes du TVCP SCF
+  // Définition des colonnes du TVCP SCF (optimisé pour affichage écran sans scroll horizontal)
   const colonnes = [
-    { key: 'capital',      label: 'Capital Social (101/109)',       numCol: '#1e40af', bg: '#eff6ff' },
-    { key: 'reserves',     label: 'Primes & Réserves (103/106)',    numCol: '#047857', bg: '#ecfdf5' },
-    { key: 'ecarts',       label: 'Écarts Évaluation (105)',        numCol: '#7c3aed', bg: '#f5f3ff' },
-    { key: 'ran',          label: 'Report à Nouveau (11)',          numCol: '#b45309', bg: '#fffbeb' },
-    { key: 'resultat',     label: 'Résultat Net (12)',              numCol: '#0369a1', bg: '#f0f9ff' },
-    { key: 'subventions',  label: 'Subventions & Prov. (13/14)',    numCol: '#475569', bg: '#f8fafc' },
-    { key: 'total',        label: 'TOTAL CAPITAUX PROPRES',         numCol: '#0f172a', bg: '#f1f5f9', isTotal: true }
+    { key: 'capital',      label: 'Capital (101)',          numCol: '#1e40af', bg: '#eff6ff' },
+    { key: 'reserves',     label: 'Réserves (106)',         numCol: '#047857', bg: '#ecfdf5' },
+    { key: 'ecarts',       label: 'Écarts (105)',           numCol: '#7c3aed', bg: '#f5f3ff' },
+    { key: 'ran',          label: 'Report (11)',            numCol: '#b45309', bg: '#fffbeb' },
+    { key: 'resultat',     label: 'Résultat (12)',          numCol: '#0369a1', bg: '#f0f9ff' },
+    { key: 'subventions',  label: 'Subv./Prov (13/14)',     numCol: '#475569', bg: '#f8fafc' },
+    { key: 'total',        label: 'TOTAL CAPITAUX',         numCol: '#0f172a', bg: '#f1f5f9', isTotal: true }
   ];
 
   // Construction des 6 lignes matricielles SCF
