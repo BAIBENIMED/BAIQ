@@ -1410,7 +1410,8 @@ export const calculateBilanFonctionnel = (data) => {
 };
 
 export const calculateSIG = (data) => {
-  if (data && data.isBalance && data.rows) {
+  const rows = Array.isArray(data) ? data : (data?.rows || (data?.isBalance ? data.rows : null));
+  if (rows && rows.length > 0) {
     // Rubriques officielles du TCR par Nature (SCF Algérie)
     let c70 = 0; // Ventes et produits annexes (CA)
     let c72 = 0; // Variation des stocks de produits finis et en-cours
@@ -1439,7 +1440,7 @@ export const calculateSIG = (data) => {
     let c77 = 0; // Produits extraordinaires
     let c67 = 0; // Charges extraordinaires
 
-    data.rows.forEach(row => {
+    rows.forEach(row => {
       if (row.ignore || !row.compte) return;
       const c = row.compte.toString().trim();
       const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
