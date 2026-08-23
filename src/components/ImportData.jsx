@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, File, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Upload, File, ChevronRight, ChevronLeft, Download, Play, Sparkles } from 'lucide-react';
 import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
+import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
 
 export function ImportData({ onDataImported }) {
   const [step, setStep] = useState(1); // 1: Profil & Secteur, 2: Import Balances N et N-1
@@ -60,6 +61,61 @@ export function ImportData({ onDataImported }) {
 
   const loadSavedDossier = (dossier) => {
     onDataImported(dossier.data);
+  };
+
+  // ── Handlers Exemples de Démonstration ──
+  const handleLoadSampleToStep2 = (sample) => {
+    setProfil({
+      nomEntreprise: sample.title,
+      secteurId: sample.secteurId,
+      effectif: String(sample.effectif || ''),
+    });
+    setFileN({ name: `Balance_${sample.id}_N.xlsx` });
+    setParsedN(sample.rowsN);
+    setErrorN(null);
+    if (sample.rowsN1 && sample.rowsN1.length > 0) {
+      setFileN1({ name: `Balance_${sample.id}_N1.xlsx` });
+      setParsedN1(sample.rowsN1);
+      setErrorN1(null);
+    } else {
+      setFileN1(null);
+      setParsedN1(null);
+      setErrorN1(null);
+    }
+    setStep(2);
+  };
+
+  const handleQuickLaunchSample = (sample) => {
+    const prof = {
+      nomEntreprise: sample.title,
+      secteurId: sample.secteurId,
+      effectif: String(sample.effectif || ''),
+    };
+    const payloadN = { isBalance: true, rows: sample.rowsN };
+    const bilanN   = calculateBilanFonctionnel(payloadN);
+    const sigN     = calculateSIG(payloadN);
+    const ratiosN  = calculateRatios(bilanN, sigN, sample.rowsN);
+
+    let dataN1 = null;
+    if (sample.rowsN1 && sample.rowsN1.length > 0) {
+      const payloadN1 = { isBalance: true, rows: sample.rowsN1 };
+      const bilanN1   = calculateBilanFonctionnel(payloadN1);
+      const sigN1     = calculateSIG(payloadN1);
+      const ratiosN1  = calculateRatios(bilanN1, sigN1, sample.rowsN1);
+      dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, rows: sample.rowsN1 };
+    }
+
+    const fullPayload = {
+      bilan: bilanN,
+      sig: sigN,
+      ratios: ratiosN,
+      rows: sample.rowsN,
+      profil: prof,
+      dataN1,
+    };
+
+    saveDossierToStorage(fullPayload);
+    onDataImported(fullPayload);
   };
 
   // ── Handlers Profil ──
@@ -242,6 +298,88 @@ export function ImportData({ onDataImported }) {
             </div>
           )}
 
+          {/* 🚀 Balances d'Exemple & Jeux de Test SCF */}
+          <div style={{ background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)', border: '1px solid #bfdbfe', borderRadius: 16, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <h4 style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                  <Sparkles size={18} className="text-blue-600" />
+                  Jeux d'Essai &amp; Balances de Démonstration (Prêts à tester)
+                </h4>
+                <p style={{ fontSize: '0.74rem', color: '#475569', margin: '3px 0 0' }}>
+                  Testez instantanément toutes les fonctionnalités (Bilan, SIG, Ratios, et <strong>Audit &amp; Jointures SCF</strong>) sans importer vos propres fichiers.
+                </p>
+              </div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '3px 9px', borderRadius: 6, background: '#dbeafe', color: '#1e40af' }}>
+                3 Modèles Complets Inclus
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+              {SAMPLE_BALANCES.map(s => (
+                <div key={s.id} style={{
+                  background: '#ffffff', borderRadius: 12, padding: 16, border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12,
+                  transition: 'transform 0.15s, box-shadow 0.15s'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 900, padding: '2px 8px', borderRadius: 4,
+                        background: `${s.badgeColor}15`, color: s.badgeColor, border: `1px solid ${s.badgeColor}40`
+                      }}>
+                        {s.badge}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                        {s.caN}
+                      </span>
+                    </div>
+
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a', marginBottom: 2 }}>
+                      {s.title}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginBottom: 6 }}>
+                      {s.subtitle}
+                    </div>
+                    <div style={{ fontSize: '0.70rem', color: '#475569', lineHeight: 1.35 }}>
+                      {s.description}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => handleQuickLaunchSample(s)}
+                        style={{
+                          flex: 1, padding: '8px 10px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                          color: '#ffffff', border: 'none', borderRadius: 8, fontSize: '0.74rem', fontWeight: 800,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          boxShadow: '0 2px 6px rgba(37,99,235,0.25)'
+                        }}
+                      >
+                        <Play size={14} fill="#ffffff" />
+                        Tester en 1 Clic
+                      </button>
+
+                      <button
+                        onClick={() => downloadSampleExcel(s.id)}
+                        title="Télécharger le classeur Excel (.xlsx) de cet exemple"
+                        style={{
+                          padding: '8px 10px', background: '#f8fafc', border: '1px solid #cbd5e1',
+                          borderRadius: 8, fontSize: '0.72rem', fontWeight: 700, color: '#334155',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                        }}
+                      >
+                        <Download size={14} />
+                        .xlsx
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* 🔒 1. Confidentialité & Anonymat */}
           <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#059669' }}>lock</span>
@@ -352,7 +490,31 @@ export function ImportData({ onDataImported }) {
 
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Chargement des Balances Comptables SCF</h3>
-            <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Importez la balance de l'exercice N (obligatoire). Vous pouvez également importer la balance N-1 (optionnelle) pour débloquer l'analyse comparative d'évolution.</p>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 12 }}>Importez la balance de l'exercice N (obligatoire). Vous pouvez également importer la balance N-1 (optionnelle) pour débloquer l'analyse comparative d'évolution.</p>
+
+            {/* Quick sample bar in Step 2 */}
+            <div style={{ background: '#f8fafc', padding: '10px 16px', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} className="text-blue-600" />
+                Ou charger une balance d'exemple prête à l'emploi :
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {SAMPLE_BALANCES.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleLoadSampleToStep2(s)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff',
+                      fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.badgeColor }}></span>
+                    {s.badge}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 20, alignItems: 'stretch' }}>
