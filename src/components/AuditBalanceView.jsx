@@ -54,7 +54,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
 
   // ── Filtrage onglet Natures ──────────────────────────────────────────────
   const filteredAccounts = audit.comptesAudit.filter(c => {
-    if (hideZeroAccounts && Math.abs(c.deb) < 0.001 && Math.abs(c.cred) < 0.001 && Math.abs(c.mouvDeb || 0) < 0.001 && Math.abs(c.mouvCred || 0) < 0.001) return false;
+    if (hideZeroAccounts && Math.abs(c.deb) < 1.0 && Math.abs(c.cred) < 1.0 && Math.abs(c.mouvDeb || 0) < 1.0 && Math.abs(c.mouvCred || 0) < 1.0) return false;
     if (natureFilter === 'anomalies' && c.verification.statut !== 'ANOMALIE')  return false;
     if (natureFilter === 'atypiques' && c.verification.statut !== 'ATYPIQUE')  return false;
     if (natureFilter === 'conformes' && c.verification.statut !== 'CONFORME')  return false;
@@ -273,11 +273,11 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                         <span>{c.verification.statut}</span>
                       </span>
                     </td>
-                    <td className="right mono" style={{ padding: '5px 8px', color: c.deb > 0 ? '#60a5fa' : 'var(--text-muted)', fontWeight: c.deb > 0 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
-                      {c.deb > 0 ? Math.round(c.deb).toLocaleString('fr-FR') : '—'}
+                    <td className="right mono" style={{ padding: '5px 8px', color: c.deb >= 1 ? '#60a5fa' : 'var(--text-muted)', fontWeight: c.deb >= 1 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
+                      {c.deb >= 1 ? Math.round(c.deb).toLocaleString('fr-FR') : '—'}
                     </td>
-                    <td className="right mono" style={{ padding: '5px 8px', color: c.cred > 0 ? '#34d399' : 'var(--text-muted)', fontWeight: c.cred > 0 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
-                      {c.cred > 0 ? Math.round(c.cred).toLocaleString('fr-FR') : '—'}
+                    <td className="right mono" style={{ padding: '5px 8px', color: c.cred >= 1 ? '#34d399' : 'var(--text-muted)', fontWeight: c.cred >= 1 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
+                      {c.cred >= 1 ? Math.round(c.cred).toLocaleString('fr-FR') : '—'}
                     </td>
                     <td style={{
                       fontSize: '0.68rem',

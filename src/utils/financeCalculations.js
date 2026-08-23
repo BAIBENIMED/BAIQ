@@ -21,8 +21,9 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
   const deb = parseNum(soldeFinDebit);
   const cred = parseNum(soldeFinCredit);
   const netSolde = deb - cred; // > 0 = Débiteur, < 0 = Créditeur, 0 = Nul
-  const isDeb = netSolde > 0.001;
-  const isCred = netSolde < -0.001;
+  const MIN_SIGNIFICANT = 1.0; // Seuil de matérialité SCF : ignorer les résidus de centimes / très petits montants (< 1 DA)
+  const isDeb = netSolde >= MIN_SIGNIFICANT;
+  const isCred = netSolde <= -MIN_SIGNIFICANT;
   const isNul = !isDeb && !isCred;
 
   // ── CLASSE 1 : COMPTES DE CAPITAUX (Passif / Capitaux Propres & Dettes LT) ──
@@ -138,20 +139,20 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
       return {
         classe: 2, classeLabel: '2 — Amortissements', nature: 'Amortissements des immobilisations', sensAttendu: 'CRÉDITEUR',
         statut: isDeb ? 'ANOMALIE' : 'CONFORME',
-        diagnostic: isDeb ? 'Anomalie : Les amortissements (Compte 28) doivent obligatoirement être créditeurs.' : 'Amortissement cumulé régulier (valeur négative d\'actif).'
+        diagnostic: isDeb ? 'Anomalie : Les amortissements (Compte 28) doivent obligatoirement être créditeurs.' : isCred ? 'Amortissement cumulé régulier (valeur négative d\'actif).' : 'Amortissement soldé (Solde nul).'
       };
     }
     if (c.startsWith('29')) {
       return {
         classe: 2, classeLabel: '2 — Dépréciations', nature: 'Pertes de valeur / Dépréciations d\'immobilisations', sensAttendu: 'CRÉDITEUR',
         statut: isDeb ? 'ANOMALIE' : 'CONFORME',
-        diagnostic: isDeb ? 'Anomalie : Une dépréciation d\'actif doit être créditrice.' : 'Perte de valeur régulière (compte correcteur d\'actif).'
+        diagnostic: isDeb ? 'Anomalie : Une dépréciation d\'actif doit être créditrice.' : isCred ? 'Perte de valeur régulière (compte correcteur d\'actif).' : 'Dépréciation soldée (Solde nul).'
       };
     }
     return {
       classe: 2, classeLabel: '2 — Immobilisations', nature: 'Immobilisations incorporelles, corporelles ou financières (Brut)', sensAttendu: 'DÉBITEUR',
       statut: isCred ? 'ANOMALIE' : 'CONFORME',
-      diagnostic: isCred ? 'Anomalie critique : Une immobilisation brute (Compte 20/21/22/23/26/27) ne peut avoir un solde créditeur.' : 'Immobilisation brute régulière (solde débiteur).'
+      diagnostic: isCred ? 'Anomalie critique : Une immobilisation brute (Compte 20/21/22/23/26/27) ne peut avoir un solde créditeur.' : isDeb ? 'Immobilisation brute régulière (solde débiteur).' : 'Immobilisation soldée (Solde nul).'
     };
   }
 
@@ -161,13 +162,13 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
       return {
         classe: 3, classeLabel: '3 — Dépréciations Stocks', nature: 'Pertes de valeur sur stocks', sensAttendu: 'CRÉDITEUR',
         statut: isDeb ? 'ANOMALIE' : 'CONFORME',
-        diagnostic: isDeb ? 'Anomalie : La dépréciation de stock (Compte 39) doit être créditrice.' : 'Dépréciation de stock régulière.'
+        diagnostic: isDeb ? 'Anomalie : La dépréciation de stock (Compte 39) doit être créditrice.' : isCred ? 'Dépréciation de stock régulière.' : 'Dépréciation de stock soldée (Solde nul).'
       };
     }
     return {
       classe: 3, classeLabel: '3 — Stocks & En-cours', nature: 'Stocks de marchandises, matières ou produits', sensAttendu: 'DÉBITEUR',
       statut: isCred ? 'ANOMALIE' : 'CONFORME',
-      diagnostic: isCred ? 'Anomalie critique : Un compte de stock physique (30/31/32/33/35) ne peut avoir un solde négatif (créditeur).' : 'Stock régulier (solde débiteur).'
+      diagnostic: isCred ? 'Anomalie critique : Un compte de stock physique (30/31/32/33/35) ne peut avoir un solde négatif (créditeur).' : isDeb ? 'Stock régulier (solde débiteur).' : 'Stock soldé (Solde nul).'
     };
   }
 
@@ -366,7 +367,7 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
     return {
       classe: 6, classeLabel: '6 — Charges d\'Exploitation/Financières', nature: 'Achats, services, personnel, dotations & impôts', sensAttendu: 'DÉBITEUR',
       statut: isCred ? 'ANOMALIE' : 'CONFORME',
-      diagnostic: isCred ? 'Anomalie : Une charge (Classe 6) ne doit pas avoir un solde net créditeur (annulations ou erreurs d\'imputation).' : 'Charge d\'exploitation régulière (solde débiteur).'
+      diagnostic: isCred ? 'Anomalie : Une charge (Classe 6) ne doit pas avoir un solde net créditeur (annulations ou erreurs d\'imputation).' : isDeb ? 'Charge d\'exploitation régulière (solde débiteur).' : 'Compte de charge soldé (Solde nul).'
     };
   }
 
@@ -387,13 +388,13 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
       return {
         classe: 7, classeLabel: '7 — Rabais accordés', nature: 'Rabais, remises et ristournes accordés par l\'entreprise', sensAttendu: 'DÉBITEUR',
         statut: isCred ? 'ATYPIQUE' : 'CONFORME',
-        diagnostic: isCred ? 'Solde créditeur sur RRR accordés.' : 'RRR accordés réguliers (diminution du chiffre d\'affaires).'
+        diagnostic: isCred ? 'Solde créditeur sur RRR accordés.' : isDeb ? 'RRR accordés réguliers (diminution du chiffre d\'affaires).' : 'Compte RRR accordés soldé (Solde nul).'
       };
     }
     return {
       classe: 7, classeLabel: '7 — Produits & Ventes', nature: 'Ventes, subventions, produits annexes & financiers', sensAttendu: 'CRÉDITEUR',
       statut: isDeb ? 'ANOMALIE' : 'CONFORME',
-      diagnostic: isDeb ? 'Anomalie : Un compte de produit (Classe 7) ne doit pas avoir un solde net débiteur (avoirs supérieurs aux factures).' : 'Produit régulier (solde créditeur).'
+      diagnostic: isDeb ? 'Anomalie : Un compte de produit (Classe 7) ne doit pas avoir un solde net débiteur (avoirs supérieurs aux factures).' : isCred ? 'Produit régulier (solde créditeur).' : 'Compte de produit soldé (Solde nul).'
     };
   }
 
@@ -421,17 +422,21 @@ export function auditBalanceAccounts(rows = []) {
     let deb = safeNum(r.soldeFinDebit);
     let cred = safeNum(r.soldeFinCredit);
 
+    // Ignorer les résidus inférieurs à 1 DA (centimes / arrondis)
+    if (deb < 1.0) deb = 0;
+    if (cred < 1.0) cred = 0;
+
     // Si les colonnes Solde Fin n'étaient pas présentes dans l'import
     if (r.soldeFinDebit === undefined && r.soldeFinCredit === undefined) {
       if (r.solde !== undefined) {
         const s = safeNum(r.solde);
-        if (s > 0.001) deb = s;
-        else if (s < -0.001) cred = -s;
+        if (s >= 1.0) deb = s;
+        else if (s <= -1.0) cred = -s;
       } else {
         const totalDeb = safeNum(r.soldeDebutDebit) + safeNum(r.mouvementDebit);
         const totalCred = safeNum(r.soldeDebutCredit) + safeNum(r.mouvementCredit);
-        if (totalDeb > totalCred) deb = totalDeb - totalCred;
-        else if (totalCred > totalDeb) cred = totalCred - totalDeb;
+        if (totalDeb - totalCred >= 1.0) deb = totalDeb - totalCred;
+        else if (totalCred - totalDeb >= 1.0) cred = totalCred - totalDeb;
       }
     }
 
