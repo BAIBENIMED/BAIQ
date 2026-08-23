@@ -694,27 +694,35 @@ export function auditCrossAccountMovements(rows = []) {
   });
 
   const c600 = getSums('600');
-  const ecart600_30 = safeNum(Math.abs(c600.mouvDeb - c30.mouvCred));
-  const isZero600 = c600.mouvDeb === 0 && c30.mouvCred === 0;
+  const c603 = getSums('603');
+  const soldeNet603 = safeNum(c603.finDeb - c603.finCred);
+  const totalChargeMarchandisesTCR = c600.mouvDeb > 0 ? c600.mouvDeb : safeNum(c600.finDeb + soldeNet603);
+  const varReelleMarchandises = safeNum(c30.soldeInit - c30.soldeFin);
+  const totalFluxStocks30Bilan = c30.mouvCred > 0 ? c30.mouvCred : Math.max(0, varReelleMarchandises);
+  const ecartMarchandises = safeNum(Math.abs(totalChargeMarchandisesTCR - totalFluxStocks30Bilan));
+  const isZeroMarchandises = totalChargeMarchandisesTCR === 0 && totalFluxStocks30Bilan === 0;
+
   regles.push({
-    id: 'conso_600_30',
+    id: 'cycle_marchandises_600_603_30',
     cycle: 'Consommations & Ventes',
-    titre: 'Marchandises Vendues : Débit 600 vs Sorties de Stock 30 (Crédit)',
-    sourceLabel: 'Débit 600 (Achats vendus)',
-    sourceVal: c600.mouvDeb,
-    sourceAccounts: c600.accounts,
+    titre: 'Marchandises : Achats Vendus & Variation (600 / 603) vs Sorties de Stocks 30 (Crédit & Déstockage)',
+    sourceLabel: 'Charges Marchandises TCR (Débit 600 / Solde 603)',
+    sourceVal: totalChargeMarchandisesTCR,
+    sourceAccounts: [...c600.accounts, ...c603.accounts],
     sourceFocus: 'DEBIT',
-    cibleLabel: 'Crédit 30 (Sorties marchandises)',
-    cibleVal: c30.mouvCred,
+    cibleLabel: 'Sorties & Déstockage 30 (Crédit 30)',
+    cibleVal: totalFluxStocks30Bilan,
     cibleAccounts: c30.accounts,
     cibleFocus: 'CREDIT',
-    ecart: ecart600_30,
-    statut: isZero600 ? 'NON_MOUVEMENTE' : ecart600_30 < 1 ? 'CONFORME' : ecart600_30 < 1000 ? 'TOLERANCE' : 'ANOMALIE',
-    explication: isZero600
-      ? 'Aucun achat vendu (600) ni sortie de stock de marchandises (30) constaté.'
-      : ecart600_30 < 1
-      ? 'Égalité parfaite : Le coût d\'achat des marchandises vendues (600) correspond exactement aux sorties de stock (30).'
-      : `Écart de stock constaté de ${fmtDA(ecart600_30)} : Décalage d'inventaire ou régularisation de fin d'exercice.`
+    ecart: ecartMarchandises,
+    statut: isZeroMarchandises ? 'NON_MOUVEMENTE' : ecartMarchandises < 1 ? 'CONFORME' : ecartMarchandises < 200000 ? 'TOLERANCE' : 'ANOMALIE',
+    explication: isZeroMarchandises
+      ? 'Aucun mouvement de marchandises (600 / 603 / 30) constaté sur la période.'
+      : ecartMarchandises < 1
+      ? 'Égalité parfaite (SCF) : Les charges de marchandises au TCR (600 / 603) correspondent exactement aux sorties de stocks au bilan (Compte 30).'
+      : ecartMarchandises < 200000
+      ? `Écart d'inventaire minime de ${fmtDA(ecartMarchandises)} (${((ecartMarchandises / (totalChargeMarchandisesTCR || 1)) * 100).toFixed(2)}%) : Ajustement régulier d'inventaire physique de fin d'exercice.`
+      : `Écart de ${fmtDA(ecartMarchandises)} entre les charges de marchandises au TCR (${fmtDA(totalChargeMarchandisesTCR)}) et les sorties physiques de stocks (30 : ${fmtDA(totalFluxStocks30Bilan)}).`
   });
 
   const c602 = getSums('602');
@@ -870,36 +878,7 @@ export function auditCrossAccountMovements(rows = []) {
       : `Écart constaté de ${fmtDA(ecart72)} : Le montant de la variation de production (Compte 72) au TCR diffère de la variation constatée au bilan (Comptes 35/33/34).`
   });
 
-  // ── 6. CYCLE VARIATION DES STOCKS DE MARCHANDISES (Compte 603 vs Stocks Marchandises 30 UNIQUEMENT) ──
-  const c603 = getSums('603');
-  const cMarchandises30 = getSums('30', ['39']); // Compte 30 Marchandises UNIQUEMENT
-  const varReelleMarchandises = safeNum(cMarchandises30.soldeInit - cMarchandises30.soldeFin); // Stock Initial 30 - Stock Final 30 = Déstockage Marchandises
-  const soldeNet603 = safeNum(c603.finDeb - c603.finCred); // Débit 603 (déstockage) - Crédit 603 (stockage)
-  const ecart603 = safeNum(Math.abs(varReelleMarchandises - soldeNet603));
-  const isZero603 = Math.abs(soldeNet603) < 0.001 && Math.abs(varReelleMarchandises) < 0.001;
-
-  regles.push({
-    id: 'variation_stocks_603',
-    cycle: 'Marchandises (TCR & Bilan)',
-    titre: 'Compte 603 (Variation Stocks Marchandises) vs Déstockage Marchandises 30 UNIQUEMENT (Stock Initial - Stock Final)',
-    sourceLabel: 'Solde Net 603 (TCR - Var. Marchandises)',
-    sourceVal: soldeNet603,
-    sourceAccounts: c603.accounts,
-    sourceFocus: 'FIN',
-    cibleLabel: 'Déstockage Net Compte 30 (SI - SF)',
-    cibleVal: varReelleMarchandises,
-    cibleAccounts: cMarchandises30.accounts,
-    cibleFocus: 'VAR',
-    ecart: ecart603,
-    statut: isZero603 ? 'NON_MOUVEMENTE' : ecart603 < 1 ? 'CONFORME' : ecart603 < 1000 ? 'TOLERANCE' : 'ANOMALIE',
-    explication: isZero603
-      ? 'Aucune variation de stock de marchandises (603 / 30) sur la période.'
-      : ecart603 < 1
-      ? 'Concordance parfaite : Le compte 603 reflète fidèlement la variation des stocks de marchandises (Compte 30 uniquement : Stock Initial - Stock Final).'
-      : `Écart constaté de ${fmtDA(ecart603)} : Le compte 603 au TCR ne correspond pas à la variation constatée sur le compte de marchandises 30 (Stock Initial ${fmtDA(cMarchandises30.soldeInit)} → Stock Final ${fmtDA(cMarchandises30.soldeFin)}).`
-  });
-
-  // ── 7. CYCLE VIREMENTS INTERNES (58 Débit vs 58 Crédit) ──
+  // ── 6. CYCLE VIREMENTS INTERNES (58 Débit vs 58 Crédit) ──
   const c58 = getSums('58');
   const ecart58 = safeNum(Math.abs(c58.mouvDeb - c58.mouvCred));
   const soldeFin58 = safeNum(Math.abs(c58.soldeFin));
