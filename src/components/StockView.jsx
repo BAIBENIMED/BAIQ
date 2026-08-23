@@ -329,8 +329,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
         </div>
       </div>
 
-      {/* ── SÉLECTEUR D'ONGLETS INTERACTIF HAUTE VISIBILITÉ (4 OUTILS EXPERTS) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, margin: '6px 0 20px 0' }}>
+      {/* ── SÉLECTEUR D'ONGLETS INTERACTIF HAUTE VISIBILITÉ (3 OUTILS EXPERTS) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, margin: '6px 0 20px 0' }}>
         {[
           {
             id: 'synthese',
@@ -364,17 +364,6 @@ export function StockView({ rows, ratios, formatCurrency }) {
             subtitle: 'Anti-rupture & surconsommation',
             icon: 'shield',
             accent: '#d97706'
-          },
-          {
-            id: 'rapprochement',
-            num: '04',
-            badge: '📑 Audit Croisé',
-            badgeColor: '#7c3aed',
-            badgeBg: '#f5f3ff',
-            title: '4. Rapprochement SCF',
-            subtitle: 'Concordance Bilan ↔ 603 / 72',
-            icon: 'account_tree',
-            accent: '#7c3aed'
           }
         ].map(t => {
           const isActive = activeTab === t.id;
@@ -1042,84 +1031,6 @@ export function StockView({ rows, ratios, formatCurrency }) {
               </div>
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════
-          TAB 4 : RAPPROCHEMENT COMPTABLE SCF (CLASSE 3 VS 603/72)
-      ═══════════════════════════════════════════════════════════ */}
-      {activeTab === 'rapprochement' && (
-        <div className="space-y-6">
-          <div className="card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#7c3aed' }}>account_tree</span>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 800 }}>
-                  Rapprochement d'Audit Comptable : Variation Bilan vs Comptes 603 &amp; 72
-                </h3>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Contrôle de concordance entre la variation des stocks (Bilan Actif) et les charges/produits (TCR)
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-              {/* Approvisionnements (30/31/32 vs 603) */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1e40af', marginBottom: 8, textTransform: 'uppercase' }}>
-                  📦 Approvisionnements &amp; Marchandises (603)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.74rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Mouvement Débit 603 (Déstockage) :</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{fmt(comptesConcordance.deb603)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Mouvement Crédit 603 (Stockage) :</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{fmt(comptesConcordance.cred603)}</span>
-                  </div>
-                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                    <span>Solde Net Compte 603 :</span>
-                    <span className="mono" style={{ color: comptesConcordance.net603 > 0 ? '#d97706' : '#059669' }}>
-                      {fmt(comptesConcordance.net603)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Production Stockée (35 vs 72) */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#047857', marginBottom: 8, textTransform: 'uppercase' }}>
-                  🏭 Production Stockée (72)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.74rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Mouvement Crédit 72 (Stockage PF) :</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{fmt(comptesConcordance.cred72)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Mouvement Débit 72 (Déstockage PF) :</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{fmt(comptesConcordance.deb72)}</span>
-                  </div>
-                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                    <span>Solde Net Compte 72 :</span>
-                    <span className="mono" style={{ color: comptesConcordance.net72 > 0 ? '#059669' : '#d97706' }}>
-                      {fmt(comptesConcordance.net72)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563eb' }}>fact_check</span>
-              <span style={{ fontSize: '0.74rem', color: '#1e40af', lineHeight: 1.4 }}>
-                <strong>Principe d'inversion SCF :</strong> Un compte 603 débiteur ou 72 débiteur traduit un <em>déstockage</em> (consommation ou vente sur stocks antérieurs), tandis qu'un solde créditeur traduit un <em>stockage</em> (économie de charges ou production mise en réserve).
-              </span>
-            </div>
           </div>
         </div>
       )}
