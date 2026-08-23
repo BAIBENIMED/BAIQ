@@ -231,7 +231,75 @@ export function StockView({ rows, ratios, formatCurrency }) {
           </tfoot>
         </table>
       </div>
+      </div>
+
+      {/* ── CADRE D'ANALYSE FINANCIÈRE & STRATÉGIQUE DES STOCKS (BFR / SÉCURITÉ) ── */}
+      <div style={{
+        marginTop: 20,
+        padding: '18px 22px',
+        borderRadius: 14,
+        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.03) 0%, rgba(15, 23, 42, 0.06) 100%)',
+        border: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>insights</span>
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.90rem', fontWeight: 800, color: 'var(--text)' }}>
+              Diagnostic Financier : Déstockage, BFR &amp; Stock de Sécurité
+            </h4>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              Grille d'interprétation managériale de la variation des stocks (Loi 07-11 / Gestion Financière)
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginTop: 4 }}>
+          {/* 1. Déstockage = Opportunité Cash */}
+          <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid #bbf7d0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#16a34a' }}>trending_down</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>
+                Déstockage Maîtrisé (Gain de Trésorerie)
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text)', lineHeight: 1.45 }}>
+              Un déstockage est <strong>un signal très positif pour le BFR</strong> : il libère des liquidités immédiates, diminue les capitaux immobilisés et réduit les frais financiers et coûts d'entreposage.
+            </p>
+          </div>
+
+          {/* 2. Condition 1 : Rendement & Surconsommation */}
+          <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid #fed7aa', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#ea580c' }}>verified</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase' }}>
+                Condition 1 : Rendement Matière
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text)', lineHeight: 1.45 }}>
+              Vérifier l'<strong>absence de surconsommation</strong> : les matières déstockées doivent s'être traduites en production vendue ou facturée, et non en rebuts, pertes ou coulage d'atelier.
+            </p>
+          </div>
+
+          {/* 3. Condition 2 : Stock de Sécurité & Rupture */}
+          <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid #bfdbfe', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>shield</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
+                Condition 2 : Stock de Sécurité
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text)', lineHeight: 1.45 }}>
+              Contrôler le <strong>délai d'écoulement ({Math.round(rotationJours)} j)</strong> : le stock final doit rester supérieur au seuil critique de sécurité pour prévenir tout arrêt de production ou rupture client.
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </div>
-);
+  );
 }
