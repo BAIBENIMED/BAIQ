@@ -1,5 +1,13 @@
 import * as XLSX from 'xlsx';
 
+const safeNum = (v) => {
+  if (v === undefined || v === null || v === '') return 0;
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+};
+
 /**
  * ═══════════════════════════════════════════════════════════════
  * VÉRIFICATION DE LA NATURE DES COMPTES (SCF Algérie — Loi 07-11)
@@ -1330,7 +1338,9 @@ export const calculateBilanFonctionnel = (data) => {
     data.rows.forEach(row => {
       if (row.ignore || !row.compte) return;
       const c = row.compte.toString().trim();
-      const solde = row.solde || 0; // debit - credit (positif = debiteur, negatif = crediteur)
+      const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+      const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+      const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
       if (c.startsWith('6')) {
         sum6 += solde;
@@ -1344,7 +1354,9 @@ export const calculateBilanFonctionnel = (data) => {
     data.rows.forEach(row => {
       if (row.ignore || !row.compte) return;
       const c = row.compte.toString().trim();
-      const solde = row.solde || 0;
+      const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+      const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+      const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
       // 1. Amortissements et Dépréciations de l'actif (28, 29, 39, 49, 59)
       if (c.startsWith('28') || c.startsWith('29') || c.startsWith('39') || c.startsWith('49') || c.startsWith('59')) {
@@ -1430,7 +1442,9 @@ export const calculateSIG = (data) => {
     data.rows.forEach(row => {
       if (row.ignore || !row.compte) return;
       const c = row.compte.toString().trim();
-      const solde = row.solde || 0; // solde = debit - credit (debiteur > 0, crediteur < 0)
+      const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+      const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+      const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
       // ── CLASSE 6 : CHARGES (solde débiteur = positif) ──
       if (c.startsWith('6')) {
@@ -1555,11 +1569,13 @@ export const calculateRatios = (bilan, sig, rows) => {
     rows.forEach(row => {
       if (row.ignore || !row.compte) return;
       const c = row.compte.toString().trim();
-      const solde = row.solde || 0;
+      const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+      const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+      const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
       // Créances clients (Compte 41x hors 419)
       if (c.startsWith('41') && !c.startsWith('419')) {
-        const soldeNet = solde > 0 ? solde : ((row.soldeFinDebit || 0) - (row.soldeFinCredit || 0));
+        const soldeNet = solde > 0 ? solde : (deb - cred);
         if (soldeNet > 0) creancesClients += soldeNet;
       }
       
@@ -1575,7 +1591,7 @@ export const calculateRatios = (bilan, sig, rows) => {
 
       // Dettes Fournisseurs (Compte 40x hors 409 et 406)
       if (c.startsWith('40') && !c.startsWith('409') && !c.startsWith('406')) {
-        const soldeNet = solde < 0 ? -solde : ((row.soldeFinCredit || 0) - (row.soldeFinDebit || 0));
+        const soldeNet = solde < 0 ? -solde : (cred - deb);
         if (soldeNet > 0) dettesFournisseurs += soldeNet;
       }
 
@@ -1975,8 +1991,13 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
   if (sig && sig.resultatNet !== undefined && sig.resultatNet !== 0) {
     resNetExercice = sig.resultatNet;
   } else {
-    const rFin = getSoldeFin('12');
-    resNetExercice = rFin !== 0 ? rFin : (getSoldeFin('120') - getSoldeFin('129'));
+    const computedSIG = calculateSIG({ isBalance: true, rows });
+    if (computedSIG && computedSIG.resultatNet !== undefined && computedSIG.resultatNet !== 0) {
+      resNetExercice = computedSIG.resultatNet;
+    } else {
+      const rFin = getSoldeFin('12');
+      resNetExercice = rFin !== 0 ? rFin : (getSoldeFin('120') - getSoldeFin('129'));
+    }
   }
 
   // 6. Subventions d'investissement & Provisions réglementées (13, 14)
