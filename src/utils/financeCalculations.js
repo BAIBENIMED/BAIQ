@@ -2156,8 +2156,13 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
       totalFin: soldeClotTotal,
       variationNette: varNette,
       pctVariation: pctVar,
-      resultatNet: resNetExercice,
-      dividendesEstimes: dividendes
+      resultatNetAnterieur: resNetAnterieur,
+      affectationReserves,
+      affectationRAN,
+      dividendesEstimes: dividendes,
+      varCapital,
+      resultatNetN: resNetExercice,
+      resultatNet: resNetExercice
     },
     comptesClasse1
   };

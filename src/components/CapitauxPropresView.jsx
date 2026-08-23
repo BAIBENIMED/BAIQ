@@ -129,34 +129,33 @@ export function CapitauxPropresView({ data, fmt }) {
           </div>
         </div>
 
-        {/* 2. Résultat Net */}
+        {/* 2. Résultat N-1 & Affectation (Dividendes / RAN / Réserves) */}
         <div className="card" style={{ 
           padding: '16px 20px', 
-          background: kpis.resultatNet >= 0 
-            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.02) 100%)' 
-            : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.02) 100%)', 
-          border: `1px solid ${kpis.resultatNet >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`, 
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.02) 100%)', 
+          border: '1px solid rgba(245, 158, 11, 0.3)', 
           position: 'relative', 
           overflow: 'hidden' 
         }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: kpis.resultatNet >= 0 ? '#047857' : '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
-            Résultat Net de l'Exercice (N)
+          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            Affectation Résultat (N-1) &amp; Dividendes
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: kpis.resultatNet >= 0 ? '#059669' : '#dc2626', lineHeight: 1.2 }}>
-            {fmtCurrency(kpis.resultatNet)}
+          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#d97706', lineHeight: 1.2 }}>
+            {fmtCurrency(kpis.resultatNetAnterieur || 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: kpis.resultatNet >= 0 ? '#059669' : '#dc2626', fontWeight: 800, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{kpis.resultatNet >= 0 ? 'check_circle' : 'cancel'}</span>
-            {kpis.resultatNet >= 0 ? 'Bénéfice net comptable (TCR / Compte 12)' : 'Perte nette comptable (TCR / Compte 12)'}
+          <div style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 800, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706' }}>pie_chart</span>
+            {kpis.dividendesEstimes > 0 
+              ? `Dividendes : ${fmtCurrency(kpis.dividendesEstimes)} • Réserves/RAN : ${fmtCurrency((kpis.affectationRAN || 0) + (kpis.affectationReserves || 0))}`
+              : `100% conservé (Reporté au RAN / Réserves : ${fmtCurrency(kpis.resultatNetAnterieur || 0)})`
+            }
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.09, pointerEvents: 'none' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: kpis.resultatNet >= 0 ? '#059669' : '#dc2626' }}>
-              {kpis.resultatNet >= 0 ? 'trending_up' : 'trending_down'}
-            </span>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#d97706' }}>payments</span>
           </div>
         </div>
 
-        {/* 3. Variation Nette */}
+        {/* 3. Variation Nette & Résultat Net (N) */}
         <div className="card" style={{ padding: '16px 20px', background: isPositiveVar ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)', border: `1px solid ${isPositiveVar ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`, position: 'relative', overflow: 'hidden' }}>
           <div style={{ fontSize: '0.68rem', fontWeight: 800, color: isPositiveVar ? '#047857' : '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Variation Nette Globale (N)
@@ -164,8 +163,8 @@ export function CapitauxPropresView({ data, fmt }) {
           <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: isPositiveVar ? '#059669' : '#dc2626', lineHeight: 1.2 }}>
             {isPositiveVar ? '+' : ''}{fmtCurrency(kpis.variationNette)}
           </div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isPositiveVar ? '#059669' : '#dc2626', marginTop: 4 }}>
-            {fmtPct(kpis.pctVariation)} sur l'exercice
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isPositiveVar ? '#047857' : '#b91c1c', marginTop: 4 }}>
+            Résultat N : {fmtCurrency(kpis.resultatNetN || kpis.resultatNet)} (à affecter en N+1)
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 64, color: isPositiveVar ? '#059669' : '#dc2626' }}>swap_vert</span>
