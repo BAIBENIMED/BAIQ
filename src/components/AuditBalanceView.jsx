@@ -811,13 +811,16 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             {accounts.length > 0 && (
               <tfoot>
                 <tr style={{ background: thBg, borderTop: `2px solid ${accentBorder}` }}>
-                  <td colSpan="3" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.73rem', color: '#ffffff' }}>
-                    TOTAL — {accounts.length} compte{accounts.length > 1 ? 's' : ''}
+                  <td colSpan="2" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.73rem', color: '#ffffff' }}>
+                    TOTAL ({accounts.length} compte{accounts.length > 1 ? 's' : ''})
                     {checked.size > 0 && (
                       <span style={{ marginLeft: 8, fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: isSource ? '#2563eb' : '#059669', color: '#ffffff' }}>
                         {checked.size} sélectionné{checked.size > 1 ? 's' : ''}
                       </span>
                     )}
+                  </td>
+                  <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.68rem', color: tagColor, fontWeight: 800 }}>
+                    Solde net : <strong className="mono" style={{ color: '#ffffff', fontSize: '0.76rem' }}>{fmt(totalVal)}</strong>
                   </td>
                   <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#ffffff', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
                     {fmtN(sumTotal)}
