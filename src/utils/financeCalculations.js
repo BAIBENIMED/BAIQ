@@ -1146,6 +1146,11 @@ export const parseFile = async (file) => {
             fc(['début', 'debit']) !== -1 ? fc(['début', 'debit']) :
             fc(['debut', 'debit']) !== -1 ? fc(['debut', 'debit']) :
             fc(['initial', 'debit']) !== -1 ? fc(['initial', 'debit']) :
+            fc(['init', 'deb']) !== -1 ? fc(['init', 'deb']) :
+            fc(['init', 'dbt']) !== -1 ? fc(['init', 'dbt']) :
+            fc(['ant', 'dbt']) !== -1 ? fc(['ant', 'dbt']) :
+            fc(['ant', 'débit']) !== -1 ? fc(['ant', 'débit']) :
+            fc(['ant', 'debit']) !== -1 ? fc(['ant', 'debit']) :
             fc(['ouv', 'debit']) !== -1 ? fc(['ouv', 'debit']) : -1;
           let soldeDebutCreditIdx = soldeDebutDebitIdx !== -1 ? soldeDebutDebitIdx + 1 : -1;
 
@@ -1154,11 +1159,19 @@ export const parseFile = async (file) => {
             fc(['mouvement', 'débit']) !== -1 ? fc(['mouvement', 'débit']) :
             fc(['mouvement', 'debit']) !== -1 ? fc(['mouvement', 'debit']) :
             fc(['mouv', 'débit']) !== -1 ? fc(['mouv', 'débit']) :
-            fc(['mouv', 'debit']) !== -1 ? fc(['mouv', 'debit']) : -1;
+            fc(['mouv', 'debit']) !== -1 ? fc(['mouv', 'debit']) :
+            fc(['mouv', 'dbt']) !== -1 ? fc(['mouv', 'dbt']) :
+            fc(['débit', 'période']) !== -1 ? fc(['débit', 'période']) :
+            fc(['debit', 'periode']) !== -1 ? fc(['debit', 'periode']) :
+            fc(['dbt', 'pér']) !== -1 ? fc(['dbt', 'pér']) :
+            fc(['dbt', 'periode']) !== -1 ? fc(['dbt', 'periode']) : -1;
           let mouvCreditIdx = mouvDebitIdx !== -1 ? mouvDebitIdx + 1 : -1;
 
           // ── 3. Solde Période Débit (identifier pour IGNORER, col Crédit = +1) ──
           let soldePeriodeDebitIdx =
+            fc(['solde', 'pér', 'dbt']) !== -1 ? fc(['solde', 'pér', 'dbt']) :
+            fc(['solde', 'période', 'débit']) !== -1 ? fc(['solde', 'période', 'débit']) :
+            fc(['solde', 'periode', 'debit']) !== -1 ? fc(['solde', 'periode', 'debit']) :
             fc(['période', 'débit']) !== -1 ? fc(['période', 'débit']) :
             fc(['periode', 'debit']) !== -1 ? fc(['periode', 'debit']) : -1;
           let soldePeriodeCreditIdx = soldePeriodeDebitIdx !== -1 ? soldePeriodeDebitIdx + 1 : -1;
@@ -1166,11 +1179,14 @@ export const parseFile = async (file) => {
           // ── 4. Solde Fin Débit — EXCLURE période/periode (col Crédit = +1) ────
           // Priorité 1 : combined avec exclusion explicite de "période"
           let soldeFinDebitIdx =
-            fc(['fin', 'débit'], ['periode', 'période', 'period']) !== -1 ? fc(['fin', 'débit'], ['periode', 'période', 'period']) :
-            fc(['fin', 'debit'], ['periode', 'période', 'period']) !== -1 ? fc(['fin', 'debit'], ['periode', 'période', 'period']) :
+            fc(['fin', 'dbt'], ['periode', 'période', 'period', 'pér']) !== -1 ? fc(['fin', 'dbt'], ['periode', 'période', 'period', 'pér']) :
+            fc(['fin', 'débit'], ['periode', 'période', 'period', 'pér']) !== -1 ? fc(['fin', 'débit'], ['periode', 'période', 'period', 'pér']) :
+            fc(['fin', 'debit'], ['periode', 'période', 'period', 'pér']) !== -1 ? fc(['fin', 'debit'], ['periode', 'période', 'period', 'pér']) :
             fc(['clôture', 'débit']) !== -1 ? fc(['clôture', 'débit']) :
             fc(['cloture', 'debit']) !== -1 ? fc(['cloture', 'debit']) :
-            fc(['final', 'debit']) !== -1 ? fc(['final', 'debit']) : -1;
+            fc(['cloture', 'dbt']) !== -1 ? fc(['cloture', 'dbt']) :
+            fc(['final', 'debit']) !== -1 ? fc(['final', 'debit']) :
+            fc(['final', 'dbt']) !== -1 ? fc(['final', 'dbt']) : -1;
 
           // Priorité 2 : si soldePériodeDebitIdx trouvé mais soldeFinDebitIdx aussi,
           // s'assurer qu'ils sont différents (Solde Fin doit être APRÈS Solde Période)
