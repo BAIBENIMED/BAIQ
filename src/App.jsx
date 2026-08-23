@@ -13,6 +13,7 @@ import { StockView } from './components/StockView';
 import { ReportsView } from './components/ReportsView';
 import { AIView } from './components/AIView';
 import { WhatIfSimulator } from './components/WhatIfSimulator';
+import { CalculationsIndexView } from './components/CalculationsIndexView';
 import { calculateStockEvolution } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
@@ -20,18 +21,19 @@ import { SECTEURS } from './utils/secteurs';
 /* Avatar supprimé — on utilise des initiales */
 
 const NAV = [
-  { id: 'import',    label: 'Importation',         icon: 'upload_file'   },
-  { id: 'dashboard', label: "Vue d'ensemble",       icon: 'dashboard'     },
-  { id: 'balance',   label: 'Balance Générale',     icon: 'account_balance'},
-  { id: 'audit',     label: 'Audit Balance (SCF)',  icon: 'fact_check'    },
-  { id: 'bilan',     label: 'Bilan Fonctionnel',    icon: 'account_tree'  },
-  { id: 'sig',       label: 'SIG & TCR (SCF)',      icon: 'analytics'     },
-  { id: 'capitaux',  label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
-  { id: 'stocks',    label: 'Variation Stocks',     icon: 'warehouse'     },
-  { id: 'ratios',    label: 'Ratios Financiers',    icon: 'query_stats'   },
-  { id: 'whatif',    label: 'Simulateur What-If',   icon: 'tune'          },
-  { id: 'reports',   label: 'Rapports',             icon: 'description'   },
-  { id: 'ai',        label: 'Assistant IA',         icon: 'smart_toy'     },
+  { id: 'import',      label: 'Importation',           icon: 'upload_file'   },
+  { id: 'dashboard',   label: "Vue d'ensemble",         icon: 'dashboard'     },
+  { id: 'balance',     label: 'Balance Générale',       icon: 'account_balance'},
+  { id: 'audit',       label: 'Audit Balance (SCF)',    icon: 'fact_check'    },
+  { id: 'bilan',       label: 'Bilan Fonctionnel',      icon: 'account_tree'  },
+  { id: 'sig',         label: 'SIG & TCR (SCF)',        icon: 'analytics'     },
+  { id: 'capitaux',    label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
+  { id: 'stocks',      label: 'Variation Stocks',       icon: 'warehouse'     },
+  { id: 'ratios',      label: 'Ratios Financiers',      icon: 'query_stats'   },
+  { id: 'whatif',      label: 'Simulateur What-If',     icon: 'tune'          },
+  { id: 'methodology', label: 'Index des Calculs',      icon: 'menu_book'     },
+  { id: 'reports',     label: 'Rapports',               icon: 'description'   },
+  { id: 'ai',          label: 'Assistant IA',           icon: 'smart_toy'     },
 ];
 
 export default function App() {
@@ -446,10 +448,11 @@ export default function App() {
     if (tab === 'capitaux') return <CapitauxPropresView data={activeData} fmt={fmt} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
-    if (tab === 'whatif')   return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
-    if (tab === 'reports')  return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} />;
-    if (tab === 'ai')       return <AIView data={activeData} geminiKey={geminiKey} />;
-    if (tab === 'settings') return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} />;
+    if (tab === 'whatif')      return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
+    if (tab === 'methodology') return <CalculationsIndexView />;
+    if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} />;
+    if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
+    if (tab === 'settings')    return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} />;
 
     /* ── DASHBOARD ── */
     if (!data) return (
