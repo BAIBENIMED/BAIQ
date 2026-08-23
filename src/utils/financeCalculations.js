@@ -118,10 +118,17 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
         diagnostic: isDeb ? 'Charge différée ou impôt différé actif (Débiteur).' : 'Produit différé ou subvention (Créditeur).'
       };
     }
+    if (c.startsWith('18')) {
+      return {
+        classe: 1, classeLabel: '1 — Comptes de Liaison', nature: 'Comptes de liaison entre établissements (Compte 18)', sensAttendu: 'MIXTE',
+        statut: 'CONFORME',
+        diagnostic: isNul ? 'Compte de liaison soldé (Solde nul).' : isDeb ? 'Compte de liaison débiteur.' : 'Compte de liaison créditeur.'
+      };
+    }
     return {
       classe: 1, classeLabel: '1 — Capitaux Propres', nature: 'Fonds propres & Réserves', sensAttendu: 'CRÉDITEUR',
       statut: isDeb ? 'ANOMALIE' : 'CONFORME',
-      diagnostic: isDeb ? 'Anomalie majeure : Les fonds propres (Compte 10) ne peuvent être débiteurs.' : 'Capitaux propres réguliers (solde créditeur).'
+      diagnostic: isDeb ? 'Anomalie majeure : Les fonds propres (Compte 10) ne peuvent être débiteurs.' : isCred ? 'Capitaux propres réguliers (solde créditeur).' : 'Compte soldé (Solde nul).'
     };
   }
 
@@ -413,25 +420,21 @@ export function auditBalanceAccounts(rows = []) {
   const comptesAudit = rows.filter(r => r.compte && !r.ignore).map(r => {
     let deb = safeNum(r.soldeFinDebit);
     let cred = safeNum(r.soldeFinCredit);
-    if (deb === 0 && cred === 0) {
+
+    // Si les colonnes Solde Fin n'étaient pas présentes dans l'import
+    if (r.soldeFinDebit === undefined && r.soldeFinCredit === undefined) {
       if (r.solde !== undefined) {
         const s = safeNum(r.solde);
         if (s > 0.001) deb = s;
         else if (s < -0.001) cred = -s;
-      }
-      // Fallback sur mouvements UNIQUEMENT si les deux sont positifs
-      // (certains exports ont des mouvements crédit en négatif — ne pas utiliser)
-      if (deb === 0 && cred === 0) {
-        const md = Math.max(0, safeNum(r.mouvementDebit));
-        const mc = Math.max(0, safeNum(r.mouvementCredit));
-        if (md > mc) deb = md - mc;
-        else if (mc > md) cred = mc - md;
-        else if (md > 0 || mc > 0) {
-          deb = md;
-          cred = mc;
-        }
+      } else {
+        const totalDeb = safeNum(r.soldeDebutDebit) + safeNum(r.mouvementDebit);
+        const totalCred = safeNum(r.soldeDebutCredit) + safeNum(r.mouvementCredit);
+        if (totalDeb > totalCred) deb = totalDeb - totalCred;
+        else if (totalCred > totalDeb) cred = totalCred - totalDeb;
       }
     }
+
     const verification = verifyAccountNature(r.compte, deb, cred);
 
     return {
