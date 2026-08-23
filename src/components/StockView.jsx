@@ -19,11 +19,46 @@ export function StockView({ rows, ratios, formatCurrency }) {
   const tauxRotation = ratios?.tauxRotationStocks || (stockMoyen > 0 ? (achatsConsommes / stockMoyen) : 0);
   const chiffreAffaires = ratios?.chiffreAffaires || ratios?.ca || (achatsConsommes * 1.5) || 1;
 
-  // Analyse Financière BFR & Trésorerie
+  // Analyse Financière BFR & Trésorerie avec Taux de Possession Personnalisables
+  const [tauxPossession, setTauxPossession] = useState({
+    tauxFinancier: 5.0,    // 5.0% - Coût financier & opportunité du capital
+    tauxEntreposage: 3.0,  // 3.0% - Loyer, électricité, locaux, amortissements entrepôts
+    tauxManutention: 2.0,  // 2.0% - Magasiniers, caristes, sécurité, engins
+    tauxAssurance: 1.0,    // 1.0% - Assurance vol, incendie, dégâts des eaux
+    tauxObsolescence: 1.0  // 1.0% - Pertes, freinte, avaries, décote
+  });
+
+  const totalTauxPossession = useMemo(() => {
+    return Number((
+      (Number(tauxPossession.tauxFinancier) || 0) +
+      (Number(tauxPossession.tauxEntreposage) || 0) +
+      (Number(tauxPossession.tauxManutention) || 0) +
+      (Number(tauxPossession.tauxAssurance) || 0) +
+      (Number(tauxPossession.tauxObsolescence) || 0)
+    ).toFixed(2));
+  }, [tauxPossession]);
+
   const cashImpact = -data.totalVariation; // Déstockage = Cash libéré (+), Stockage = Cash consommé (-)
   const isCashPositive = cashImpact >= 0;
-  const coutPossessionEstime = Math.round(stockMoyen * 0.12); // Coût annuel de portage/magasinage estimé à 12%
-  const gainPortageEstime = data.totalVariation < 0 ? Math.round(Math.abs(data.totalVariation) * 0.12) : 0;
+  const coutPossessionEstime = Math.round(stockMoyen * (totalTauxPossession / 100));
+  const gainPortageEstime = data.totalVariation < 0 ? Math.round(Math.abs(data.totalVariation) * (totalTauxPossession / 100)) : 0;
+
+  const applyPreset = (preset) => {
+    if (preset === 'standard') {
+      setTauxPossession({ tauxFinancier: 5.0, tauxEntreposage: 3.0, tauxManutention: 2.0, tauxAssurance: 1.0, tauxObsolescence: 1.0 });
+    } else if (preset === 'industrie') {
+      setTauxPossession({ tauxFinancier: 6.0, tauxEntreposage: 4.0, tauxManutention: 2.5, tauxAssurance: 1.5, tauxObsolescence: 1.5 });
+    } else if (preset === 'commerce') {
+      setTauxPossession({ tauxFinancier: 4.5, tauxEntreposage: 2.5, tauxManutention: 1.5, tauxAssurance: 0.5, tauxObsolescence: 1.0 });
+    } else if (preset === 'agro') {
+      setTauxPossession({ tauxFinancier: 6.0, tauxEntreposage: 5.0, tauxManutention: 3.0, tauxAssurance: 2.0, tauxObsolescence: 4.0 });
+    }
+  };
+
+  const handleRateChange = (key, val) => {
+    const num = Math.max(0, Math.min(30, parseFloat(val) || 0));
+    setTauxPossession(prev => ({ ...prev, [key]: num }));
+  };
 
   // Statut de Sécurité & Risque de Rupture
   let securiteStatut = {
@@ -100,6 +135,59 @@ export function StockView({ rows, ratios, formatCurrency }) {
       </div>
     );
   }
+
+  const ratesDefinitions = [
+    {
+      key: 'tauxFinancier',
+      label: '1. Coût Financier / Opportunité du Capital',
+      desc: 'Intérêts bancaires (crédits court terme / découverts) ou rendement d\'un placement alternatif',
+      icon: 'account_balance',
+      color: '#2563eb',
+      bg: '#eff6ff',
+      max: 15,
+      step: 0.25
+    },
+    {
+      key: 'tauxEntreposage',
+      label: '2. Coût d\'Entreposage, Loyer & Énergie',
+      desc: 'Amortissement ou location des entrepôts, électricité, froid industriel, entretien locaux',
+      icon: 'warehouse',
+      color: '#059669',
+      bg: '#ecfdf5',
+      max: 12,
+      step: 0.25
+    },
+    {
+      key: 'tauxManutention',
+      label: '3. Manutention, Personnel & Gardiennage',
+      desc: 'Salaires des magasiniers, caristes, gardiennage, maintenance des chariots élévateurs',
+      icon: 'forklift',
+      color: '#d97706',
+      bg: '#fffbeb',
+      max: 10,
+      step: 0.25
+    },
+    {
+      key: 'tauxAssurance',
+      label: '4. Primes d\'Assurance des Stocks',
+      desc: 'Couverture contre l\'incendie, le vol, les inondations et avaries de stockage',
+      icon: 'verified_user',
+      color: '#7c3aed',
+      bg: '#f5f3ff',
+      max: 6,
+      step: 0.1
+    },
+    {
+      key: 'tauxObsolescence',
+      label: '5. Pertes, Freinte, Casse & Obsolescence',
+      desc: 'Périssabilité, casse lors des manutentions, changements de gamme, dépréciations (Compte 39)',
+      icon: 'warning',
+      color: '#dc2626',
+      bg: '#fef2f2',
+      max: 12,
+      step: 0.25
+    }
+  ];
 
   return (
     <div className="fade-in space-y-6">
@@ -364,69 +452,235 @@ export function StockView({ rows, ratios, formatCurrency }) {
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          TAB 2 : DIAGNOSTIC TRÉSORERIE & BFR
+          TAB 2 : DIAGNOSTIC TRÉSORERIE & BFR — SIMULATEUR DU TAUX DE POSSESSION
       ═══════════════════════════════════════════════════════════ */}
       {activeTab === 'tresorerie' && (
         <div className="space-y-6">
           <div className="card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#059669' }}>payments</span>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 800 }}>
-                  Impact du Stock sur la Trésorerie &amp; le BFR
-                </h3>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Conversion des stocks en liquidités et coûts cachés de détention
-                </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#2563eb' }}>payments</span>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>
+                    Diagnostic Trésorerie, BFR &amp; Coût de Possession du Stock
+                  </h3>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    Simulateur dynamique des coûts cachés d'entreposage et calcul du gain de portage
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-sub)' }}>Profils Sectoriels :</span>
+                {[
+                  { id: 'standard', label: 'Standard (12%)' },
+                  { id: 'industrie', label: 'Industrie (15.5%)' },
+                  { id: 'commerce', label: 'Commerce (10%)' },
+                  { id: 'agro', label: 'Agroalimentaire (20%)' }
+                ].map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => applyPreset(p.id)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
+                      background: 'var(--surface-alt)', fontSize: '0.71rem', fontWeight: 700,
+                      color: 'var(--text)', cursor: 'pointer', transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-alt)'; e.currentTarget.style.color = 'var(--text)'; }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            {/* 3 Cartes Résumé */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 20 }}>
               {/* Carte 1 : Cash Généré / Consommé */}
-              <div style={{ padding: '16px', borderRadius: 12, background: isCashPositive ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isCashPositive ? '#bbf7d0' : '#fecaca'}` }}>
-                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: isCashPositive ? '#166534' : '#991b1b', textTransform: 'uppercase', marginBottom: 4 }}>
-                  {isCashPositive ? '💰 Trésorerie Libérée (Cash-In)' : '📉 Trésorerie Immobilisée (Cash-Out)'}
+              <div style={{ padding: '14px 16px', borderRadius: 12, background: isCashPositive ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isCashPositive ? '#bbf7d0' : '#fecaca'}` }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: isCashPositive ? '#166534' : '#991b1b', textTransform: 'uppercase', marginBottom: 3 }}>
+                  {isCashPositive ? '💰 Trésorerie Libérée (Cash-In)' : '📉 Trésorerie Mobilisée (Cash-Out)'}
                 </div>
-                <div className="mono" style={{ fontSize: '1.5rem', fontWeight: 900, color: isCashPositive ? '#15803d' : '#b91c1c' }}>
+                <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: isCashPositive ? '#15803d' : '#b91c1c' }}>
                   {isCashPositive ? '+' : ''}{fmt(cashImpact)}
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: '0.73rem', color: 'var(--text)', lineHeight: 1.4 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text)', lineHeight: 1.35 }}>
                   {isCashPositive 
-                    ? `Le déstockage de l'exercice a permis de désengager ${fmt(Math.abs(data.totalVariation))} du BFR pour alimenter directement les disponibilités bancaires.`
-                    : `L'augmentation des stocks a mobilisé ${fmt(data.totalVariation)} de trésorerie nette qui reste temporairement gelée dans les entrepôts.`
+                    ? `Désengagement direct du BFR réinjecté dans les disponibilités bancaires.`
+                    : `Trésorerie nette gelée sous forme de stocks supplémentaires.`
                   }
                 </p>
               </div>
 
-              {/* Carte 2 : Coût de Possession Annuel */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-sub)', textTransform: 'uppercase', marginBottom: 4 }}>
-                  Coût de Possession Annuel Estimé (12%)
+              {/* Carte 2 : Coût de Possession Global */}
+              <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: 3 }}>
+                  Coût Global de Possession ({totalTauxPossession}%)
                 </div>
-                <div className="mono" style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e40af' }}>
+                <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e40af' }}>
                   {fmt(coutPossessionEstime)} / an
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  Comprend les coûts d'entreposage, manutention, assurance, surveillance et le coût d'opportunité des capitaux immobilisés (base moyenne : {fmt(stockMoyen)}).
+                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                  Charges annuelles totales engagées pour détenir le stock moyen ({fmt(stockMoyen)}).
                 </p>
               </div>
 
-              {/* Carte 3 : Économies de Stockage Réalisées */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-sub)', textTransform: 'uppercase', marginBottom: 4 }}>
-                  Économies de Portages Réalisées
+              {/* Carte 3 : Économies de Portage */}
+              <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: gainPortageEstime > 0 ? '#15803d' : 'var(--text-sub)', textTransform: 'uppercase', marginBottom: 3 }}>
+                  Économie Annuelle de Portage Réalisée
                 </div>
-                <div className="mono" style={{ fontSize: '1.5rem', fontWeight: 900, color: gainPortageEstime > 0 ? '#059669' : 'var(--text)' }}>
-                  {gainPortageEstime > 0 ? `+${fmt(gainPortageEstime)}` : '0 DZD'}
+                <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: gainPortageEstime > 0 ? '#059669' : 'var(--text)' }}>
+                  {gainPortageEstime > 0 ? `+${fmt(gainPortageEstime)}` : '0 DZD'} / an
                 </div>
-                <p style={{ margin: '6px 0 0', fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                   {gainPortageEstime > 0
-                    ? `Gain récurrent annuel généré grâce à la diminution des volumes stockés et la baisse des frais de gardiennage/assurance.`
-                    : `Aucune baisse de coûts de stockage constatée (maintien ou hausse des volumes).`
+                    ? `Gain récurrent sur le compte de résultat généré par la baisse de volume.`
+                    : `Aucune baisse de coûts constatée (maintien ou augmentation des stocks).`
                   }
                 </p>
               </div>
             </div>
+
+            {/* ── GRILLE DES 5 TAUX PERSONNALISABLES (SLIDERS + INPUTS) ── */}
+            <div style={{ marginTop: 10, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)' }}>tune</span>
+                  Paramétrage Personnalisé des 5 Composantes du Taux de Possession
+                </h4>
+                <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 6 }}>
+                  Taux Global : {totalTauxPossession}% par an
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
+                {ratesDefinitions.map(rate => {
+                  const val = Number(tauxPossession[rate.key]) || 0;
+                  const coutPoste = Math.round(stockMoyen * (val / 100));
+
+                  return (
+                    <div key={rate.key} style={{
+                      padding: '12px 14px', borderRadius: 10, background: 'var(--surface)',
+                      border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 18, color: rate.color }}>{rate.icon}</span>
+                          <span style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text)' }}>{rate.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max={rate.max}
+                            step={rate.step}
+                            value={val}
+                            onChange={e => handleRateChange(rate.key, e.target.value)}
+                            style={{
+                              width: 58, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)',
+                              fontSize: '0.82rem', fontWeight: 800, textAlign: 'right', outline: 'none',
+                              color: rate.color, background: 'var(--surface-alt)'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: rate.color }}>%</span>
+                        </div>
+                      </div>
+
+                      {/* Slider interactif */}
+                      <input
+                        type="range"
+                        min="0"
+                        max={rate.max}
+                        step={rate.step}
+                        value={val}
+                        onChange={e => handleRateChange(rate.key, e.target.value)}
+                        style={{ width: '100%', accentColor: rate.color, cursor: 'pointer' }}
+                      />
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: 'var(--text-muted)' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }} title={rate.desc}>{rate.desc}</span>
+                        <span className="mono" style={{ fontWeight: 800, color: rate.color }}>
+                          = {fmt(coutPoste)} / an
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── TABLEAU DÉTAILLÉ DE DÉCOMPOSITION DU COÛT DE POSSESSION ── */}
+            <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.80rem', fontWeight: 800, color: 'var(--text)' }}>
+                  Décomposition Analytique du Coût Annuel de Détention
+                </span>
+                <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
+                  Base Stock Moyen : <strong className="mono">{fmt(stockMoyen)} DZD</strong>
+                </span>
+              </div>
+
+              <table className="data-table compact-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface)' }}>
+                    <th>COMPOSANTE DU COÛT</th>
+                    <th>NATURE DES CHARGES INCLUSES</th>
+                    <th className="right">TAUX (%)</th>
+                    <th className="right">COÛT ANNUEL ESTIMÉ</th>
+                    <th className="right">PART DU TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ratesDefinitions.map(rate => {
+                    const val = Number(tauxPossession[rate.key]) || 0;
+                    const coutPoste = Math.round(stockMoyen * (val / 100));
+                    const partTotal = totalTauxPossession > 0 ? ((val / totalTauxPossession) * 100).toFixed(1) : '0.0';
+
+                    return (
+                      <tr key={rate.key}>
+                        <td style={{ fontWeight: 700, color: rate.color }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{rate.icon}</span>
+                            {rate.label}
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{rate.desc}</td>
+                        <td className="right mono" style={{ fontWeight: 800, color: rate.color }}>{val.toFixed(2)}%</td>
+                        <td className="right mono" style={{ fontWeight: 800 }}>{fmt(coutPoste)}</td>
+                        <td className="right mono" style={{ color: 'var(--text-sub)' }}>{partTotal}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--surface-alt)', borderTop: '2px solid var(--border)' }}>
+                    <td colSpan="2" style={{ fontWeight: 900, color: 'var(--text)' }}>
+                      TOTAL COÛT DE POSSESSION GLOBAL DU STOCK
+                    </td>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af', fontSize: '0.80rem' }}>
+                      {totalTauxPossession.toFixed(2)}%
+                    </td>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af', fontSize: '0.84rem' }}>
+                      {fmt(coutPossessionEstime)} DZD
+                    </td>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af' }}>100.0%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Note d'interprétation */}
+            <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb', flexShrink: 0 }}>tips_and_updates</span>
+              <span style={{ fontSize: '0.72rem', color: '#1e40af', lineHeight: 1.4 }}>
+                <strong>Impact Managériel :</strong> Tout déstockage réduit immédiatement le BFR (gain de trésorerie disponible) et génère une économie récurrente de portage de <strong>{totalTauxPossession}% par an</strong> sur chaque Dinar déstocké.
+              </span>
+            </div>
+
           </div>
         </div>
       )}
