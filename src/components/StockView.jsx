@@ -274,29 +274,149 @@ export function StockView({ rows, ratios, formatCurrency }) {
         </div>
       </div>
 
-      {/* ── ONGLETS D'ANALYSE APPROFONDIE ── */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)', paddingBottom: 8, flexWrap: 'wrap' }}>
+      {/* ── SÉLECTEUR D'ONGLETS INTERACTIF HAUTE VISIBILITÉ (4 OUTILS EXPERTS) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, margin: '6px 0 20px 0' }}>
         {[
-          { id: 'synthese',     label: '1. Synthèse des Stocks par Catégorie', icon: 'grid_view' },
-          { id: 'tresorerie',   label: '2. Diagnostic Trésorerie & BFR',        icon: 'payments' },
-          { id: 'securite',     label: '3. Stock de Sécurité & Rendement Matières', icon: 'shield' },
-          { id: 'rapprochement',label: '4. Rapprochement SCF (Comptes 603 / 72)', icon: 'account_tree' }
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            style={{
-              padding: '7px 14px', borderRadius: 8, border: 'none',
-              background: activeTab === t.id ? 'var(--primary)' : 'var(--surface-alt)',
-              color: activeTab === t.id ? '#ffffff' : 'var(--text-muted)',
-              fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
+          {
+            id: 'synthese',
+            num: '01',
+            badge: 'Bilan SCF',
+            badgeColor: '#2563eb',
+            badgeBg: '#eff6ff',
+            title: '1. Synthèse par Catégorie',
+            subtitle: '5 rubriques & mouvements SCF',
+            icon: 'grid_view',
+            accent: '#2563eb'
+          },
+          {
+            id: 'tresorerie',
+            num: '02',
+            badge: '✨ Simulateur 5 Taux',
+            badgeColor: '#059669',
+            badgeBg: '#ecfdf5',
+            title: '2. Trésorerie, BFR & Portage',
+            subtitle: 'Coût possession & gain portage',
+            icon: 'payments',
+            accent: '#059669'
+          },
+          {
+            id: 'securite',
+            num: '03',
+            badge: '🛡 Jauge & Alerte',
+            badgeColor: '#d97706',
+            badgeBg: '#fffbeb',
+            title: '3. Sécurité & Rendement',
+            subtitle: 'Anti-rupture & surconsommation',
+            icon: 'shield',
+            accent: '#d97706'
+          },
+          {
+            id: 'rapprochement',
+            num: '04',
+            badge: '📑 Audit Croisé',
+            badgeColor: '#7c3aed',
+            badgeBg: '#f5f3ff',
+            title: '4. Rapprochement SCF',
+            subtitle: 'Concordance Bilan ↔ 603 / 72',
+            icon: 'account_tree',
+            accent: '#7c3aed'
+          }
+        ].map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: isActive ? `2px solid ${t.accent}` : '1px solid var(--border)',
+                background: isActive
+                  ? `linear-gradient(135deg, ${t.badgeBg} 0%, var(--surface) 100%)`
+                  : 'var(--surface)',
+                boxShadow: isActive
+                  ? `0 6px 16px -2px ${t.accent}30`
+                  : '0 1px 3px rgba(0,0,0,0.04)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isActive ? 'translateY(-2px)' : 'none'
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.borderColor = `${t.accent}80`;
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                }
+              }}
+            >
+              {/* En-tête de la carte onglet : Icône + Badge attractif */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: isActive ? t.accent : t.badgeBg,
+                  color: isActive ? '#ffffff' : t.accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{t.icon}</span>
+                </div>
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: 800,
+                  padding: '2px 8px', borderRadius: 12,
+                  background: isActive ? t.accent : t.badgeBg,
+                  color: isActive ? '#ffffff' : t.badgeColor,
+                  border: `1px solid ${isActive ? t.accent : t.accent + '40'}`,
+                  letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {t.badge}
+                </span>
+              </div>
+
+              {/* Titre & Sous-titre */}
+              <div style={{ marginTop: 2 }}>
+                <div style={{
+                  fontSize: '0.82rem', fontWeight: 900,
+                  color: isActive ? t.accent : 'var(--text)',
+                  lineHeight: 1.25,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                  {t.title}
+                </div>
+                <div style={{
+                  fontSize: '0.68rem', fontWeight: 600,
+                  color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                  marginTop: 2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  opacity: 0.9
+                }}>
+                  {t.subtitle}
+                </div>
+              </div>
+
+              {/* Indicateur actif barre inférieure */}
+              {isActive && (
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: 3, background: t.accent, borderRadius: '3px 3px 0 0'
+                }} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
