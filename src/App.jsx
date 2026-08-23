@@ -91,9 +91,12 @@ export default function App() {
       activeData.rows.forEach(r => {
         if (r.ignore || !r.compte) return;
         const c = r.compte.toString().trim();
-        const v = Math.abs(r.solde || 0);
-        if (c.startsWith('7')) totP += v;
-        else if (c.startsWith('6')) totC += v;
+        const deb = Number(r.soldeFinDebit !== undefined ? r.soldeFinDebit : r.debit) || 0;
+        const cred = Number(r.soldeFinCredit !== undefined ? r.soldeFinCredit : r.credit) || 0;
+        const v = r.solde !== undefined && r.solde !== null ? r.solde : (deb - cred);
+        const absV = Math.abs(v);
+        if (c.startsWith('7')) totP += absV;
+        else if (c.startsWith('6')) totC += absV;
       });
     } else {
       totP = (activeData?.sig?.chiffreAffaires || 1200000) + 260000;
@@ -115,24 +118,42 @@ export default function App() {
   /* ── Expenses breakdown (Nomenclature SCF Algérie) ── */
   const expenses = useMemo(() => {
     let a=0, s=0, p=0, i=0, o=0;
-    (activeData?.rows||[]).forEach(r => {
-      if(r.ignore || !r.compte) return;
-      const c = r.compte.toString();
-      const v = r.solde || 0;
-      if(c.startsWith('60')) a += v;
-      else if(c.startsWith('61') || c.startsWith('62')) s += v;
-      else if(c.startsWith('63')) p += v; // SCF : 63 = Personnel
-      else if(c.startsWith('64')) i += v; // SCF : 64 = Impôts et taxes
-      else if(c.startsWith('6'))  o += v;
-    });
-    const tot = (a + s + p + i + o) || 1;
+    const hasRows = activeData?.rows && activeData.rows.length > 0;
+    if (hasRows) {
+      activeData.rows.forEach(r => {
+        if (r.ignore || !r.compte) return;
+        const c = r.compte.toString().trim();
+        const deb = Number(r.soldeFinDebit !== undefined ? r.soldeFinDebit : r.debit) || 0;
+        const cred = Number(r.soldeFinCredit !== undefined ? r.soldeFinCredit : r.credit) || 0;
+        const v = r.solde !== undefined && r.solde !== null ? r.solde : (deb - cred);
+        const absV = Math.abs(v);
+        if (c.startsWith('60')) a += absV;
+        else if (c.startsWith('61') || c.startsWith('62')) s += absV;
+        else if (c.startsWith('63')) p += absV; // SCF : 63 = Personnel
+        else if (c.startsWith('64')) i += absV; // SCF : 64 = Impôts et taxes
+        else if (c.startsWith('6'))  o += absV;
+      });
+    }
+
+    const tot = a + s + p + i + o;
+    if (tot > 0) {
+      return [
+        { label: 'Achats consommés (60)',       val: a, color: '#2563eb' },
+        { label: 'Services extérieurs (61/62)', val: s, color: '#059669' },
+        { label: 'Charges de personnel (63)',   val: p, color: '#d97706' },
+        { label: 'Impôts & taxes (64)',          val: i, color: '#7c3aed' },
+        { label: 'Autres charges (65/68)',      val: o, color: '#94a3b8' },
+      ].map(x => ({ ...x, pct: Number(((x.val / tot) * 100).toFixed(1)) }));
+    }
+
+    // Fallback démo équilibré si aucune balance chargée
     return [
-      { label:'Achats consommés (60)',      val:a||342000, color:'#2563eb' },
-      { label:'Services extérieurs (61/62)',val:s||156000, color:'#059669' },
-      { label:'Charges de personnel (63)',  val:p||289000, color:'#d97706' },
-      { label:'Impôts & taxes (64)',         val:i||42000,  color:'#7c3aed' },
-      { label:'Autres charges (65/68)',     val:o||45000,  color:'#94a3b8' },
-    ].map(x => ({ ...x, pct: Math.round((x.val/tot)*100) }));
+      { label: 'Achats consommés (60)',       val: 342000, color: '#2563eb', pct: 39.1 },
+      { label: 'Services extérieurs (61/62)', val: 156000, color: '#059669', pct: 17.8 },
+      { label: 'Charges de personnel (63)',   val: 289000, color: '#d97706', pct: 33.1 },
+      { label: 'Impôts & taxes (64)',          val: 42000,  color: '#7c3aed', pct: 4.8 },
+      { label: 'Autres charges (65/68)',      val: 45000,  color: '#94a3b8', pct: 5.1 },
+    ];
   }, [activeData]);
 
   /* ── Évolution des stocks par catégorie ── */
