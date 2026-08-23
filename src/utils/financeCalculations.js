@@ -845,7 +845,7 @@ export function auditCrossAccountMovements(rows = []) {
   const c72 = getSums('72');
   const cProdStocks = getSums(['33', '34', '35', '36'], ['39']);
   const varReelleProd = safeNum(cProdStocks.soldeFin - cProdStocks.soldeInit); // Stock Final - Stock Initial (Production stockée si > 0)
-  const soldeNet72 = safeNum(c72.soldeFinCredit - c72.soldeFinDebit); // Crédit 72 (stockage) - Débit 72 (déstockage)
+  const soldeNet72 = safeNum(c72.finCred - c72.finDeb); // Crédit 72 (stockage) - Débit 72 (déstockage)
   const ecart72 = safeNum(Math.abs(varReelleProd - soldeNet72));
   const isZero72 = Math.abs(soldeNet72) < 0.001 && Math.abs(varReelleProd) < 0.001;
 
@@ -874,7 +874,7 @@ export function auditCrossAccountMovements(rows = []) {
   const c603 = getSums('603');
   const cMarchandises30 = getSums('30', ['39']); // Compte 30 Marchandises UNIQUEMENT
   const varReelleMarchandises = safeNum(cMarchandises30.soldeInit - cMarchandises30.soldeFin); // Stock Initial 30 - Stock Final 30 = Déstockage Marchandises
-  const soldeNet603 = safeNum(c603.soldeFinDebit - c603.soldeFinCredit); // Débit 603 (déstockage) - Crédit 603 (stockage)
+  const soldeNet603 = safeNum(c603.finDeb - c603.finCred); // Débit 603 (déstockage) - Crédit 603 (stockage)
   const ecart603 = safeNum(Math.abs(varReelleMarchandises - soldeNet603));
   const isZero603 = Math.abs(soldeNet603) < 0.001 && Math.abs(varReelleMarchandises) < 0.001;
 
