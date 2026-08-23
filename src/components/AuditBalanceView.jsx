@@ -506,6 +506,8 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
   // Ensemble des comptes déjà liés dans une jointure enregistrée
   const joinedSrcComptes = new Set(jointures.flatMap(j => j.sources.map(s => String(s.compte))));
   const joinedTgtComptes = new Set(jointures.flatMap(j => j.cibles.map(c => String(c.compte))));
+  const joinedSrcMap = new Map(jointures.flatMap(j => j.sources.map(s => [String(s.compte), j.id])));
+  const joinedTgtMap = new Map(jointures.flatMap(j => j.cibles.map(c => [String(c.compte), j.id])));
 
   // Filtrage : comptes avec mouvement + NON ENCORE LIÉS dans une jointure
   const filterAccounts = (accounts, focus, isSource) =>
