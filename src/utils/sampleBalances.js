@@ -25,14 +25,14 @@ export const SAMPLE_BALANCES = [
     rowsN: realDataAlgerie2026
   },
   {
-    id: 'balance_ibai_2025',
-    title: 'CAS RÉEL : GROUPE INDUSTRIEL IBAI 2025',
+    id: 'balance_ibaiben_2025',
+    title: 'CAS RÉEL : GROUPE INDUSTRIEL IBAIBEN 2025',
     subtitle: 'Grande industrie de production (780 comptes SCF réels)',
     secteurId: 'industrie',
     effectif: 180,
     caN: '780 Comptes Détaillés',
     description: 'Balance réelle complète de grand groupe de production (IBS 19%) : parcs d\'usines, lignes de production, dépréciations, impôts différés (133) et sous-traitances industrielles.',
-    badge: '🏭 Production Groupe IBAI',
+    badge: '🏭 Production Groupe IBAIBEN',
     badgeColor: '#059669',
     rowsN: realDataIbai2025
   },
