@@ -130,35 +130,125 @@ export function AuditBalanceView({ rows, formatCurrency }) {
         </div>
       </div>
 
-      {/* ── TABS ── */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid var(--border)', paddingBottom: 0 }}>
+      {/* ── SÉLECTEUR D'ONGLETS AUDIT HAUTE VISIBILITÉ (2 VOLETS EXPERTS) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { id: 'natures',  label: 'Natures de Comptes (SCF)',    icon: 'manage_accounts' },
-          { id: 'flux',     label: 'Flux Croisés & Contrôles',    icon: 'compare_arrows'  },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
-              marginBottom: -2,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
+          {
+            id: 'natures',
+            badge: `${audit.total} Comptes`,
+            badgeColor: '#2563eb',
+            badgeBg: '#eff6ff',
+            title: '1. Natures de Comptes & Soldes (SCF)',
+            subtitle: 'Contrôle individuel du sens normal (Débit / Crédit)',
+            icon: 'manage_accounts',
+            accent: '#2563eb'
+          },
+          {
+            id: 'flux',
+            badge: `${crossAudit.regles?.length || 0} Contrôles Experts`,
+            badgeColor: '#7c3aed',
+            badgeBg: '#f5f3ff',
+            title: '2. Flux Croisés & Rapprochements Symétriques',
+            subtitle: 'Audit des contreparties, amortissements, TVA & stocks',
+            icon: 'compare_arrows',
+            accent: '#7c3aed'
+          }
+        ].map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: '14px 16px',
+                borderRadius: 12,
+                border: isActive ? `2px solid ${t.accent}` : '1px solid var(--border)',
+                background: isActive
+                  ? `linear-gradient(135deg, ${t.badgeBg} 0%, var(--surface) 100%)`
+                  : 'var(--surface)',
+                boxShadow: isActive
+                  ? `0 6px 16px -2px ${t.accent}30`
+                  : '0 1px 3px rgba(0,0,0,0.04)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isActive ? 'translateY(-2px)' : 'none'
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.borderColor = `${t.accent}80`;
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                }
+              }}
+            >
+              {/* En-tête : Icône + Badge */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: isActive ? t.accent : t.badgeBg,
+                  color: isActive ? '#ffffff' : t.accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{t.icon}</span>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 800,
+                  padding: '2px 9px', borderRadius: 12,
+                  background: isActive ? t.accent : t.badgeBg,
+                  color: isActive ? '#ffffff' : t.badgeColor,
+                  border: `1px solid ${isActive ? t.accent : t.accent + '40'}`,
+                  letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {t.badge}
+                </span>
+              </div>
+
+              {/* Titre & Sous-titre */}
+              <div style={{ marginTop: 2 }}>
+                <div style={{
+                  fontSize: '0.88rem', fontWeight: 900,
+                  color: isActive ? t.accent : 'var(--text)',
+                  lineHeight: 1.25,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                  {t.title}
+                </div>
+                <div style={{
+                  fontSize: '0.71rem', fontWeight: 600,
+                  color: isActive ? 'var(--text)' : 'var(--text-muted)',
+                  marginTop: 2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  opacity: 0.9
+                }}>
+                  {t.subtitle}
+                </div>
+              </div>
+
+              {/* Barre indicatrice inférieure active */}
+              {isActive && (
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: 3, background: t.accent, borderRadius: '3px 3px 0 0'
+                }} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -170,23 +260,32 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {[
-                { id: 'all',       label: `Tous (${audit.total})` },
-                { id: 'conformes', label: `✅ Conformes (${audit.conformes})` },
-                { id: 'atypiques', label: `🟡 Atypiques (${audit.atypiques})` },
-                { id: 'anomalies', label: `🔴 Anomalies (${audit.anomalies})` },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => { setNatureFilter(f.id); setCurrentPage(1); }}
-                  style={{
-                    padding: '5px 12px', borderRadius: 8, border: '1px solid',
-                    fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
-                    background: natureFilter === f.id ? (f.id === 'anomalies' ? '#fee2e2' : f.id === 'atypiques' ? '#fef3c7' : f.id === 'conformes' ? '#dcfce7' : 'var(--primary)') : 'var(--surface-alt)',
-                    borderColor: natureFilter === f.id ? (f.id === 'anomalies' ? '#fca5a5' : f.id === 'atypiques' ? '#fde68a' : f.id === 'conformes' ? '#86efac' : 'var(--primary)') : 'var(--border)',
-                    color: natureFilter === f.id ? (f.id === 'anomalies' ? '#b91c1c' : f.id === 'atypiques' ? '#92400e' : f.id === 'conformes' ? '#15803d' : '#ffffff') : 'var(--text-muted)'
-                  }}
-                >{f.label}</button>
-              ))}
+                { id: 'all',       label: `Tous (${audit.total})`, icon: 'apps' },
+                { id: 'conformes', label: `Conformes (${audit.conformes})`, icon: 'check_circle', color: '#16a34a', bg: '#f0fdf4', bdr: '#bbf7d0' },
+                { id: 'atypiques', label: `Atypiques (${audit.atypiques})`, icon: 'warning', color: '#d97706', bg: '#fffbeb', bdr: '#fde68a' },
+                { id: 'anomalies', label: `Anomalies (${audit.anomalies})`, icon: 'error', color: '#dc2626', bg: '#fef2f2', bdr: '#fecaca' },
+              ].map(f => {
+                const isSel = natureFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => { setNatureFilter(f.id); setCurrentPage(1); }}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8,
+                      border: isSel ? `1px solid ${f.bdr || 'var(--primary)'}` : '1px solid var(--border)',
+                      fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      background: isSel ? (f.bg || 'var(--primary)') : 'var(--surface-alt)',
+                      color: isSel ? (f.color || '#ffffff') : 'var(--text-muted)',
+                      boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {f.icon && <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{f.icon}</span>}
+                    {f.label}
+                  </button>
+                );
+              })}
 
               {/* Toggle 0 DA */}
               <button
@@ -196,7 +295,8 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
                   background: hideZeroAccounts ? '#eff6ff' : 'var(--surface-alt)',
                   borderColor: hideZeroAccounts ? '#bfdbfe' : 'var(--border)',
-                  color: hideZeroAccounts ? '#1d4ed8' : 'var(--text-sub)'
+                  color: hideZeroAccounts ? '#1d4ed8' : 'var(--text-sub)',
+                  transition: 'all 0.15s'
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>
@@ -347,17 +447,38 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           </div>
 
           {/* Cycle filter */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-sub)', marginRight: 4 }}>Filtrer par Cycle :</span>
             <button onClick={() => setCycleFilter('all')}
-              style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', background: cycleFilter === 'all' ? 'var(--primary)' : 'var(--surface-alt)', borderColor: cycleFilter === 'all' ? 'var(--primary)' : 'var(--border)', color: cycleFilter === 'all' ? '#fff' : 'var(--text-muted)' }}>
+              style={{
+                padding: '5px 12px', borderRadius: 8, border: '1px solid', fontSize: '0.74rem', fontWeight: 800,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                background: cycleFilter === 'all' ? 'var(--primary)' : 'var(--surface-alt)',
+                borderColor: cycleFilter === 'all' ? 'var(--primary)' : 'var(--border)',
+                color: cycleFilter === 'all' ? '#fff' : 'var(--text-muted)',
+                boxShadow: cycleFilter === 'all' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s'
+              }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>category</span>
               Tous les cycles
             </button>
-            {cycles.map(c => (
-              <button key={c} onClick={() => setCycleFilter(c)}
-                style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', background: cycleFilter === c ? '#1e293b' : 'var(--surface-alt)', borderColor: cycleFilter === c ? '#1e293b' : 'var(--border)', color: cycleFilter === c ? '#fff' : 'var(--text-muted)' }}>
-                {c}
-              </button>
-            ))}
+            {cycles.map(c => {
+              const isSel = cycleFilter === c;
+              return (
+                <button key={c} onClick={() => setCycleFilter(c)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 8, border: '1px solid', fontSize: '0.74rem', fontWeight: 800,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                    background: isSel ? '#1e293b' : 'var(--surface-alt)',
+                    borderColor: isSel ? '#334155' : 'var(--border)',
+                    color: isSel ? '#38bdf8' : 'var(--text-muted)',
+                    boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
+                    transition: 'all 0.15s'
+                  }}>
+                  {c}
+                </button>
+              );
+            })}
           </div>
 
           {/* Règles table */}
