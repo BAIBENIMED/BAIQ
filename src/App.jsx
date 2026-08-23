@@ -5,6 +5,7 @@ import {
 import { ImportData } from './components/ImportData';
 import { BilanView } from './components/BilanView';
 import { SIGView } from './components/SIGView';
+import { CapitauxPropresView } from './components/CapitauxPropresView';
 import { RatiosView } from './components/RatiosView';
 import { BalanceView } from './components/BalanceView';
 import { AuditBalanceView } from './components/AuditBalanceView';
@@ -25,6 +26,7 @@ const NAV = [
   { id: 'audit',     label: 'Audit Balance (SCF)',  icon: 'fact_check'    },
   { id: 'bilan',     label: 'Bilan Fonctionnel',    icon: 'account_tree'  },
   { id: 'sig',       label: 'SIG & TCR (SCF)',      icon: 'analytics'     },
+  { id: 'capitaux',  label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
   { id: 'stocks',    label: 'Variation Stocks',     icon: 'warehouse'     },
   { id: 'ratios',    label: 'Ratios Financiers',    icon: 'query_stats'   },
   { id: 'whatif',    label: 'Simulateur What-If',   icon: 'tune'          },
@@ -420,6 +422,7 @@ export default function App() {
     if (tab === 'audit')    return <AuditBalanceView rows={activeData?.rows} formatCurrency={fmt} />;
     if (tab === 'bilan')    return <BilanView data={activeData?.bilan} dataN1={activeData?.dataN1} rows={activeData?.rows} formatCurrency={fmt} />;
     if (tab === 'sig')      return <SIGView data={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
+    if (tab === 'capitaux') return <CapitauxPropresView data={activeData} fmt={fmt} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'whatif')   return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;

@@ -1877,3 +1877,273 @@ export function autoMatchAccounts(sourceAccounts = [], targetAccounts = [], sour
   };
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * TABLEAU DE VARIATION DES CAPITAUX PROPRES (TVCP — SCF Algérie Loi 07-11 / IAS 1)
+ * Calcul matriciel des mouvements de capitaux propres entre l'ouverture et la clôture.
+ * ═══════════════════════════════════════════════════════════════
+ */
+export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig = null) {
+  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    return {
+      colonnes: [],
+      lignes: [],
+      kpis: { totalDebut: 0, totalFin: 0, variationNette: 0, pctVariation: 0, resultatNet: 0 },
+      comptesClasse1: []
+    };
+  }
+
+  const safeNum = (v) => {
+    if (v === undefined || v === null || v === '') return 0;
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  // Filtrer les comptes de la classe 1 (Capitaux Propres & Dettes LT)
+  const c1Rows = rows.filter(r => r.compte && !r.ignore && String(r.compte).trim().startsWith('1'));
+
+  // Extraction par famille de comptes SCF
+  const getSoldeDeb = (prefixes, exclude = []) => {
+    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
+    const exList = Array.isArray(exclude) ? exclude : [exclude];
+    return c1Rows.reduce((sum, r) => {
+      const c = String(r.compte).trim();
+      if (exList.some(ex => c.startsWith(ex))) return sum;
+      if (pList.some(p => c.startsWith(p))) {
+        // En classe 1, le sens normal est créditeur : Crédit - Débit
+        const sDeb = safeNum(r.soldeDebutCredit) - safeNum(r.soldeDebutDebit);
+        return sum + sDeb;
+      }
+      return sum;
+    }, 0);
+  };
+
+  const getSoldeFin = (prefixes, exclude = []) => {
+    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
+    const exList = Array.isArray(exclude) ? exclude : [exclude];
+    return c1Rows.reduce((sum, r) => {
+      const c = String(r.compte).trim();
+      if (exList.some(ex => c.startsWith(ex))) return sum;
+      if (pList.some(p => c.startsWith(p))) {
+        const sFin = safeNum(r.soldeFinCredit) - safeNum(r.soldeFinDebit);
+        return sum + sFin;
+      }
+      return sum;
+    }, 0);
+  };
+
+  const getMouvements = (prefixes, exclude = []) => {
+    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
+    const exList = Array.isArray(exclude) ? exclude : [exclude];
+    let deb = 0, cred = 0;
+    c1Rows.forEach(r => {
+      const c = String(r.compte).trim();
+      if (exList.some(ex => c.startsWith(ex))) return;
+      if (pList.some(p => c.startsWith(p))) {
+        deb += safeNum(r.mouvementDebit);
+        cred += safeNum(r.mouvementCredit);
+      }
+    });
+    return { debit: deb, credit: cred, net: cred - deb };
+  };
+
+  // 1. Capital social (101) - Capital souscrit non appelé (109)
+  const cap101Deb = getSoldeDeb('101');
+  const cap109Deb = getSoldeDeb('109'); // négatif si débiteur
+  const capDeb = cap101Deb + cap109Deb;
+
+  const cap101Fin = getSoldeFin('101');
+  const cap109Fin = getSoldeFin('109');
+  const capFin = cap101Fin + cap109Fin;
+  const varCapital = capFin - capDeb;
+
+  // 2. Primes d'émission et réserves (103, 106)
+  const resDeb = getSoldeDeb(['103', '106']);
+  const resFin = getSoldeFin(['103', '106']);
+  const varRes = resFin - resDeb;
+
+  // 3. Écarts d'évaluation & de réévaluation (105)
+  const ecartDeb = getSoldeDeb('105');
+  const ecartFin = getSoldeFin('105');
+  const varEcart = ecartFin - ecartDeb;
+
+  // 4. Report à nouveau (110, 119, 11)
+  const ranDeb = getSoldeDeb('11');
+  const ranFin = getSoldeFin('11');
+  const varRan = ranFin - ranDeb;
+
+  // 5. Résultat net de l'exercice N-1 & N (120, 129, 12)
+  const resNetAnterieur = getSoldeDeb('12'); // Résultat N-1 en début d'exercice N
+  let resNetExercice = 0;
+  if (sig && sig.resultatNet !== undefined && sig.resultatNet !== 0) {
+    resNetExercice = sig.resultatNet;
+  } else {
+    const rFin = getSoldeFin('12');
+    resNetExercice = rFin !== 0 ? rFin : (getSoldeFin('120') - getSoldeFin('129'));
+  }
+
+  // 6. Subventions d'investissement & Provisions réglementées (13, 14)
+  const subvDeb = getSoldeDeb(['13', '14'], ['133']); // exclure 133 impôts différés
+  const subvFin = getSoldeFin(['13', '14'], ['133']);
+  const varSubv = subvFin - subvDeb;
+
+  // 7. Affectation du résultat antérieur (N-1)
+  // Le résultat antérieur est viré vers les réserves, le report à nouveau, et/ou distribué en dividendes
+  const affectationReserves = Math.max(0, varRes);
+  const affectationRAN = varRan;
+  // Dividendes = Résultat antérieur - Affectation aux réserves - Affectation au RAN (si positif)
+  let dividendes = 0;
+  if (resNetAnterieur > 0) {
+    const affecteInterne = affectationReserves + affectationRAN;
+    if (resNetAnterieur > affecteInterne && affecteInterne >= 0) {
+      dividendes = resNetAnterieur - affecteInterne;
+    }
+  }
+
+  // Définition des colonnes du TVCP SCF
+  const colonnes = [
+    { key: 'capital',      label: 'Capital Social (101/109)',       numCol: '#1e40af', bg: '#eff6ff' },
+    { key: 'reserves',     label: 'Primes & Réserves (103/106)',    numCol: '#047857', bg: '#ecfdf5' },
+    { key: 'ecarts',       label: 'Écarts Évaluation (105)',        numCol: '#7c3aed', bg: '#f5f3ff' },
+    { key: 'ran',          label: 'Report à Nouveau (11)',          numCol: '#b45309', bg: '#fffbeb' },
+    { key: 'resultat',     label: 'Résultat Net (12)',              numCol: '#0369a1', bg: '#f0f9ff' },
+    { key: 'subventions',  label: 'Subventions & Prov. (13/14)',    numCol: '#475569', bg: '#f8fafc' },
+    { key: 'total',        label: 'TOTAL CAPITAUX PROPRES',         numCol: '#0f172a', bg: '#f1f5f9', isTotal: true }
+  ];
+
+  // Construction des 6 lignes matricielles SCF
+  const soldeOuvTotal = capDeb + resDeb + ecartDeb + ranDeb + resNetAnterieur + subvDeb;
+
+  const rowOuverture = {
+    id: 'ouverture',
+    libelle: '1. Solde d\'ouverture au 1er Janvier',
+    type: 'header_row',
+    capital: capDeb,
+    reserves: resDeb,
+    ecarts: ecartDeb,
+    ran: ranDeb,
+    resultat: resNetAnterieur,
+    subventions: subvDeb,
+    total: soldeOuvTotal
+  };
+
+  const rowAffectation = {
+    id: 'affectation',
+    libelle: '2. Affectation du résultat antérieur (N-1)',
+    type: 'movement_row',
+    capital: 0,
+    reserves: affectationReserves,
+    ecarts: 0,
+    ran: affectationRAN,
+    resultat: -resNetAnterieur,
+    subventions: 0,
+    total: -dividendes
+  };
+
+  const rowVarCapital = {
+    id: 'var_capital',
+    libelle: '3. Augmentation / Réduction de capital',
+    type: 'movement_row',
+    capital: varCapital,
+    reserves: 0,
+    ecarts: 0,
+    ran: 0,
+    resultat: 0,
+    subventions: 0,
+    total: varCapital
+  };
+
+  const rowAutresVar = {
+    id: 'autres_var',
+    libelle: '4. Autres variations & Subventions nettes',
+    type: 'movement_row',
+    capital: 0,
+    reserves: varRes - affectationReserves,
+    ecarts: varEcart,
+    ran: 0,
+    resultat: 0,
+    subventions: varSubv,
+    total: (varRes - affectationReserves) + varEcart + varSubv
+  };
+
+  const rowResultatN = {
+    id: 'resultat_n',
+    libelle: '5. Résultat net de l\'exercice',
+    type: 'resultat_row',
+    capital: 0,
+    reserves: 0,
+    ecarts: 0,
+    ran: 0,
+    resultat: resNetExercice,
+    subventions: 0,
+    total: resNetExercice
+  };
+
+  const soldeClotTotal = capFin + resFin + ecartFin + ranFin + resNetExercice + subvFin;
+
+  const rowCloture = {
+    id: 'cloture',
+    libelle: '6. Solde de clôture au 31 Décembre',
+    type: 'total_row',
+    capital: capFin,
+    reserves: resFin,
+    ecarts: ecartFin,
+    ran: ranFin,
+    resultat: resNetExercice,
+    subventions: subvFin,
+    total: soldeClotTotal
+  };
+
+  const lignes = [
+    rowOuverture,
+    rowAffectation,
+    rowVarCapital,
+    rowAutresVar,
+    rowResultatN,
+    rowCloture
+  ];
+
+  const varNette = soldeClotTotal - soldeOuvTotal;
+  const pctVar = soldeOuvTotal !== 0 ? (varNette / Math.abs(soldeOuvTotal)) * 100 : 0;
+
+  // Liste détaillée des comptes classe 1 mouvementés
+  const comptesClasse1 = c1Rows.map(r => {
+    const c = String(r.compte).trim();
+    const deb = safeNum(r.soldeFinDebit);
+    const cred = safeNum(r.soldeFinCredit);
+    const debInit = safeNum(r.soldeDebutDebit);
+    const credInit = safeNum(r.soldeDebutCredit);
+    const mouvDeb = safeNum(r.mouvementDebit);
+    const mouvCred = safeNum(r.mouvementCredit);
+    const netSoldeInit = credInit - debInit;
+    const netSoldeFin  = cred - deb;
+    const varSolde = netSoldeFin - netSoldeInit;
+
+    return {
+      compte: c,
+      libelle: r.libelle || '',
+      soldeDebut: netSoldeInit,
+      mouvementDebit: mouvDeb,
+      mouvementCredit: mouvCred,
+      soldeFin: netSoldeFin,
+      variation: varSolde
+    };
+  });
+
+  return {
+    colonnes,
+    lignes,
+    kpis: {
+      totalDebut: soldeOuvTotal,
+      totalFin: soldeClotTotal,
+      variationNette: varNette,
+      pctVariation: pctVar,
+      resultatNet: resNetExercice,
+      dividendesEstimes: dividendes
+    },
+    comptesClasse1
+  };
+}
+
