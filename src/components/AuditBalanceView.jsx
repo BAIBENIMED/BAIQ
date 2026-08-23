@@ -504,16 +504,17 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
   };
 
   // Ensemble des comptes déjà liés dans une jointure enregistrée
-  const joinedSrcMap = new Map(jointures.flatMap(j => j.sources.map(s => [String(s.compte), j.id])));
-  const joinedTgtMap = new Map(jointures.flatMap(j => j.cibles.map(c => [String(c.compte), j.id])));
+  const joinedSrcComptes = new Set(jointures.flatMap(j => j.sources.map(s => String(s.compte))));
+  const joinedTgtComptes = new Set(jointures.flatMap(j => j.cibles.map(c => String(c.compte))));
 
-  const joinedSrcComptes = new Set(joinedSrcMap.keys());
-  const joinedTgtComptes = new Set(joinedTgtMap.keys());
-
-  // Filtrage : comptes avec mouvement
-  const filterAccounts = (accounts, focus) =>
+  // Filtrage : comptes avec mouvement + NON ENCORE LIÉS dans une jointure
+  const filterAccounts = (accounts, focus, isSource) =>
     (accounts || []).filter(a => {
       const cStr = String(a.compte);
+      // Ne plus afficher en haut si déjà associé dans le tableau des jointures
+      if (isSource && joinedSrcComptes.has(cStr)) return false;
+      if (!isSource && joinedTgtComptes.has(cStr)) return false;
+
       if (!showZeroInModal && getFocusAmount(a, focus) < 0.001) return false;
       if (filterText) {
         const q = filterText.toLowerCase();
@@ -523,8 +524,8 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
       return true;
     });
 
-  const srcAccounts = filterAccounts(rule.sourceAccounts, rule.sourceFocus);
-  const tgtAccounts = filterAccounts(rule.cibleAccounts,  rule.cibleFocus);
+  const srcAccounts = filterAccounts(rule.sourceAccounts, rule.sourceFocus, true);
+  const tgtAccounts = filterAccounts(rule.cibleAccounts,  rule.cibleFocus,  false);
 
   const sumSrc = srcAccounts.reduce((s, a) => s + getFocusAmount(a, rule.sourceFocus), 0);
   const sumTgt = tgtAccounts.reduce((s, a) => s + getFocusAmount(a, rule.cibleFocus),  0);
@@ -1134,14 +1135,14 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed' }}>
                   <thead>
                     <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
-                      <th style={{ width: '70px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
-                      <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
+                      <th style={{ width: '65px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
+                      <th style={{ width: '26%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
                       <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
-                      <th style={{ width: '27%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
+                      <th style={{ width: '26%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
                       <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
                       <th style={{ width: '11%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
-                      <th style={{ width: '85px', padding: '7px 8px', textAlign: 'center', fontWeight: 800, fontSize: '0.70rem' }}>STATUT</th>
-                      <th style={{ width: '40px', padding: '7px 6px', textAlign: 'center' }}></th>
+                      <th style={{ width: '105px', padding: '7px 6px', textAlign: 'center', fontWeight: 800, fontSize: '0.70rem' }}>STATUT</th>
+                      <th style={{ width: '45px', padding: '7px 6px', textAlign: 'center' }}></th>
                     </tr>
                   </thead>
                 <tbody>
@@ -1216,10 +1217,10 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                       }}>
                         {fmtN(j.ecart)}
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'top' }}>
+                      <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
                         <span style={{
-                          fontSize: '0.68rem', fontWeight: 900, padding: '3px 7px', borderRadius: 4,
-                          whiteSpace: 'nowrap', display: 'inline-block',
+                          fontSize: '0.66rem', fontWeight: 900, padding: '3px 6px', borderRadius: 4,
+                          whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3,
                           background: j.isEquilibre ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                           color: j.isEquilibre ? '#34d399' : '#f87171',
                           border: `1px solid ${j.isEquilibre ? '#059669' : '#dc2626'}`
@@ -1227,7 +1228,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           {j.isEquilibre ? '✓ ÉQUILIBRÉ' : '🔴 DIFFÉRENCE'}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'top' }}>
+                      <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button
                           onClick={() => deleteJointure(j.id)}
                           style={{

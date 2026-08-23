@@ -12,7 +12,7 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
   const parseNum = (v) => {
     if (v === undefined || v === null || v === '') return 0;
     if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/\s/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
@@ -405,7 +405,7 @@ export function auditBalanceAccounts(rows = []) {
   const safeNum = (v) => {
     if (v === undefined || v === null || v === '') return 0;
     if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/\s/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
@@ -483,7 +483,7 @@ export function auditCrossAccountMovements(rows = []) {
   const safeNum = (v) => {
     if (v === undefined || v === null || v === '') return 0;
     if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/\s/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
@@ -1187,7 +1187,7 @@ export const parseFile = async (file) => {
               for (let r = dataStart; r < Math.min(data.length, dataStart + 15); r++) {
                 const v = data[r]?.[col];
                 if (v !== undefined && v !== null && v !== '') {
-                  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[\s]/g, '').replace(',', '.'));
+                  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(',', '.'));
                   if (!isNaN(n)) { numCols.push(col); break; }
                 }
               }
@@ -1232,9 +1232,15 @@ export const parseFile = async (file) => {
           const libelle = String(row[colMap.libelle] || '').trim();
           
           const parseNumber = (val) => {
-            if (typeof val === 'number') return val;
-            if (!val) return 0;
-            return parseFloat(String(val).replace(/\s/g, '').replace(',', '.')) || 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+            if (!val && val !== 0) return 0;
+            // Supprimer espaces normaux, insécables (\u00a0), fins (\u202f), et autres unicode
+            const s = String(val)
+              .replace(/[\u00a0\u202f\u2009\u2007\u2008\u0020\t]/g, '')  // tous types d'espaces
+              .replace(/\s/g, '')       // fallback regex \s
+              .replace(',', '.');       // virgule décimale française → point
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
           };
 
           const getCol = (idx) => (idx !== undefined && idx !== null && idx !== -1) ? parseNumber(row[idx]) : 0;
