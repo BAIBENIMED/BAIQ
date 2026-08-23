@@ -336,10 +336,10 @@ export function CapitauxPropresView({ data, fmt }) {
           {/* Diagnostic & Note SCF */}
           <div style={{ padding: '12px 20px', background: 'var(--surface-alt)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-              <strong>Contrôle de cohérence SCF :</strong> Le solde de clôture des capitaux propres ({fmtCurrency(kpis.totalFin)}) équilibre fidèlement le Bilan Fonctionnel et intègre l'affectation du résultat antérieur ainsi que le résultat net de l'exercice N.
+              <strong>Principe SCF &amp; IAS 1 :</strong> L'affectation (Ligne 2) porte exclusivement sur le <strong>résultat antérieur (N-1)</strong> décidé en Assemblée Générale (virement aux réserves, report à nouveau, dividendes). Le <strong>résultat net de l'exercice N</strong> (Ligne 5 : {fmtCurrency(kpis.resultatNet)}) s'ajoute en clôture (Compte 12) pour constituer les capitaux propres au 31 Décembre ({fmtCurrency(kpis.totalFin)}).
             </p>
             <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#059669', background: '#dcfce7', padding: '3px 8px', borderRadius: 6, border: '1px solid #86efac' }}>
-              ✓ ÉQUILIBRÉ
+              ✓ ÉQUILIBRÉ SCF
             </span>
           </div>
         </div>

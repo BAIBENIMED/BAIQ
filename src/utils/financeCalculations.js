@@ -2034,7 +2034,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowOuverture = {
     id: 'ouverture',
-    libelle: '1. Solde d\'ouverture au 1er Janvier',
+    libelle: '1. Solde d\'ouverture au 1er Janvier (dont Résultat N-1)',
     type: 'header_row',
     capital: capDeb,
     reserves: resDeb,
@@ -2047,7 +2047,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowAffectation = {
     id: 'affectation',
-    libelle: '2. Affectation du résultat antérieur (N-1)',
+    libelle: '2. Affectation du résultat de N-1 (Réserves / RAN / Dividendes)',
     type: 'movement_row',
     capital: 0,
     reserves: affectationReserves,
@@ -2060,7 +2060,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowVarCapital = {
     id: 'var_capital',
-    libelle: '3. Augmentation / Réduction de capital',
+    libelle: '3. Augmentation / Réduction de capital (N)',
     type: 'movement_row',
     capital: varCapital,
     reserves: 0,
@@ -2073,7 +2073,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowAutresVar = {
     id: 'autres_var',
-    libelle: '4. Autres variations & Subventions nettes',
+    libelle: '4. Autres variations & Subventions nettes (N)',
     type: 'movement_row',
     capital: 0,
     reserves: varRes - affectationReserves,
@@ -2086,7 +2086,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowResultatN = {
     id: 'resultat_n',
-    libelle: '5. Résultat net de l\'exercice',
+    libelle: '5. Résultat net de l\'exercice (N)',
     type: 'resultat_row',
     capital: 0,
     reserves: 0,
@@ -2101,7 +2101,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   const rowCloture = {
     id: 'cloture',
-    libelle: '6. Solde de clôture au 31 Décembre',
+    libelle: '6. Solde de clôture au 31 Décembre (Passif Bilan N)',
     type: 'total_row',
     capital: capFin,
     reserves: resFin,
