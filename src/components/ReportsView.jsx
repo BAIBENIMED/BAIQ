@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { exportFinancialWorkbook } from '../utils/excelExporter';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
 import { generateGeminiReport } from '../utils/aiEngine';
+import { generateFullPDF } from '../utils/pdfExporter';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Rapport Financier Complet avec Diagnostic IA Gemini
@@ -21,12 +22,26 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
   const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => (v || 0).toLocaleString('fr-FR') + ' DZD');
   const [reportType, setReportType] = useState('audit_diagnostic');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const [geminiError, setGeminiError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
 
   const handleGenerateGeminiReport = () => setShowConfirmModal(true);
+
+  const handleExportPDF = async () => {
+    if (!data) return;
+    setIsPdfGenerating(true);
+    try {
+      await generateFullPDF(data);
+    } catch (e) {
+      console.error('Erreur export PDF:', e);
+      alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));
+    } finally {
+      setIsPdfGenerating(false);
+    }
+  };
 
   // Identifiant unique du dossier / balance courante (anonyme)
   const dossierId = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}` : 'default';
@@ -348,18 +363,66 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, background: '#059669', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 8px rgba(5,150,105,0.2)' }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>table_view</span>
-            Export Classeur Excel Multi-Feuilles (.xlsx)
+            Export Excel (.xlsx)
           </button>
           <button
-            className="btn btn-primary"
-            onClick={() => window.print()}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, borderRadius: 10, padding: '9px 16px', fontWeight: 800 }}
+            onClick={handleExportPDF}
+            disabled={isPdfGenerating || !data}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+              background: isPdfGenerating ? '#94a3b8' : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+              color: '#fff', border: 'none', borderRadius: 10, padding: '9px 18px',
+              fontWeight: 900, cursor: isPdfGenerating ? 'wait' : 'pointer',
+              boxShadow: isPdfGenerating ? 'none' : '0 4px 14px rgba(220,38,38,0.35)',
+              fontSize: '0.88rem', transition: 'all 0.2s'
+            }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
-            Imprimer / Exporter PDF
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
+              {isPdfGenerating ? 'hourglass_empty' : 'picture_as_pdf'}
+            </span>
+            {isPdfGenerating ? 'Génération en cours…' : '📄 Exporter PDF Structuré (7 sections)'}
           </button>
         </div>
       </div>
+
+      {/* ── Bannière PDF ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #b91c1c 100%)',
+        borderRadius: 14, padding: '18px 24px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16,
+        boxShadow: '0 8px 24px rgba(185,28,28,0.2)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff' }}>picture_as_pdf</span>
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff' }}>Export PDF Professionnel — Rapport Annuel Complet (7 sections)</div>
+            <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
+              Page de garde · Bilan fonctionnel · SIG/TCR · Ratios · Comparatif N-1 · Diagnostic Forces/Risques · Audit SCF
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={isPdfGenerating || !data}
+          style={{
+            padding: '10px 22px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
+            background: isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
+            color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: isPdfGenerating ? 'wait' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
+            transition: 'all 0.2s', flexShrink: 0
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+          onMouseLeave={e => e.currentTarget.style.background = isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)'}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+            {isPdfGenerating ? 'hourglass_empty' : 'download'}
+          </span>
+          {isPdfGenerating ? 'Génération PDF…' : 'Télécharger le PDF'}
+        </button>
+      </div>
+
 
       {/* ── SECTION IA GOOGLE GEMINI : GÉNÉRATION DE RAPPORTS & DIAGNOSTICS ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(124, 58, 237, 0.3)', boxShadow: '0 8px 30px rgba(124, 58, 237, 0.08)' }}>
