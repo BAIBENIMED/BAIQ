@@ -544,7 +544,6 @@ export function AIView({ data, geminiKey }) {
                 <p style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.6, margin: '8px 0 14px' }}>
                   {rec.detail}
                 </p>
-
                 {/* Étapes d'action concrètes */}
                 {rec.etapes && rec.etapes.length > 0 && (
                   <div style={{ background: 'var(--surface-alt)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border)' }}>
@@ -573,19 +572,36 @@ export function AIView({ data, geminiKey }) {
       ══════════════════════ */}
       {activeTab === 'chat' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {!geminiKey && (
-            <div style={{ padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: '0.8rem', color: '#92400e' }}>
-              ⚡ <strong>Mode local actif</strong> — Les réponses sont générées par le moteur IA embarqué. Configurez une clé <strong>Gemini</strong> dans Paramètres pour une IA conversationnelle avancée.
+
+          {/* ── Bannière "Faites Parler Votre Balance" ── */}
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #7c3aed 100%)',
+            borderRadius: 14, padding: '16px 20px',
+            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap'
+          }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#fff' }}>record_voice_over</span>
             </div>
-          )}
-          {geminiKey && (
-            <div style={{ padding: '12px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, fontSize: '0.8rem', color: '#1e40af' }}>
-              🤖 <strong>Gemini IA connectée</strong> — Posez n'importe quelle question sur votre situation financière !
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontWeight: 900, fontSize: '0.95rem', color: '#fff' }}>Faites Parler Votre Balance 🇩🇿</div>
+              <div style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+                {geminiKey
+                  ? '🤖 Gemini IA connectée — Posez n\'importe quelle question en langage naturel sur vos données SCF'
+                  : '⚡ Mode local actif — Moteur IA embarqué · Configurez Gemini dans Paramètres pour l\'IA avancée'}
+              </div>
             </div>
-          )}
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>
+                {geminiKey ? '✅ IA Gemini' : '🔵 IA Locale'}
+              </div>
+              <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#34d399' }}>
+                🔒 100% Local
+              </div>
+            </div>
+          </div>
 
           {/* Zone de chat */}
-          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 520 }}>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 480 }}>
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {chatMessages.map((msg, i) => (
@@ -633,24 +649,69 @@ export function AIView({ data, geminiKey }) {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Suggestions rapides */}
-            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {/* ── Questions suggérées groupées par thème ── */}
+            <div style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '10px 14px', maxHeight: 210, overflowY: 'auto' }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                💬 Faites parler votre balance — Cliquez pour interroger
+              </div>
               {[
-                '📊 Score global ?',
-                '💰 Analyser les marges',
-                '🔄 Pourquoi mon BFR est élevé ?',
-                '⚡ Principales recommandations',
-                '💧 Ma trésorerie est-elle saine ?',
-                '📦 Diagnostic des stocks',
-                '🚨 Quel est le risque principal ?',
-              ].map(q => (
-                <button
-                  key={q}
-                  onClick={() => sendCustomMessage(q.slice(3))}
-                  style={{ fontSize: '0.72rem', padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  {q}
-                </button>
+                {
+                  theme: '📊 Équilibre & Trésorerie', color: '#2563eb',
+                  questions: ['Pourquoi mon BFR est-il élevé ?', 'Mon FRNG couvre-t-il mon BFR ?', 'État de ma trésorerie nette ?', 'Comment améliorer mon équilibre financier ?']
+                },
+                {
+                  theme: '📈 SIG & Rentabilité', color: '#7c3aed',
+                  questions: ['Analysez mes marges et rentabilité', 'Où est passée ma Valeur Ajoutée ?', 'Mon EBE est-il suffisant ?', 'Pourquoi mon résultat net est faible malgré un bon CA ?']
+                },
+                {
+                  theme: '🔍 Audit Soldes & Écritures', color: '#dc2626',
+                  questions: ['Y a-t-il des soldes anormaux dans ma balance ?', 'Les dotations 68x correspondent-elles aux amortissements 28x ?', 'Mon compte caisse est-il sain ?', 'Quels comptes 47x sont non soldés ?']
+                },
+                {
+                  theme: '📦 Stocks & Variation', color: '#d97706',
+                  questions: ['Analysez ma rotation des stocks', 'Impact du compte 72 sur mon SIG ?', 'Mes stocks sont-ils bien valorisés ?', 'Stockage ou déstockage cette année ?']
+                },
+                {
+                  theme: '💼 TVCP & Capitaux Propres', color: '#0891b2',
+                  questions: ['Évolution de mes capitaux propres ?', 'Mon capital a-t-il été augmenté ?', 'Quel est le taux de mise en réserve ?', 'Analyse de l\'affectation du résultat']
+                },
+                {
+                  theme: '🏦 Banque & Solvabilité', color: '#059669',
+                  questions: ['Quel est mon score Banque d\'Algérie ?', 'Mon dossier de crédit est-il solide ?', 'Quel est mon score Altman Z\'\' ?', 'Quel est le risque de défaillance ?']
+                },
+                {
+                  theme: '📉 Évolution N vs N-1', color: '#64748b',
+                  questions: ['Mon CA a-t-il progressé par rapport à N-1 ?', 'Évolution de l\'EBE sur 2 exercices ?', 'Le BFR s\'est-il amélioré ?', 'Tendance du résultat net N vs N-1 ?']
+                },
+                {
+                  theme: '💡 Recommandations & Actions', color: '#0f172a',
+                  questions: ['Quelles sont les 3 actions prioritaires ?', 'Comment réduire mon DSO clients ?', 'Comment améliorer ma liquidité rapidement ?', 'Que corriger avant ma prochaine demande de crédit ?']
+                },
+              ].map(group => (
+                <div key={group.theme} style={{ marginBottom: 9 }}>
+                  <div style={{ fontSize: '0.63rem', fontWeight: 900, color: group.color, marginBottom: 5, letterSpacing: '0.03em' }}>{group.theme}</div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {group.questions.map(q => (
+                      <button
+                        key={q}
+                        onClick={() => sendCustomMessage(q)}
+                        style={{
+                          fontSize: '0.69rem', padding: '3px 10px', borderRadius: 20,
+                          border: `1px solid ${group.color}35`,
+                          background: `${group.color}09`,
+                          color: group.color,
+                          cursor: 'pointer', fontWeight: 600,
+                          transition: 'all 0.15s',
+                          lineHeight: 1.4
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = `${group.color}20`; e.currentTarget.style.borderColor = group.color; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = `${group.color}09`; e.currentTarget.style.borderColor = `${group.color}35`; }}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
 
@@ -660,7 +721,7 @@ export function AIView({ data, geminiKey }) {
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder={data ? 'Posez une question sur votre situation financière...' : 'Importez des données pour commencer'}
+                placeholder={data ? '💬 Posez n\'importe quelle question sur votre balance...' : 'Importez des données pour commencer'}
                 disabled={!data || isLoading}
                 style={{ flex: 1, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: '0.85rem', outline: 'none', background: data ? '#fff' : 'var(--surface-alt)', color: 'var(--text)' }}
               />
