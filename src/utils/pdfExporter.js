@@ -226,6 +226,7 @@ function latexKpiRow(doc, items, y) {
 // ── Table Booktabs LaTeX Standard ─────────────────────────────────────
 function drawBooktabsTable(doc, head, body, startY, opts = {}) {
   const margin = 18;
+  const pageWidth = doc.internal.pageSize.getWidth();
 
   autoTable(doc, {
     head,
@@ -257,45 +258,45 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
       }
     },
     didDrawCell: (data) => {
-      const { doc, cell, row, column, table } = data;
+      const { doc: d, cell, row, column } = data;
       const isFirstRow = row.index === 0 && data.section === 'head';
       const isLastHead = row.index === head.length - 1 && data.section === 'head';
       const isLastBody = row.index === body.length - 1 && data.section === 'body';
 
       // \toprule (haut du tableau)
       if (isFirstRow && column.index === 0) {
-        doc.setDrawColor(...T.ruleHeavy);
-        doc.setLineWidth(1.0);
-        doc.line(table.margin.left, cell.y, doc.internal.pageSize.getWidth() - table.margin.right, cell.y);
+        d.setDrawColor(...T.ruleHeavy);
+        d.setLineWidth(1.0);
+        d.line(margin, cell.y, pageWidth - margin, cell.y);
       }
 
       // \midrule (sous les en-têtes)
       if (isLastHead && column.index === 0) {
-        doc.setDrawColor(...T.ruleMedium);
-        doc.setLineWidth(0.6);
+        d.setDrawColor(...T.ruleMedium);
+        d.setLineWidth(0.6);
         const lineY = cell.y + cell.height;
-        doc.line(table.margin.left, lineY, doc.internal.pageSize.getWidth() - table.margin.right, lineY);
+        d.line(margin, lineY, pageWidth - margin, lineY);
       }
 
       // Ligne fine sous les sections totales
       if (data.section === 'body' && opts.totalRowIndices && opts.totalRowIndices.includes(row.index) && column.index === 0) {
-        doc.setDrawColor(...T.ruleLight);
-        doc.setLineWidth(0.4);
-        doc.line(table.margin.left, cell.y, doc.internal.pageSize.getWidth() - table.margin.right, cell.y);
+        d.setDrawColor(...T.ruleLight);
+        d.setLineWidth(0.4);
+        d.line(margin, cell.y, pageWidth - margin, cell.y);
       }
 
       // \bottomrule (fin du tableau)
       if (isLastBody && column.index === 0) {
-        doc.setDrawColor(...T.ruleHeavy);
-        doc.setLineWidth(1.0);
+        d.setDrawColor(...T.ruleHeavy);
+        d.setLineWidth(1.0);
         const lineY = cell.y + cell.height;
-        doc.line(table.margin.left, lineY, doc.internal.pageSize.getWidth() - table.margin.right, lineY);
+        d.line(margin, lineY, pageWidth - margin, lineY);
       }
     },
     ...opts,
   });
 
-  return doc.lastAutoTable.finalY + 8;
+  return (doc.lastAutoTable ? doc.lastAutoTable.finalY : startY) + 8;
 }
 
 // ══════════════════════════════════════════════════════════════════════
