@@ -541,6 +541,87 @@ ${a.faiblesses.slice(0, 4).map((f, i) => `✗ **Alerte ${i + 1}** [${f.severite.
   }
 
   if (reportType === 'recommendations_plan') {
+    // Actions par phase avec fallbacks riches et contextualisés
+    const p1Actions = a.recommandations.filter(r => r.horizon?.includes('30') || r.horizon?.includes('15') || r.priorite === 1 || r.urgence === 'critique');
+    const p2Actions = a.recommandations.filter(r => r.horizon?.includes('1 à 3') || r.horizon?.includes('3 mois') || r.horizon?.includes('1 à 6') || r.priorite === 2 || r.urgence === 'haute');
+    const p3Actions = a.recommandations.filter(r => r.horizon?.includes('3 à 6') || r.horizon?.includes('12') || r.horizon?.includes('an') || r.priorite === 3 || r.urgence === 'moyenne' || r.urgence === 'basse');
+
+    const defaultP1 = [
+      {
+        action: `Accélération du Recouvrement Clients & Sécurisation du Cash (DSO actuel : ${Math.round(m.dso)} jours)`,
+        categorie: 'Trésorerie & BFR',
+        horizon: '0 à 30 jours',
+        detail: `Le poste clients immobilise des liquidités clés. Un plan de relance rigoureux permet de fluidifier la trésorerie${diag.gainDSO > 0 ? ` et de récupérer jusqu'à ${fmtDZD(diag.gainDSO)}` : ''}.`,
+        gainEstime: diag.gainDSO > 0 ? fmtDZD(diag.gainDSO) : 'Trésorerie immédiate',
+        etapes: [
+          'Établir la balance âgée des comptes 411 et prioriser les 20 plus gros encours échus.',
+          'Systématiser les relances préventives (J-5 avant échéance) et curatives (J+5, J+15).',
+          'Instaurer un escompte de règlement anticipé (ex: 1% pour paiement sous 10 jours).',
+          'Exiger un acompte obligatoire de 30% à la commande pour tout nouveau contrat.'
+        ]
+      },
+      {
+        action: `Audit des Soldes & Régularisation des Comptes d'Attente SCF`,
+        categorie: 'Audit & Conformité SCF',
+        horizon: '0 à 15 jours',
+        detail: `Vérification du sens des soldes et apurement complet des comptes transitoires avant l'arrêté des comptes.`,
+        gainEstime: 'Conformité & Régularité Fiscale',
+        etapes: [
+          'Apurer et justifier tout solde en suspens dans les comptes d\'attente 471 à 478.',
+          'Contrôler le compte Caisse (53x) pour garantir l\'absence totale de solde créditeur.',
+          'Reclasser les avances et acomptes dans les comptes appropriés (409 fournisseurs / 419 clients).'
+        ]
+      }
+    ];
+
+    const defaultP2 = [
+      {
+        action: `Optimisation de la Rotation des Stocks & Approvisionnements (Rotation actuelle : ${Math.round(m.rotS)} jours)`,
+        categorie: 'Exploitation & Stocks',
+        horizon: '1 à 3 mois',
+        detail: `L'ajustement des seuils de réapprovisionnement et le déstockage des références lentes permettront de réduire le BFR${diag.gainStock > 0 ? ` à hauteur de ${fmtDZD(diag.gainStock)}` : ''}.`,
+        gainEstime: diag.gainStock > 0 ? fmtDZD(diag.gainStock) : 'Allègement du BFR',
+        etapes: [
+          'Réaliser une analyse ABC/Pareto sur les comptes 30 (Marchandises) et 31 (Matières Premières).',
+          'Déstocker ou provisionner les références sans rotation depuis plus de 180 jours.',
+          'Ajuster les commandes fournisseurs en méthode de point de commande économique.',
+          'Mettre en place des livraisons échelonnées avec les fournisseurs principaux.'
+        ]
+      },
+      {
+        action: `Négociation des Délais Fournisseurs & Maîtrise des Charges Externes (DPO actuel : ${Math.round(m.dpo)} jours)`,
+        categorie: 'Achats & Marges',
+        horizon: '1 à 3 mois',
+        detail: `Alignement des règlements fournisseurs vers 45 à 60 jours fin de mois et audit des consommations intermédiaires (Comptes 60, 61, 62).`,
+        gainEstime: diag.gainDPO > 0 ? fmtDZD(diag.gainDPO) : 'Marge brute d\'EBE',
+        etapes: [
+          'Renégocier les conditions de crédit commercial avec les fournisseurs clés.',
+          'Auditer les contrats de sous-traitance et prestations de services (Comptes 61/62).',
+          'Surveiller l\'évolution de la marge d\'EBE (actuellement à ' + pct(m.margeEBE) + ' du CA).'
+        ]
+      }
+    ];
+
+    const defaultP3 = [
+      {
+        action: `Consolidation des Fonds Propres & Structure Financière Permanente (FRNG)`,
+        categorie: 'Structure & Haut de Bilan',
+        horizon: '3 à 12 mois',
+        detail: `Renforcement de l'autonomie financière et de la Capacité d'Autofinancement (CAF : ${fmtDZD(diag.caf)}) face aux critères de la Banque d'Algérie.`,
+        gainEstime: 'Rating & Solvabilité Bancaire',
+        etapes: [
+          'Affecter en priorité les bénéfices en réserves statutaires et facultatives (Compte 106).',
+          'Adosser les programmes d\'investissement durables à des ressources stables (Compte 16).',
+          'Maintenir le ratio Dettes Financières / CAF sous le seuil prudentiel de 3.5 années.',
+          'Piloter le tableau de bord financier selon les 6 KPIs hebdomadaires.'
+        ]
+      }
+    ];
+
+    const finalP1 = p1Actions.length > 0 ? p1Actions : defaultP1;
+    const finalP2 = p2Actions.length > 0 ? p2Actions : defaultP2;
+    const finalP3 = p3Actions.length > 0 ? p3Actions : defaultP3;
+
     return `# 🎯 PLAN D'ACTION STRATÉGIQUE & FEUILLE DE ROUTE OPÉRATIONNELLE DAF
 **Entité** : ${company} | **Secteur** : ${sec.label} | **Date** : ${dateStr}
 **Objectif Global** : Sécurisation de la trésorerie, allègement du BFR et consolidation de la marge nette.
@@ -548,11 +629,11 @@ ${a.faiblesses.slice(0, 4).map((f, i) => `✗ **Alerte ${i + 1}** [${f.severite.
 ---
 
 ### 1. PHASE 1 : ACTIONS D'URGENCE IMMÉDIATE (0 À 30 JOURS)
-${a.recommandations.filter(r => r.priorite === 1 || r.urgence === 'critique').map((r, i) => `
+${finalP1.map((r, i) => `
 #### 🔴 Action 1.${i + 1} : ${r.action}
-- **Horizon** : Immédiat (0-15 jours) | **Catégorie** : ${r.categorie}
+- **Horizon** : ${r.horizon || '0 à 30 jours'} | **Catégorie** : ${r.categorie || 'Trésorerie'}
 - **Diagnostic** : ${r.detail}
-- **Impact Attendu** : ${r.gainEstime || 'Sécurisation immédiate'}
+- **Impact Attendu** : **${r.gainEstime || 'Sécurisation immédiate'}**
 - **Étapes d'Exécution** :
 ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 `).join('')}
@@ -560,11 +641,11 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 ---
 
 ### 2. PHASE 2 : ACTIONS À COURT TERME (1 À 3 MOIS)
-${a.recommandations.filter(r => r.priorite === 2 || r.urgence === 'haute').map((r, i) => `
+${finalP2.map((r, i) => `
 #### 🟠 Action 2.${i + 1} : ${r.action}
-- **Horizon** : Court terme (1-3 mois) | **Catégorie** : ${r.categorie}
+- **Horizon** : ${r.horizon || '1 à 3 mois'} | **Catégorie** : ${r.categorie || 'Exploitation'}
 - **Diagnostic** : ${r.detail}
-- **Impact Attendu** : ${r.gainEstime || 'Optimisation BFR'}
+- **Impact Attendu** : **${r.gainEstime || 'Optimisation BFR'}**
 - **Étapes d'Exécution** :
 ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 `).join('')}
@@ -572,11 +653,11 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 ---
 
 ### 3. PHASE 3 : ACTIONS STRATÉGIQUES DE MOYEN TERME (3 À 12 MOIS)
-${a.recommandations.filter(r => r.priorite === 3 || r.urgence === 'moyenne' || r.urgence === 'basse').map((r, i) => `
+${finalP3.map((r, i) => `
 #### 🔵 Action 3.${i + 1} : ${r.action}
-- **Horizon** : 3 à 12 mois | **Catégorie** : ${r.categorie}
+- **Horizon** : ${r.horizon || '3 à 12 mois'} | **Catégorie** : ${r.categorie || 'Haut de bilan'}
 - **Diagnostic** : ${r.detail}
-- **Impact Attendu** : ${r.gainEstime || 'Haut de bilan'}
+- **Impact Attendu** : **${r.gainEstime || 'Haut de bilan & Solvabilité'}**
 - **Étapes d'Exécution** :
 ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 `).join('')}
