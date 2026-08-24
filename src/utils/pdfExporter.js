@@ -1,167 +1,305 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BAIQ — Exporteur PDF Global Structuré
-   Utilise jsPDF + jspdf-autotable pour générer un rapport financier complet
-   en format A4 professionnel (SCF Algérie)
+   BAIQ — Exporteur PDF Style LaTeX / Monographie Académique & Audit
+   Formatage professionnel inspiré de LaTeX (Booktabs, Fancyhdr, Serif Typography)
+   Conforme au Système Comptable Financier (SCF Algérie — Loi 07-11)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// ── Palette de couleurs BAIQ ──────────────────────────────────────────
-const C = {
-  navy:    [15, 23, 42],
-  blue:    [37, 99, 235],
-  blueLight: [219, 234, 254],
-  green:   [5, 150, 105],
-  greenLight: [209, 250, 229],
-  red:     [220, 38, 38],
-  redLight: [254, 226, 226],
-  amber:   [217, 119, 6],
-  amberLight: [254, 243, 199],
-  slate:   [100, 116, 139],
-  slateLight: [241, 245, 249],
-  white:   [255, 255, 255],
-  border:  [226, 232, 240],
+// ── Palette Typographique & Teintes LaTeX ──────────────────────────────
+const T = {
+  inkPrimary:   [17, 24, 39],       // Noir d'encre profond (#111827)
+  inkSecondary: [55, 65, 81],       // Gris foncé texte (#374151)
+  inkMuted:     [107, 114, 128],    // Gris moyen (#6b7280)
+  inkLight:     [156, 163, 175],    // Gris clair légendes (#9ca3af)
+  
+  navy:         [15, 32, 67],       // Bleu institutionnel Oxford (#0f2043)
+  darkRed:      [153, 27, 27],      // Rouge bordeaux LaTeX (#991b1b)
+  darkGreen:    [22, 101, 52],      // Vert forêt LaTeX (#166534)
+  darkAmber:    [146, 64, 14],      // Ocre sombre (#92400e)
+  
+  ruleHeavy:    [17, 24, 39],       // Ligne principale 1.0pt
+  ruleMedium:   [75, 85, 99],       // Ligne médiane 0.6pt
+  ruleLight:    [209, 213, 219],    // Filet léger 0.3pt (#d1d5db)
+  boxBg:        [248, 249, 250],    // Fond grisé style tcolorbox (#f8f9fa)
+  boxBorder:    [229, 231, 235],    // Bordure boîte (#e5e7eb)
+  accentBg:     [241, 245, 249],    // Fond bleu grisé discret
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────
-const fmtNum  = (v) => Math.round(v || 0).toLocaleString('fr-FR') + ' DZD';
-const fmtPct  = (v) => `${(v >= 0 ? '+' : '')}${((v || 0) * 100).toFixed(1)} %`;
-const fmtRaw  = (v, d = 2) => isFinite(v) && v !== null && v !== undefined ? Number(v).toFixed(d) : '—';
-const fmtDays = (v) => `${Math.round(v || 0)} jours`;
-const safeDiv = (a, b) => (b && b !== 0 ? a / b : 0);
+// ── Fonctions Utilitaires de Formatage ─────────────────────────────────
+const fmtDZD = (v) => {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return Math.round(v).toLocaleString('fr-FR') + ' DZD';
+};
 
-// ── Dessiner l'en-tête de page ────────────────────────────────────────
-function drawPageHeader(doc, pageNum, totalPages, titre, profil) {
+const fmtPct = (v, d = 1) => {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  const prefix = v > 0 ? '+' : '';
+  return `${prefix}${(v * 100).toFixed(d)} %`;
+};
+
+const fmtNum = (v, d = 2) => {
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  return Number(v).toFixed(d);
+};
+
+const fmtDays = (v) => {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return `${Math.round(v)} j`;
+};
+
+const safeDiv = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
+
+// ── En-tête et Pied de Page style LaTeX (fancyhdr) ────────────────────
+function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N') {
   const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const margin = 18;
 
-  // Bande bleue en haut
-  doc.setFillColor(...C.navy);
-  doc.rect(0, 0, W, 22, 'F');
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
 
-  // Logo texte BAIQ
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.white);
-  doc.text('BAIQ', 12, 14);
+    // Page de garde : pas d'en-tête, pied de page minimal
+    if (p === 1) {
+      doc.setDrawColor(...T.ruleLight);
+      doc.setLineWidth(0.3);
+      doc.line(margin, H - 15, W - margin, H - 15);
 
-  // Sous-titre à gauche
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.text('Balance & Analytics IQ — Analyse Financière SCF Algérie', 30, 14);
+      doc.setFont('times', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...T.inkMuted);
+      doc.text('BAIQ Platform — Rapport financier confidentiel à usage de gestion et d\'audit.', margin, H - 10);
+      doc.text('Page 1', W - margin, H - 10, { align: 'right' });
+      continue;
+    }
 
-  // Titre du rapport centré
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.white);
-  doc.text(titre, W / 2, 14, { align: 'center' });
+    // ── En-tête de page (fancyhdr running header) ──
+    doc.setFont('times', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...T.inkSecondary);
+    
+    // Titre courant gauche
+    doc.text('BAIQ Finance · Système Comptable Financier (SCF Algérie)', margin, 12);
+    
+    // Dossier et exercice à droite
+    doc.setFont('times', 'normal');
+    doc.text(`${dossierName} · Exercice ${exerciceYear}`, W - margin, 12, { align: 'right' });
 
-  // Page numéro à droite
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Page ${pageNum} / ${totalPages}`, W - 12, 14, { align: 'right' });
+    // Filet d'en-tête (thin rule)
+    doc.setDrawColor(...T.ruleMedium);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 14.5, W - margin, 14.5);
 
-  // Ligne de séparation
-  doc.setDrawColor(...C.blue);
-  doc.setLineWidth(0.4);
-  doc.line(0, 22, W, 22);
-}
+    // ── Pied de page (fancyhdr running footer) ──
+    doc.setDrawColor(...T.ruleLight);
+    doc.setLineWidth(0.3);
+    doc.line(margin, H - 14, W - margin, H - 14);
 
-// ── Dessiner le pied de page ──────────────────────────────────────────
-function drawPageFooter(doc, profil) {
-  const W  = doc.internal.pageSize.getWidth();
-  const H  = doc.internal.pageSize.getHeight();
-  const y  = H - 10;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...T.inkMuted);
+    
+    const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+    doc.text(`Document généré le ${printDate} · Traitement local sécurisé`, margin, H - 9);
 
-  doc.setDrawColor(...C.border);
-  doc.setLineWidth(0.3);
-  doc.line(12, y - 3, W - 12, y - 3);
+    // Folio centré style LaTeX : — [Page X / Y] —
+    doc.setFont('times', 'bold');
+    doc.setTextColor(...T.inkPrimary);
+    doc.text(`— ${p} / ${totalPages} —`, W / 2, H - 9, { align: 'center' });
 
-  doc.setFontSize(6.5);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(...C.slate);
-  const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-  doc.text(`Généré le ${dateStr} — BAIQ Finance Platform — Données 100% locales`, 12, y);
-  doc.text('Confidentiel — Usage interne uniquement', W - 12, y, { align: 'right' });
-}
-
-// ── Titre de section ──────────────────────────────────────────────────
-function sectionTitle(doc, text, y, iconLetter = '■') {
-  const W = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...C.navy);
-  doc.roundedRect(12, y, W - 24, 9, 1.5, 1.5, 'F');
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.white);
-  doc.text(`${iconLetter}  ${text.toUpperCase()}`, 18, y + 6.2);
-  return y + 14;
-}
-
-// ── Boîte KPI (3 par ligne) ───────────────────────────────────────────
-function drawKpiBox(doc, x, y, w, label, value, sub, color = C.blue) {
-  // Fond clair adapté à la couleur
-  doc.setFillColor(239, 246, 255);
-  doc.roundedRect(x, y, w, 22, 2, 2, 'F');
-  doc.setDrawColor(...color);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(x, y, w, 22, 2, 2, 'S');
-
-  // Barre couleur gauche
-  doc.setFillColor(...color);
-  doc.roundedRect(x, y, 3, 22, 1, 1, 'F');
-
-  doc.setFontSize(6.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.slate);
-  doc.text(label.toUpperCase(), x + 6, y + 6);
-
-  doc.setFontSize(9.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...color);
-  const lines = doc.splitTextToSize(value, w - 8);
-  doc.text(lines[0] || value, x + 6, y + 14);
-
-  if (sub) {
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.slate);
-    doc.text(sub, x + 6, y + 20);
+    doc.setFont('times', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...T.inkMuted);
+    doc.text('Loi n° 07-11 / Décret 08-156', W - margin, H - 9, { align: 'right' });
   }
 }
 
-// ── Table utilitaire générique ────────────────────────────────────────
-function drawTable(doc, head, body, startY, opts = {}) {
+// ── Titre de Chapitre LaTeX (\section{...}) ────────────────────────────
+function latexSection(doc, number, title, y) {
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 18;
+
+  // Ligne de rappel supérieure fine
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.8);
+  doc.line(margin, y, W - margin, y);
+
+  // Titre en capitales avec Serif
+  doc.setFont('times', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...T.navy);
+  doc.text(`SECTION ${number}.  ${title.toUpperCase()}`, margin, y + 5.5);
+
+  doc.setDrawColor(...T.ruleLight);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y + 7.5, W - margin, y + 7.5);
+
+  return y + 13;
+}
+
+// ── Sous-titre (\subsection{...}) ──────────────────────────────────────
+function latexSubSection(doc, title, y) {
+  const margin = 18;
+  doc.setFont('times', 'bolditalic');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...T.inkPrimary);
+  doc.text(title, margin, y);
+  return y + 5;
+}
+
+// ── Boîte de Définition / Formule Mathématique (LaTeX tcolorbox) ────────
+function latexMathBox(doc, formulaText, subtitle, y, height = 18) {
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 18;
+  const boxW = W - margin * 2;
+
+  doc.setFillColor(...T.boxBg);
+  doc.setDrawColor(...T.boxBorder);
+  doc.setLineWidth(0.4);
+  doc.rect(margin, y, boxW, height, 'FD');
+
+  // Filet vertical gauche d'accent
+  doc.setFillColor(...T.navy);
+  doc.rect(margin, y, 1.8, height, 'F');
+
+  // Formule centrée en style mathématique
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...T.navy);
+  doc.text(formulaText, margin + 8, y + 7);
+
+  if (subtitle) {
+    doc.setFont('times', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...T.inkMuted);
+    doc.text(subtitle, margin + 8, y + 13);
+  }
+
+  return y + height + 6;
+}
+
+// ── Blocs KPI style Thèse / Rapport de Gestion (3 colonnes) ────────────
+function latexKpiRow(doc, items, y) {
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 18;
+  const colW = (W - margin * 2 - 8) / items.length;
+  const h = 20;
+
+  items.forEach((item, idx) => {
+    const x = margin + idx * (colW + 4);
+
+    doc.setFillColor(...T.boxBg);
+    doc.setDrawColor(...T.boxBorder);
+    doc.setLineWidth(0.3);
+    doc.rect(x, y, colW, h, 'FD');
+
+    // Petite barre supérieure colorée
+    const barColor = item.status === 'ok' ? T.darkGreen : item.status === 'danger' ? T.darkRed : T.navy;
+    doc.setFillColor(...barColor);
+    doc.rect(x, y, colW, 1.2, 'F');
+
+    // Label en Small Caps / Italic
+    doc.setFont('times', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...T.inkMuted);
+    doc.text(item.label, x + 4, y + 6);
+
+    // Valeur principale en chiffres gras
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(...barColor);
+    doc.text(item.val, x + 4, y + 13);
+
+    // Note de bas
+    if (item.sub) {
+      doc.setFont('times', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...T.inkSecondary);
+      doc.text(item.sub, x + 4, y + 18);
+    }
+  });
+
+  return y + h + 6;
+}
+
+// ── Table Booktabs LaTeX Standard ─────────────────────────────────────
+function drawBooktabsTable(doc, head, body, startY, opts = {}) {
+  const margin = 18;
+
   autoTable(doc, {
     head,
     body,
     startY,
-    margin: { left: 12, right: 12 },
+    margin: { left: margin, right: margin },
+    theme: 'plain', // LaTeX Booktabs : pas de fond zébré criard, lignes pures
     styles: {
-      fontSize: 7.5,
-      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
-      textColor: C.navy,
-      lineColor: C.border,
-      lineWidth: 0.2,
-      font: 'helvetica',
+      font: 'times',
+      fontSize: 8,
+      textColor: T.inkPrimary,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+      lineWidth: 0,
+      lineColor: T.ruleLight,
     },
     headStyles: {
-      fillColor: C.navy,
-      textColor: C.white,
+      font: 'times',
       fontStyle: 'bold',
-      fontSize: 7,
+      fontSize: 8,
+      textColor: T.navy,
+      fillColor: false,
+      lineWidth: 0,
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: opts.columnStyles || {},
-    didDrawPage: () => {},
+    willDrawCell: (data) => {
+      if (opts.boldRows && opts.boldRows.includes(data.row.index)) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = T.navy;
+      }
+    },
+    didDrawCell: (data) => {
+      const { doc, cell, row, column, table } = data;
+      const isFirstRow = row.index === 0 && data.section === 'head';
+      const isLastHead = row.index === head.length - 1 && data.section === 'head';
+      const isLastBody = row.index === body.length - 1 && data.section === 'body';
+
+      // \toprule (haut du tableau)
+      if (isFirstRow && column.index === 0) {
+        doc.setDrawColor(...T.ruleHeavy);
+        doc.setLineWidth(1.0);
+        doc.line(table.margin.left, cell.y, doc.internal.pageSize.getWidth() - table.margin.right, cell.y);
+      }
+
+      // \midrule (sous les en-têtes)
+      if (isLastHead && column.index === 0) {
+        doc.setDrawColor(...T.ruleMedium);
+        doc.setLineWidth(0.6);
+        const lineY = cell.y + cell.height;
+        doc.line(table.margin.left, lineY, doc.internal.pageSize.getWidth() - table.margin.right, lineY);
+      }
+
+      // Ligne fine sous les sections totales
+      if (data.section === 'body' && opts.totalRowIndices && opts.totalRowIndices.includes(row.index) && column.index === 0) {
+        doc.setDrawColor(...T.ruleLight);
+        doc.setLineWidth(0.4);
+        doc.line(table.margin.left, cell.y, doc.internal.pageSize.getWidth() - table.margin.right, cell.y);
+      }
+
+      // \bottomrule (fin du tableau)
+      if (isLastBody && column.index === 0) {
+        doc.setDrawColor(...T.ruleHeavy);
+        doc.setLineWidth(1.0);
+        const lineY = cell.y + cell.height;
+        doc.line(table.margin.left, lineY, doc.internal.pageSize.getWidth() - table.margin.right, lineY);
+      }
+    },
     ...opts,
   });
+
   return doc.lastAutoTable.finalY + 8;
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  FONCTION PRINCIPALE — generateFullPDF(data)
+//  FONCTION PRINCIPALE D'EXPORTATION PDF STYLE LATEX
 // ══════════════════════════════════════════════════════════════════════
 export async function generateFullPDF(data) {
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 } = data || {};
@@ -171,524 +309,574 @@ export async function generateFullPDF(data) {
   const b1 = dataN1?.bilan || null;
   const s1 = dataN1?.sig || null;
 
-  const secteurLabel = profil?.secteurId?.replace(/_/g, ' ') || 'Non défini';
-  const nomDossier   = profil?.nomEntreprise || 'Dossier Anonyme';
+  const dossierName   = profil?.nomEntreprise || 'Entité Anonyme';
+  const secteurLabel  = profil?.secteurId ? profil.secteurId.replace(/_/g, ' ').toUpperCase() : 'INDUSTRIE / NON SPÉCIFIÉ';
+  const effectifCount = profil?.effectif ? `${profil.effectif} salariés` : 'Non communiqué';
 
-  // Calculs utilitaires
-  const margeEBE      = safeDiv(s.ebe, s.chiffreAffaires);
-  const margeNette    = safeDiv(s.resultatNet, s.chiffreAffaires);
-  const margeExploit  = safeDiv(s.resultatExploitation, s.chiffreAffaires);
-  const tauxVA        = safeDiv(s.valeurAjoutee, s.chiffreAffaires);
-  const autoFinanc    = r.autonomieFinanciere || 0;
-  const liqGen        = r.liquiditeGenerale || 0;
-  const couverture    = safeDiv(s.ebe, s.chargesFinancieres);
+  // Métriques financières fondamentales
+  const ca           = s.chiffreAffaires || 0;
+  const va           = s.valeurAjoutee || 0;
+  const ebe          = s.ebe || 0;
+  const re           = s.resultatExploitation || 0;
+  const rn           = s.resultatNet || 0;
+  const frng         = b.frng || 0;
+  const bfr          = b.bfr || 0;
+  const tn           = b.tn || 0;
 
+  const margeEBE     = safeDiv(ebe, ca);
+  const margeNette   = safeDiv(rn, ca);
+  const margeExploit = safeDiv(re, ca);
+  const tauxVA       = safeDiv(va, ca);
+  const liqGen       = r.liquiditeGenerale || 0;
+  const autFinanc    = r.autonomieFinanciere || 0;
+  const dso          = r.delaiRecouvrement || 0;
+  const dpo          = r.delaiFournisseurs || 0;
+  const rotStock     = r.rotationStocks || 0;
+  const bfrJours     = r.bfrJoursCA || 0;
+
+  // Création du document jsPDF (Format A4 standardisé)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W   = doc.internal.pageSize.getWidth();
-  const H   = doc.internal.pageSize.getHeight();
-
-  // Estimation du nombre total de pages (approximatif pour l'en-tête)
-  // On repassera après pour mettre à jour si besoin
-  let totalPagesEstimate = 7;
-
-  const addPage = (pageTitle) => {
-    const pageNum = doc.internal.getNumberOfPages();
-    drawPageHeader(doc, pageNum, '—', pageTitle, profil);
-    drawPageFooter(doc, profil);
-    return 30; // y de départ après l'en-tête
-  };
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 18;
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 1 — PAGE DE GARDE
+  // PAGE 1 — PAGE DE TITRE / MONOGRAPHIE ACADÉMIQUE LATEX
   // ──────────────────────────────────────────────────────────────────
-  // Fond haut dégradé
-  doc.setFillColor(...C.navy);
-  doc.rect(0, 0, W, 100, 'F');
+  let y = 28;
 
-  // Logo grand format
-  doc.setFontSize(42);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.blue);
-  doc.text('BAIQ', W / 2, 42, { align: 'center' });
+  // En-tête Institutionnel
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...T.inkMuted);
+  doc.text('RÉPUBLIQUE ALGÉRIENNE DÉMOCRATIQUE ET POPULAIRE', W / 2, y, { align: 'center' });
+  y += 4.5;
+  doc.text('RÉFÉRENTIEL COMPTABLE ET FINANCIER SCF — LOI N° 07-11 / DÉCRET 08-156', W / 2, y, { align: 'center' });
+  y += 6;
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.text('Balance & Analytics IQ', W / 2, 52, { align: 'center' });
-
-  // Ligne dorée
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(1);
-  doc.line(40, 58, W - 40, 58);
-
-  // Titre du rapport
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.white);
-  doc.text('RAPPORT FINANCIER ANNUEL', W / 2, 72, { align: 'center' });
-
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  doc.text('Analyse Complète — Système Comptable Financier (SCF)', W / 2, 80, { align: 'center' });
-  doc.text('Algérie — Loi n° 07-11 / Décret exécutif 08-156', W / 2, 87, { align: 'center' });
-
-  // Zone infos dossier
-  let cy = 110;
-  doc.setFillColor(...C.slateLight);
-  doc.roundedRect(20, cy, W - 40, 65, 3, 3, 'F');
-  doc.setDrawColor(...C.border);
+  // Double filet décoratif LaTeX
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(1.2);
+  doc.line(margin + 20, y, W - margin - 20, y);
   doc.setLineWidth(0.4);
-  doc.roundedRect(20, cy, W - 40, 65, 3, 3, 'S');
+  doc.line(margin + 20, y + 1.8, W - margin - 20, y + 1.8);
+  y += 18;
 
-  const infoItems = [
-    ['Dossier / Raison Sociale', nomDossier],
+  // Titre Principal
+  doc.setFont('times', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...T.navy);
+  doc.text('RAPPORT D\'ANALYSE FINANCIÈRE', W / 2, y, { align: 'center' });
+  y += 7.5;
+  doc.setFontSize(14);
+  doc.text('ET D\'AUDIT DES ÉTATS DE SYNTHÈSE', W / 2, y, { align: 'center' });
+  y += 6;
+
+  // Sous-titre descriptif
+  doc.setFont('times', 'italic');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...T.inkSecondary);
+  doc.text('Diagnostic structurel de liquidité, rentabilité, équilibre fonctionnel et solvabilité', W / 2, y, { align: 'center' });
+  y += 14;
+
+  // Bloc Métadonnées du Dossier (LaTeX Description Table)
+  const metaHead = [['PARAMÈTRE DU DOSSIER', 'VALEUR DÉCLARÉE & CONTRÔLÉE']];
+  const metaBody = [
+    ['Entité / Raison Sociale', dossierName],
     ['Secteur d\'Activité', secteurLabel],
-    ['Effectif déclaré', profil?.effectif ? `${profil.effectif} personnes` : 'Non renseigné'],
-    ['Chiffre d\'Affaires (N)', fmtNum(s.chiffreAffaires)],
-    ['Résultat Net (N)', fmtNum(s.resultatNet)],
-    ['Date de génération', new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })],
+    ['Effectif Déclaré', effectifCount],
+    ['Chiffre d\'Affaires Net HT (N)', fmtDZD(ca)],
+    ['Résultat Net de l\'Exercice (N)', fmtDZD(rn)],
+    ['Fonds de Roulement Net Global (FRNG)', fmtDZD(frng)],
+    ['Trésorerie Nette de Clôture (TN)', fmtDZD(tn)],
+    ['Date d\'Analyse & Traitement', new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })],
   ];
 
-  infoItems.forEach(([label, value], i) => {
-    const iy = cy + 10 + i * 9;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.slate);
-    doc.text(label + ' :', 28, iy);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.navy);
-    doc.text(value, 100, iy);
+  y = drawBooktabsTable(doc, metaHead, metaBody, y, {
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: T.navy, cellWidth: 70 },
+      1: { cellWidth: W - margin * 2 - 70 }
+    }
   });
 
-  // Avertissement confidentialité
-  cy = 185;
-  doc.setFillColor(...C.greenLight);
-  doc.roundedRect(20, cy, W - 40, 18, 2, 2, 'F');
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.green);
-  doc.text('🔒  CONFIDENTIALITÉ & TRAITEMENT LOCAL DES DONNÉES', 28, cy + 7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(22, 101, 52);
-  doc.text('Ce rapport a été généré localement dans votre navigateur. Aucune donnée comptable n\'a été transmise à un tiers.', 28, cy + 13);
+  y += 2;
 
-  // Sections du rapport
-  cy = 215;
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.navy);
-  doc.text('SOMMAIRE DU RAPPORT', W / 2, cy, { align: 'center' });
-  cy += 6;
+  // Résumé Exécutif (Abstract LaTeX)
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...T.navy);
+  doc.text('RÉSUMÉ EXÉCUTIF (ABSTRACT)', margin, y);
+  y += 4.5;
 
-  const sommaire = [
-    ['I.', 'Équilibre Financier & Bilan Fonctionnel', '2'],
-    ['II.', 'Soldes Intermédiaires de Gestion (SIG — TCR)', '3'],
-    ['III.', 'Ratios de Liquidité, Rentabilité & Activité', '4'],
-    ['IV.', 'Comparatif N vs N-1 (Évolution pluriannuelle)', '5'],
-    ['V.', 'Diagnostic Forces, Faiblesses & Risques', '6'],
-    ['VI.', 'Audit des Soldes SCF & Anomalies Détectées', '7'],
+  const abstractText = `Le présent document constitue une analyse financière intégrale de l'entité ${dossierName} établie selon les prescriptions du Système Comptable Financier (SCF) algérien. L'évaluation porte sur la structure du bilan fonctionnel (FRNG : ${fmtDZD(frng)}, BFR : ${fmtDZD(bfr)}), la performance économique (EBE : ${fmtDZD(ebe)}, RN : ${fmtDZD(rn)}) et la conformité des soldes de balance avec les règles légales d'imputation. Les flux et ratios ont été vérifiés selon les normes sectorielles de la Banque d'Algérie.`;
+
+  doc.setFont('times', 'italic');
+  doc.setFontSize(8);
+  doc.setTextColor(...T.inkSecondary);
+  const splitAbstract = doc.splitTextToSize(abstractText, W - margin * 2);
+  doc.text(splitAbstract, margin, y);
+  y += splitAbstract.length * 4 + 8;
+
+  // Table des Matières (Table of Contents LaTeX avec points de conduite)
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...T.navy);
+  doc.text('TABLE DES MATIÈRES', margin, y);
+  y += 5;
+
+  const toc = [
+    ['1. Équilibre Financier & Bilan Fonctionnel SCF', '2'],
+    ['2. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '3'],
+    ['3. Ratios Financiers, Solvabilité & Délais de Rotation', '4'],
+    ['4. Analyse Comparative Pluriannuelle (N vs N-1)', '5'],
+    ['5. Matrice Analytique des Forces, Faiblesses et Risques', '6'],
+    ['6. Audit des Natures de Comptes & Anomalies d\'Écritures', '7'],
   ];
 
-  sommaire.forEach(([num, titre, pg], i) => {
-    const sy = cy + i * 8;
+  toc.forEach(([title, pageNum]) => {
+    doc.setFont('times', 'normal');
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.blue);
-    doc.text(num, 28, sy);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.navy);
-    doc.text(titre, 38, sy);
+    doc.setTextColor(...T.inkPrimary);
+    doc.text(title, margin + 4, y);
 
-    // Pointillés
-    const dotStart = 38 + doc.getTextWidth(titre) + 3;
-    doc.setDrawColor(...C.border);
+    // Points de conduite (\dotfill)
+    const titleWidth = doc.getTextWidth(title);
+    const startX = margin + 6 + titleWidth;
+    const endX = W - margin - 8;
+
+    doc.setDrawColor(...T.ruleLight);
     doc.setLineWidth(0.2);
-    doc.setLineDash([1, 2]);
-    doc.line(dotStart, sy - 1, W - 30, sy - 1);
+    doc.setLineDash([0.8, 1.5]);
+    if (startX < endX) {
+      doc.line(startX, y - 0.8, endX, y - 0.8);
+    }
     doc.setLineDash([]);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.blue);
-    doc.text(pg, W - 25, sy, { align: 'right' });
+    doc.setFont('times', 'bold');
+    doc.setTextColor(...T.navy);
+    doc.text(pageNum, W - margin, y, { align: 'right' });
+    y += 5;
   });
 
-  // Footer page de garde
-  drawPageFooter(doc, profil);
-
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 2 — ÉQUILIBRE FINANCIER & BILAN FONCTIONNEL
+  // PAGE 2 — SECTION 1 : ÉQUILIBRE FINANCIER & BILAN FONCTIONNEL
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
-  let y = addPage('I. Équilibre Financier & Bilan Fonctionnel');
+  y = 22;
 
-  y = sectionTitle(doc, 'I. Équilibre Financier — FRNG, BFR, Trésorerie Nette', y);
+  y = latexSection(doc, '1', 'Équilibre Financier & Bilan Fonctionnel (SCF)', y);
 
-  // 3 boîtes KPI côte à côte
-  const kpiW = (W - 30) / 3;
-  const frngColor = b.frng >= 0 ? C.green : C.red;
-  const tnColor   = b.tn   >= 0 ? C.green : C.red;
-  drawKpiBox(doc, 12,          y, kpiW - 2, 'FRNG — Fonds de Roulement Net Global', fmtNum(b.frng), b.frng >= 0 ? '✓ Excédent structurel' : '✗ Déficit structurel', frngColor);
-  drawKpiBox(doc, 12 + kpiW,   y, kpiW - 2, 'BFR — Besoin en Fonds de Roulement',  fmtNum(b.bfr),  `${fmtDays(r.bfrJoursCA)} de CA`, C.amber);
-  drawKpiBox(doc, 12 + kpiW*2, y, kpiW - 2, 'Trésorerie Nette (TN = FRNG - BFR)',  fmtNum(b.tn),   b.tn >= 0 ? '✓ Position saine' : '✗ Tension de liquidité', tnColor);
-  y += 28;
+  // Formule mathématique LaTeX
+  y = latexMathBox(
+    doc,
+    '\\text{FRNG} = \\text{Ressources Stables} - \\text{Emplois Stables} \\qquad \\text{TN} = \\text{FRNG} - \\text{BFR}',
+    'Règle d\'or de l\'équilibre : Le Fonds de Roulement Net Global doit couvrir l\'intégralité du BFR d\'exploitation.',
+    y,
+    17
+  );
 
-  // Formules d'équilibre
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(12, y, W - 24, 22, 2, 2, 'F');
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.navy);
-  doc.text('FRNG = Ressources Stables − Emplois Stables', 18, y + 7);
-  doc.text('BFR  = Actif Circulant − Passif Circulant', 18, y + 14);
-  doc.text('TN   = FRNG − BFR  =  Trésorerie Active − Trésorerie Passive', 18, y + 21);
-  y += 28;
+  // Rangée KPI LaTeX
+  y = latexKpiRow(doc, [
+    { label: 'FRNG (Ressources - Emplois)', val: fmtDZD(frng), sub: frng >= 0 ? '✓ Excédent structurel' : '✗ Déficit structurel', status: frng >= 0 ? 'ok' : 'danger' },
+    { label: 'BFR (Besoin en Fonds de Roulement)', val: fmtDZD(bfr), sub: `${fmtDays(bfrJours)} de CA HT`, status: 'normal' },
+    { label: 'Trésorerie Nette (TN)', val: fmtDZD(tn), sub: tn >= 0 ? '✓ Position de liquidité saine' : '✗ Recours aux concours CT', status: tn >= 0 ? 'ok' : 'danger' },
+  ], y);
 
-  y = sectionTitle(doc, 'Décomposition du Bilan Fonctionnel (Emplois & Ressources)', y);
+  y = latexSubSection(doc, '1.1. Tableau Synthétique des Masses Fonctionnelles', y);
 
-  const bilanHead = [['POSTE DU BILAN', 'EXERCICE N', b1 ? 'EXERCICE N-1' : '', b1 ? 'ÉVOLUTION' : ''].filter(Boolean)];
+  const bilanHead = [['MASSE FONCTIONNELLE', 'EXERCICE N (DZD)', b1 ? 'EXERCICE N-1 (DZD)' : '', b1 ? 'VARIATION (DZD)' : ''].filter(Boolean)];
   const bilanBody = [
-    ['ACTIF — EMPLOIS', '', b1 ? '' : '', b1 ? '' : ''].filter(Boolean),
-    ['Emplois Stables (Immobilisations brutes)', fmtNum(b.emploisStables), b1 ? fmtNum(b1.emploisStables) : '', b1 ? fmtNum((b.emploisStables || 0) - (b1.emploisStables || 0)) : ''].filter(Boolean),
-    ['Actif Circulant (Stocks + Créances)', fmtNum(b.actifCirculant), b1 ? fmtNum(b1.actifCirculant) : '', b1 ? fmtNum((b.actifCirculant || 0) - (b1.actifCirculant || 0)) : ''].filter(Boolean),
-    ['Trésorerie Active (Disponibilités)', fmtNum(b.tresorerieActive), b1 ? fmtNum(b1.tresorerieActive) : '', b1 ? fmtNum((b.tresorerieActive || 0) - (b1.tresorerieActive || 0)) : ''].filter(Boolean),
-    ['TOTAL ACTIF', fmtNum((b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0)), b1 ? fmtNum((b1.emploisStables || 0) + (b1.actifCirculant || 0) + (b1.tresorerieActive || 0)) : '', ''].filter(Boolean),
-    ['PASSIF — RESSOURCES', '', b1 ? '' : '', ''].filter(Boolean),
-    ['Ressources Stables (CP + Amort. + DLT)', fmtNum(b.ressourcesStables), b1 ? fmtNum(b1.ressourcesStables) : '', b1 ? fmtNum((b.ressourcesStables || 0) - (b1.ressourcesStables || 0)) : ''].filter(Boolean),
-    ['Passif Circulant (Dettes CT)', fmtNum(b.passifCirculant), b1 ? fmtNum(b1.passifCirculant) : '', b1 ? fmtNum((b.passifCirculant || 0) - (b1.passifCirculant || 0)) : ''].filter(Boolean),
-    ['Trésorerie Passive (Concours bancaires)', fmtNum(b.tresoreriePassive), b1 ? fmtNum(b1.tresoreriePassive) : '', b1 ? fmtNum((b.tresoreriePassive || 0) - (b1.tresoreriePassive || 0)) : ''].filter(Boolean),
+    ['ACTIF DU BILAN (EMPLOIS)', '', b1 ? '' : '', b1 ? '' : ''].filter(Boolean),
+    ['Emplois Stables (Actifs non courants bruts)', fmtDZD(b.emploisStables), b1 ? fmtDZD(b1.emploisStables) : '', b1 ? fmtDZD((b.emploisStables || 0) - (b1.emploisStables || 0)) : ''].filter(Boolean),
+    ['Actif Circulant d\'Exploitation (Stocks + Créances)', fmtDZD(b.actifCirculant), b1 ? fmtDZD(b1.actifCirculant) : '', b1 ? fmtDZD((b.actifCirculant || 0) - (b1.actifCirculant || 0)) : ''].filter(Boolean),
+    ['Trésorerie Active (Disponibilités & Banques débitrices)', fmtDZD(b.tresorerieActive), b1 ? fmtDZD(b1.tresorerieActive) : '', b1 ? fmtDZD((b.tresorerieActive || 0) - (b1.tresorerieActive || 0)) : ''].filter(Boolean),
+    ['TOTAL GÉNÉRAL DE L\'ACTIF', fmtDZD((b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0)), b1 ? fmtDZD((b1.emploisStables || 0) + (b1.actifCirculant || 0) + (b1.tresorerieActive || 0)) : '', ''].filter(Boolean),
+    ['PASSIF DU BILAN (RESSOURCES)', '', b1 ? '' : '', ''].filter(Boolean),
+    ['Ressources Stables (Capitaux Propres + Dettes LT + Amort.)', fmtDZD(b.ressourcesStables), b1 ? fmtDZD(b1.ressourcesStables) : '', b1 ? fmtDZD((b.ressourcesStables || 0) - (b1.ressourcesStables || 0)) : ''].filter(Boolean),
+    ['Passif Circulant d\'Exploitation (Dettes CT Fournisseurs/Fiscales)', fmtDZD(b.passifCirculant), b1 ? fmtDZD(b1.passifCirculant) : '', b1 ? fmtDZD((b.passifCirculant || 0) - (b1.passifCirculant || 0)) : ''].filter(Boolean),
+    ['Trésorerie Passive (Concours bancaires courants & soldes créditeurs)', fmtDZD(b.tresoreriePassive), b1 ? fmtDZD(b1.tresoreriePassive) : '', b1 ? fmtDZD((b.tresoreriePassive || 0) - (b1.tresoreriePassive || 0)) : ''].filter(Boolean),
+    ['TOTAL GÉNÉRAL DU PASSIF', fmtDZD((b.ressourcesStables || 0) + (b.passifCirculant || 0) + (b.tresoreriePassive || 0)), b1 ? fmtDZD((b1.ressourcesStables || 0) + (b1.passifCirculant || 0) + (b1.tresoreriePassive || 0)) : '', ''].filter(Boolean),
   ];
 
-  const colStyles = b1
-    ? { 0: { halign: 'left' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
-    : { 0: { halign: 'left' }, 1: { halign: 'right' } };
-
-  y = drawTable(doc, bilanHead, bilanBody, y, {
-    columnStyles: colStyles,
-    willDrawCell: (data) => {
-      if (data.row.raw[0]?.includes('ACTIF') || data.row.raw[0]?.includes('PASSIF') || data.row.raw[0]?.includes('TOTAL')) {
-        data.cell.styles.fillColor = C.navy;
-        data.cell.styles.textColor = C.white;
-        data.cell.styles.fontStyle = 'bold';
-      }
-    }
-  });
-
-  // ──────────────────────────────────────────────────────────────────
-  // PAGE 3 — SIG & TCR
-  // ──────────────────────────────────────────────────────────────────
-  doc.addPage();
-  y = addPage('II. Soldes Intermédiaires de Gestion (SIG — TCR)');
-
-  y = sectionTitle(doc, 'II. Compte de Résultat & SIG — SCF Algérie', y);
-
-  // 3 KPI rentabilité
-  const kpiW2 = (W - 30) / 3;
-  drawKpiBox(doc, 12,           y, kpiW2 - 2, "Chiffre d'Affaires HT", fmtNum(s.chiffreAffaires), 'Production totale vendue', C.blue);
-  drawKpiBox(doc, 12 + kpiW2,   y, kpiW2 - 2, 'Excédent Brut d\'Exploitation', fmtNum(s.ebe), `Marge EBE : ${(margeEBE * 100).toFixed(1)}%`, margeEBE > 0.10 ? C.green : C.amber);
-  drawKpiBox(doc, 12 + kpiW2*2, y, kpiW2 - 2, 'Résultat Net de l\'Exercice', fmtNum(s.resultatNet), `Marge nette : ${(margeNette * 100).toFixed(1)}%`, s.resultatNet >= 0 ? C.green : C.red);
-  y += 28;
-
-  const sigHead = [['SOLDE INTERMÉDIAIRE', 'MONTANT (N)', s1 ? 'MONTANT (N-1)' : '', s1 ? 'VARIATION' : ''].filter(Boolean)];
-  const sigBody = [
-    ["Chiffre d'Affaires (CA) — Comptes 70x", fmtNum(s.chiffreAffaires), s1 ? fmtNum(s1.chiffreAffaires) : '', s1 ? fmtNum((s.chiffreAffaires||0)-(s1.chiffreAffaires||0)) : ''].filter(Boolean),
-    ['Production de l\'exercice (70+71+72)', fmtNum(s.productionExercice), s1 ? fmtNum(s1.productionExercice) : '', s1 ? fmtNum((s.productionExercice||0)-(s1.productionExercice||0)) : ''].filter(Boolean),
-    ['Consommation de l\'exercice (60+61+62)', fmtNum(s.consommationExercice), s1 ? fmtNum(s1.consommationExercice) : '', ''].filter(Boolean),
-    ['VALEUR AJOUTÉE (VA)', fmtNum(s.valeurAjoutee), s1 ? fmtNum(s1.valeurAjoutee) : '', s1 ? fmtNum((s.valeurAjoutee||0)-(s1.valeurAjoutee||0)) : ''].filter(Boolean),
-    ['Charges de personnel (63x)', fmtNum(s.chargesPersonnel), s1 ? fmtNum(s1.chargesPersonnel) : '', ''].filter(Boolean),
-    ['Impôts & taxes (64x)', fmtNum(s.impotsTaxes), s1 ? fmtNum(s1.impotsTaxes) : '', ''].filter(Boolean),
-    ['EXCÉDENT BRUT D\'EXPLOITATION (EBE)', fmtNum(s.ebe), s1 ? fmtNum(s1.ebe) : '', s1 ? fmtNum((s.ebe||0)-(s1.ebe||0)) : ''].filter(Boolean),
-    ['Dotations aux amortissements (68x)', fmtNum(s.dotationsAmortissements), s1 ? fmtNum(s1.dotationsAmortissements) : '', ''].filter(Boolean),
-    ['RÉSULTAT D\'EXPLOITATION', fmtNum(s.resultatExploitation), s1 ? fmtNum(s1.resultatExploitation) : '', s1 ? fmtNum((s.resultatExploitation||0)-(s1.resultatExploitation||0)) : ''].filter(Boolean),
-    ['Charges financières nettes (66x-76x)', fmtNum(s.chargesFinancieres), s1 ? fmtNum(s1.chargesFinancieres) : '', ''].filter(Boolean),
-    ['RÉSULTAT AVANT IMPÔTS', fmtNum((s.resultatExploitation||0)-(s.chargesFinancieres||0)), s1 ? fmtNum((s1.resultatExploitation||0)-(s1.chargesFinancieres||0)) : '', ''].filter(Boolean),
-    ['IBS & Impôts (695x)', fmtNum(s.impotsSurResultats), s1 ? fmtNum(s1.impotsSurResultats) : '', ''].filter(Boolean),
-    ['RÉSULTAT NET DE L\'EXERCICE', fmtNum(s.resultatNet), s1 ? fmtNum(s1.resultatNet) : '', s1 ? fmtNum((s.resultatNet||0)-(s1.resultatNet||0)) : ''].filter(Boolean),
-  ];
-
-  y = drawTable(doc, sigHead, sigBody, y, {
+  y = drawBooktabsTable(doc, bilanHead, bilanBody, y, {
+    boldRows: [0, 4, 5, 9],
+    totalRowIndices: [4, 9],
     columnStyles: b1
-      ? { 0: { halign: 'left' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
-      : { 0: { halign: 'left' }, 1: { halign: 'right' } },
-    willDrawCell: (data) => {
-      const bold = ['VALEUR AJOUTÉE', 'EXCÉDENT BRUT', 'RÉSULTAT D\'EXPLOITATION', 'RÉSULTAT AVANT', 'RÉSULTAT NET'];
-      if (bold.some(k => data.row.raw[0]?.startsWith(k))) {
-        data.cell.styles.fillColor = C.navy;
-        data.cell.styles.textColor = C.white;
-        data.cell.styles.fontStyle = 'bold';
-      }
+      ? { 0: { cellWidth: 68 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+      : { 0: { cellWidth: 100 }, 1: { halign: 'right' } }
+  });
+
+  // Note d'interprétation
+  doc.setFont('times', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...T.inkMuted);
+  doc.text('Note technique : Conformément aux normes SCF, les amortissements et pertes de valeur sont reclassés en ressources stables pour apprécier la capacité totale de financement.', margin, y);
+
+  // ──────────────────────────────────────────────────────────────────
+  // PAGE 3 — SECTION 2 : SIG & COMPTE DE RÉSULTAT (TCR)
+  // ──────────────────────────────────────────────────────────────────
+  doc.addPage();
+  y = 22;
+
+  y = latexSection(doc, '2', 'Soldes Intermédiaires de Gestion (SIG / TCR SCF)', y);
+
+  // Formule mathématique SIG
+  y = latexMathBox(
+    doc,
+    '\\text{VA} = \\text{Production} - \\text{Consommations} \\qquad \\text{EBE} = \\text{VA} - \\text{Personnel (63)} - \\text{Impôts (64)}',
+    'Décomposition en cascade des agrégats de rentabilité selon la nomenclature officielle Loi 07-11.',
+    y,
+    17
+  );
+
+  y = latexKpiRow(doc, [
+    { label: 'Chiffre d\'Affaires HT', val: fmtDZD(ca), sub: 'Production vendue', status: 'normal' },
+    { label: 'Excédent Brut d\'Exploitation', val: fmtDZD(ebe), sub: `Marge EBE : ${fmtPct(margeEBE)}`, status: margeEBE >= 0.10 ? 'ok' : 'danger' },
+    { label: 'Résultat Net de l\'Exercice', val: fmtDZD(rn), sub: `Marge Nette : ${fmtPct(margeNette)}`, status: rn >= 0 ? 'ok' : 'danger' },
+  ], y);
+
+  y = latexSubSection(doc, '2.1. Tableau des Comptes de Résultats (TCR Officiel)', y);
+
+  const sigHead = [['POSTE / SOLDE INTERMÉDIAIRE', 'COMPTES SCF', 'EXERCICE N (DZD)', s1 ? 'EXERCICE N-1' : '', s1 ? 'VARIATION (%)' : ''].filter(Boolean)];
+  const sigBody = [
+    ['Chiffre d\'Affaires (Ventes de biens et services)', '700 à 709', fmtDZD(ca), s1 ? fmtDZD(s1.chiffreAffaires) : '', s1 ? fmtPct(safeDiv(ca - (s1.chiffreAffaires || 0), s1.chiffreAffaires || 1)) : ''].filter(Boolean),
+    ['Production de l\'exercice (Ventes + Var. Stocks + Immo)', '70, 72, 73', fmtDZD(s.productionExercice), s1 ? fmtDZD(s1.productionExercice) : '', ''].filter(Boolean),
+    ['Consommation de l\'exercice (Achats + Serv. Ext.)', '601..603, 61, 62', fmtDZD(s.consommationExercice), s1 ? fmtDZD(s1.consommationExercice) : '', ''].filter(Boolean),
+    ['VALEUR AJOUTÉE D\'EXPLOITATION (VA)', 'Marge brute', fmtDZD(va), s1 ? fmtDZD(s1.valeurAjoutee) : '', s1 ? fmtPct(safeDiv(va - (s1.valeurAjoutee || 0), s1.valeurAjoutee || 1)) : ''].filter(Boolean),
+    ['Charges de personnel', '631 à 638', fmtDZD(s.chargesPersonnel), s1 ? fmtDZD(s1.chargesPersonnel) : '', ''].filter(Boolean),
+    ['Impôts, taxes et versements assimilés', '641 à 648', fmtDZD(s.impotsTaxes), s1 ? fmtDZD(s1.impotsTaxes) : '', ''].filter(Boolean),
+    ['EXCÉDENT BRUT D\'EXPLOITATION (EBE)', 'Agrégat cash', fmtDZD(ebe), s1 ? fmtDZD(s1.ebe) : '', s1 ? fmtPct(safeDiv(ebe - (s1.ebe || 0), s1.ebe || 1)) : ''].filter(Boolean),
+    ['Dotations aux amortissements et provisions nettes', '681, 685 - 781', fmtDZD(s.dotationsAmortissements), s1 ? fmtDZD(s1.dotationsAmortissements) : '', ''].filter(Boolean),
+    ['RÉSULTAT OPÉRATIONNEL / D\'EXPLOITATION', 'Activité pure', fmtDZD(re), s1 ? fmtDZD(s1.resultatExploitation) : '', s1 ? fmtPct(safeDiv(re - (s1.resultatExploitation || 0), s1.resultatExploitation || 1)) : ''].filter(Boolean),
+    ['Charges financières nettes des produits financiers', '66x - 76x', fmtDZD(s.chargesFinancieres), s1 ? fmtDZD(s1.chargesFinancieres) : '', ''].filter(Boolean),
+    ['RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', 'Résultat courant', fmtDZD((re || 0) - (s.chargesFinancieres || 0)), s1 ? fmtDZD((s1.resultatExploitation || 0) - (s1.chargesFinancieres || 0)) : '', ''].filter(Boolean),
+    ['Impôt sur les bénéfices des sociétés (IBS exigible)', '695, 698', fmtDZD(s.impotsSurResultats), s1 ? fmtDZD(s1.impotsSurResultats) : '', ''].filter(Boolean),
+    ['RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', 'Solde final', fmtDZD(rn), s1 ? fmtDZD(s1.resultatNet) : '', s1 ? fmtPct(safeDiv(rn - (s1.resultatNet || 0), Math.abs(s1.resultatNet || 1))) : ''].filter(Boolean),
+  ];
+
+  y = drawBooktabsTable(doc, sigHead, sigBody, y, {
+    boldRows: [3, 6, 8, 10, 12],
+    totalRowIndices: [3, 6, 8, 12],
+    columnStyles: {
+      0: { cellWidth: 62 },
+      1: { cellWidth: 26, fontStyle: 'italic', textColor: T.inkMuted },
+      2: { halign: 'right' },
+      3: { halign: 'right' },
+      4: { halign: 'right' },
     }
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 4 — RATIOS FINANCIERS
+  // PAGE 4 — SECTION 3 : RATIOS FINANCIERS & DÉLAIS
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
-  y = addPage('III. Ratios de Liquidité, Rentabilité & Activité');
+  y = 22;
 
-  y = sectionTitle(doc, 'III-A. Ratios de Liquidité & Structure Financière', y);
+  y = latexSection(doc, '3', 'Ratios Financiers, Solvabilité & Délais de Rotation', y);
 
-  const liqHead = [['RATIO', 'VALEUR (N)', 'SEUIL CRITIQUE', 'NORME SECTORIELLE', 'INTERPRÉTATION']];
+  y = latexSubSection(doc, '3.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
+
+  const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'SEUIL CRITIQUE', 'APPRÉCIATION']];
   const liqBody = [
-    ['Liquidité Générale (AC / DCT)', fmtRaw(liqGen), '< 1.0', '≥ 1.2', liqGen >= 1.2 ? '✓ Satisfaisant' : liqGen >= 1.0 ? '△ Limite' : '✗ Insuffisant'],
-    ['Liquidité Réduite (AC-Stocks / DCT)', fmtRaw(r.liquiditeReduite), '< 0.8', '≥ 1.0', (r.liquiditeReduite||0) >= 1.0 ? '✓ Satisfaisant' : '△ À surveiller'],
-    ['Autonomie Financière (CP / Total)', `${((autoFinanc||0)*100).toFixed(1)} %`, '< 25 %', '≥ 35 %', (autoFinanc||0) >= 0.35 ? '✓ Bonne autonomie' : (autoFinanc||0) >= 0.25 ? '△ Acceptable' : '✗ Dépendance élevée'],
-    ['Solvabilité Générale (Actif/Dettes)', fmtRaw(r.solvabilite), '< 1.5', '≥ 2.0', (r.solvabilite||0) >= 2.0 ? '✓ Solvable' : '△ À surveiller'],
-    ['Couverture des Intérêts (EBE/ChgFin)', fmtRaw(couverture), '< 1.5x', '≥ 3.0x', couverture >= 3 ? '✓ Couverture aisée' : couverture >= 1.5 ? '△ Acceptable' : '✗ Risque de défaut'],
+    ['Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00', liqGen >= 1.2 ? '✓ Satisfaisant' : liqGen >= 1.0 ? '△ Limite' : '✗ Alerte sous-liquidité'],
+    ['Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(r.liquiditeReduite), '< 0.80', (r.liquiditeReduite || 0) >= 0.8 ? '✓ Conforme' : '△ Dépendance aux stocks'],
+    ['Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %', autFinanc >= 0.35 ? '✓ Excellente autonomie' : autFinanc >= 0.25 ? '△ Acceptable' : '✗ Dépendance aux dettes'],
+    ['Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', fmtNum(r.solvabilite), '< 1.50', (r.solvabilite || 0) >= 2.0 ? '✓ Solvable' : '△ À surveiller'],
+    ['Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x', safeDiv(ebe, s.chargesFinancieres) >= 3 ? '✓ Couverture large' : '✗ Tension de charge'],
   ];
-  y = drawTable(doc, liqHead, liqBody, y, {
-    columnStyles: { 0: { halign: 'left', cellWidth: 65 }, 4: { halign: 'left' } }
+
+  y = drawBooktabsTable(doc, liqHead, liqBody, y, {
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 42 },
+      1: { fontStyle: 'italic', cellWidth: 54 },
+      2: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
+      3: { halign: 'center', cellWidth: 24 },
+      4: { cellWidth: 32 }
+    }
   });
 
-  y = sectionTitle(doc, 'III-B. Ratios de Rentabilité', y);
-  const rentHead = [['RATIO', 'VALEUR (N)', 'INTERPRÉTATION']];
+  y = latexSubSection(doc, '3.2. Ratios de Rentabilité Économique et Financière', y);
+
+  const rentHead = [['RATIO DE RENTABILITÉ', 'VALEUR N', 'RÉFÉRENTIEL', 'ANALYSE DU RENDEMENT']];
   const rentBody = [
-    ['Marge EBE (EBE / CA)', `${(margeEBE*100).toFixed(1)} %`, margeEBE > 0.12 ? '✓ Excellent' : margeEBE > 0.07 ? '✓ Bon' : margeEBE > 0 ? '△ Faible' : '✗ Négatif'],
-    ["Marge d'exploitation (RE / CA)", `${(margeExploit*100).toFixed(1)} %`, margeExploit > 0.08 ? '✓ Bon' : margeExploit > 0 ? '△ À améliorer' : '✗ Déficitaire'],
-    ['Marge nette (RN / CA)', `${(margeNette*100).toFixed(1)} %`, margeNette > 0.05 ? '✓ Solide' : margeNette > 0 ? '△ Fragile' : '✗ Perte'],
-    ["Taux de valeur ajoutée (VA / CA)", `${(tauxVA*100).toFixed(1)} %`, tauxVA > 0.35 ? '✓ Forte création de valeur' : '△ Activité de transformation'],
-    ['Rentabilité économique (RE / Total Actif)', `${((r.rentabiliteEconomique||0)*100).toFixed(1)} %`, (r.rentabiliteEconomique||0) > 0.08 ? '✓ Bonne' : '△ À améliorer'],
+    ['Taux de Valeur Ajoutée (VA / CA)', fmtPct(tauxVA), '≥ 25.0 %', tauxVA >= 0.30 ? '✓ Forte création de richesse brute' : '△ Poids élevé des achats consommés'],
+    ['Marge d\'EBE (EBE / CA)', fmtPct(margeEBE), '≥ 10.0 %', margeEBE >= 0.12 ? '✓ Excellente marge brute d\'exploitation' : '△ Marge opérationnelle comprimée'],
+    ['Marge Opérationnelle (RE / CA)', fmtPct(margeExploit), '≥ 6.0 %', margeExploit >= 0.08 ? '✓ Activité commerciale hautement rentable' : '△ Rentabilité opérationnelle modérée'],
+    ['Marge Nette Finale (RN / CA)', fmtPct(margeNette), '> 0.0 %', margeNette >= 0.05 ? '✓ Taux de profit net confortable' : rn >= 0 ? '△ Marge bénéficiaire étroite' : '✗ Exercice en perte nette'],
   ];
-  y = drawTable(doc, rentHead, rentBody, y, {
-    columnStyles: { 0: { halign: 'left', cellWidth: 80 }, 2: { halign: 'left' } }
+
+  y = drawBooktabsTable(doc, rentHead, rentBody, y, {
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 },
+      1: { halign: 'right', fontStyle: 'bold', cellWidth: 25 },
+      2: { halign: 'center', cellWidth: 25 },
+      3: { cellWidth: 65 }
+    }
   });
 
-  y = sectionTitle(doc, 'III-C. Ratios d\'Activité & Délais de Rotation (en jours)', y);
-  const actHead = [['INDICATEUR', 'VALEUR (N)', 'NORME', 'STATUT']];
-  const dso = r.delaiRecouvrement || 0;
-  const dpo = r.delaiFournisseurs || 0;
-  const rot = r.rotationStocks || 0;
+  y = latexSubSection(doc, '3.3. Délais de Rotation et Cycle d\'Exploitation (en Jours)', y);
+
+  const actHead = [['CYCLE / DÉLAI D\'EXPLOITATION', 'VALEUR N', 'NORME SCF', 'IMPACT SUR LE CASH']];
   const actBody = [
-    ['DSO — Délai de recouvrement clients', fmtDays(dso), '≤ 60 j', dso <= 60 ? '✓ Bon' : dso <= 90 ? '△ Limite' : '✗ Trop long'],
-    ['DPO — Délai de règlement fournisseurs', fmtDays(dpo), '30–75 j', (dpo >= 30 && dpo <= 75) ? '✓ Correct' : '△ À vérifier'],
-    ['Rotation des stocks', fmtDays(rot), '≤ 90 j', rot <= 90 ? '✓ Rapide' : rot <= 150 ? '△ Moyen' : '✗ Lent'],
-    ['BFR en jours de CA', fmtDays(r.bfrJoursCA), '≤ 60 j', (r.bfrJoursCA||0) <= 60 ? '✓ Maîtrisé' : '△ À optimiser'],
-    ['Taux de rotation des stocks (x/an)', `${(r.tauxRotationStocks||0).toFixed(2)} x`, '≥ 4 x/an', (r.tauxRotationStocks||0) >= 4 ? '✓ Bonne vélocité' : '△ Lent'],
+    ['DSO — Délai de Recouvrement Clients', fmtDays(dso), '≤ 60 j', dso <= 60 ? '✓ Recouvrement rapide et fluide' : '✗ Risque d\'immobilisation de cash client'],
+    ['DPO — Délai de Paiement Fournisseurs', fmtDays(dpo), '30 à 75 j', dpo >= 30 && dpo <= 75 ? '✓ Financement fournisseur équilibré' : '△ Décalage de règlement à optimiser'],
+    ['Rotation Moyenne des Stocks', fmtDays(rotStock), '≤ 90 j', rotStock <= 90 ? '✓ Vélocité satisfaisante des stocks' : '✗ Risque de surstockage et dépréciation'],
+    ['BFR Exprimé en Jours de Chiffre d\'Affaires', fmtDays(bfrJours), '≤ 60 j', bfrJours <= 60 ? '✓ Besoin en fonds de roulement maîtrisé' : '✗ BFR trop lourd nécessitant du cash'],
   ];
-  y = drawTable(doc, actHead, actBody, y, {
-    columnStyles: { 0: { halign: 'left', cellWidth: 80 }, 3: { halign: 'left' } }
+
+  y = drawBooktabsTable(doc, actHead, actBody, y, {
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 65 },
+      1: { halign: 'right', fontStyle: 'bold', cellWidth: 24 },
+      2: { halign: 'center', cellWidth: 24 },
+      3: { cellWidth: 57 }
+    }
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 5 — COMPARATIF N vs N-1
+  // PAGE 5 — SECTION 4 : COMPARATIF N vs N-1
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
-  y = addPage('IV. Comparatif Pluriannuel N vs N-1');
+  y = 22;
 
-  y = sectionTitle(doc, 'IV. Analyse Comparative N vs N-1 — Évolution des Indicateurs Clés', y);
+  y = latexSection(doc, '4', 'Analyse Comparative Pluriannuelle (N vs N-1)', y);
 
   if (!dataN1) {
-    doc.setFillColor(...C.amberLight);
-    doc.roundedRect(12, y, W - 24, 16, 2, 2, 'F');
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(...C.amber);
-    doc.text('⚠  Balance N-1 non importée — Importez la balance de l\'exercice précédent pour activer l\'analyse comparative.', 18, y + 9);
-    y += 22;
+    y = latexMathBox(
+      doc,
+      '\\text{Exercice Comparative } N-1 \\text{ : Non Fourni}',
+      'Pour activer l\'analyse comparative dynamique des flux et des soldes, veuillez importer la balance de l\'exercice N-1 dans l\'application.',
+      y,
+      20
+    );
   } else {
-    const compHead = [['INDICATEUR', 'N', 'N-1', 'VARIATION (DA)', 'VAR. (%)']];
-    const pct = (n, n1) => n1 && n1 !== 0 ? `${(((n - n1) / Math.abs(n1)) * 100).toFixed(1)} %` : '—';
-    const diff = (n, n1) => {
-      const d = (n || 0) - (n1 || 0);
-      return (d > 0 ? '+' : '') + Math.round(d).toLocaleString('fr-FR') + ' DZD';
-    };
+    y = latexSubSection(doc, '4.1. Tableau des Variations Structurelles et de Rentabilité', y);
+
+    const compHead = [['AGRÉGAT MAJEUR', 'EXERCICE N (DZD)', 'EXERCICE N-1 (DZD)', 'VARIATION ABS. (DZD)', 'VARIATION REL. (%)']];
+    const diffVal = (a, b) => (a || 0) - (b || 0);
+    const diffPct = (a, b) => safeDiv(diffVal(a, b), Math.abs(b || 1));
 
     const compBody = [
-      ["Chiffre d'Affaires", fmtNum(s.chiffreAffaires), fmtNum(s1?.chiffreAffaires), diff(s.chiffreAffaires, s1?.chiffreAffaires), pct(s.chiffreAffaires, s1?.chiffreAffaires)],
-      ['Valeur Ajoutée', fmtNum(s.valeurAjoutee), fmtNum(s1?.valeurAjoutee), diff(s.valeurAjoutee, s1?.valeurAjoutee), pct(s.valeurAjoutee, s1?.valeurAjoutee)],
-      ['EBE', fmtNum(s.ebe), fmtNum(s1?.ebe), diff(s.ebe, s1?.ebe), pct(s.ebe, s1?.ebe)],
-      ['Résultat d\'Exploitation', fmtNum(s.resultatExploitation), fmtNum(s1?.resultatExploitation), diff(s.resultatExploitation, s1?.resultatExploitation), pct(s.resultatExploitation, s1?.resultatExploitation)],
-      ['Résultat Net', fmtNum(s.resultatNet), fmtNum(s1?.resultatNet), diff(s.resultatNet, s1?.resultatNet), pct(s.resultatNet, s1?.resultatNet)],
-      ['FRNG', fmtNum(b.frng), fmtNum(b1?.frng), diff(b.frng, b1?.frng), pct(b.frng, b1?.frng)],
-      ['BFR', fmtNum(b.bfr), fmtNum(b1?.bfr), diff(b.bfr, b1?.bfr), pct(b.bfr, b1?.bfr)],
-      ['Trésorerie Nette', fmtNum(b.tn), fmtNum(b1?.tn), diff(b.tn, b1?.tn), pct(b.tn, b1?.tn)],
-      ['Liquidité Générale', fmtRaw(r.liquiditeGenerale), fmtRaw(dataN1?.ratios?.liquiditeGenerale), '—', '—'],
-      ['Marge EBE (%)', `${(margeEBE*100).toFixed(1)}%`, `${(safeDiv(s1?.ebe, s1?.chiffreAffaires)*100).toFixed(1)}%`, '—', '—'],
-      ['Marge nette (%)', `${(margeNette*100).toFixed(1)}%`, `${(safeDiv(s1?.resultatNet, s1?.chiffreAffaires)*100).toFixed(1)}%`, '—', '—'],
+      ['Chiffre d\'Affaires Net HT', fmtDZD(ca), fmtDZD(s1.chiffreAffaires), fmtDZD(diffVal(ca, s1.chiffreAffaires)), fmtPct(diffPct(ca, s1.chiffreAffaires))],
+      ['Valeur Ajoutée (VA)', fmtDZD(va), fmtDZD(s1.valeurAjoutee), fmtDZD(diffVal(va, s1.valeurAjoutee)), fmtPct(diffPct(va, s1.valeurAjoutee))],
+      ['Excédent Brut d\'Exploitation (EBE)', fmtDZD(ebe), fmtDZD(s1.ebe), fmtDZD(diffVal(ebe, s1.ebe)), fmtPct(diffPct(ebe, s1.ebe))],
+      ['Résultat d\'Exploitation', fmtDZD(re), fmtDZD(s1.resultatExploitation), fmtDZD(diffVal(re, s1.resultatExploitation)), fmtPct(diffPct(re, s1.resultatExploitation))],
+      ['Résultat Net de l\'Exercice', fmtDZD(rn), fmtDZD(s1.resultatNet), fmtDZD(diffVal(rn, s1.resultatNet)), fmtPct(diffPct(rn, s1.resultatNet))],
+      ['Fonds de Roulement Net Global (FRNG)', fmtDZD(frng), fmtDZD(b1.frng), fmtDZD(diffVal(frng, b1.frng)), fmtPct(diffPct(frng, b1.frng))],
+      ['Besoin en Fonds de Roulement (BFR)', fmtDZD(bfr), fmtDZD(b1.bfr), fmtDZD(diffVal(bfr, b1.bfr)), fmtPct(diffPct(bfr, b1.bfr))],
+      ['Trésorerie Nette (TN)', fmtDZD(tn), fmtDZD(b1.tn), fmtDZD(diffVal(tn, b1.tn)), fmtPct(diffPct(tn, b1.tn))],
+      ['Liquidité Générale', fmtNum(liqGen), fmtNum(dataN1.ratios?.liquiditeGenerale), fmtNum(liqGen - (dataN1.ratios?.liquiditeGenerale || 0)), '—'],
     ];
 
-    y = drawTable(doc, compHead, compBody, y, {
-      columnStyles: { 0: { halign: 'left', cellWidth: 55 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+    y = drawBooktabsTable(doc, compHead, compBody, y, {
+      boldRows: [0, 2, 4, 5, 7],
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { halign: 'right', cellWidth: 28 },
+        2: { halign: 'right', cellWidth: 28 },
+        3: { halign: 'right', cellWidth: 32 },
+        4: { halign: 'right', cellWidth: 27 },
+      }
     });
+
+    // Synthèse de l'évolution
+    y = latexSubSection(doc, '4.2. Synthèse de la Trajectoire Pluriannuelle', y);
+    const caTrend = diffVal(ca, s1.chiffreAffaires) >= 0 ? 'croissance' : 'contraction';
+    const frngTrend = diffVal(frng, b1.frng) >= 0 ? 'consolidation' : 'érosion';
+    
+    doc.setFont('times', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...T.inkSecondary);
+    const synthText = `L'exercice N est marqué par une dynamique de ${caTrend} de l'activité commerciale (${fmtPct(diffPct(ca, s1.chiffreAffaires))} de CA). Sur le plan structurel, on observe une ${frngTrend} du fonds de roulement (${fmtDZD(diffVal(frng, b1.frng))}), tandis que la trésorerie nette varie de ${fmtDZD(diffVal(tn, b1.tn))}. L'ajustement des charges d'exploitation et la gestion du BFR constituent les axes prioritaires pour préserver l'autonomie financière.`;
+    const splitSynth = doc.splitTextToSize(synthText, W - margin * 2);
+    doc.text(splitSynth, margin, y);
+    y += splitSynth.length * 4.5 + 4;
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 6 — DIAGNOSTIC FORCES / FAIBLESSES / RISQUES
+  // PAGE 6 — SECTION 5 : DIAGNOSTIC & MATRICE DES RISQUES
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
-  y = addPage('V. Diagnostic — Forces, Faiblesses & Risques');
+  y = 22;
 
-  y = sectionTitle(doc, 'V. Diagnostic Financier — Analyse des Forces & Faiblesses (SCF)', y);
+  y = latexSection(doc, '5', 'Diagnostic Analytique & Matrice des Risques', y);
 
-  const diagnostics = [];
+  const diagItems = [];
 
-  // FRNG
-  diagnostics.push({ type: b.frng >= 0 ? 'FORCE' : 'FAIBLESSE', cat: 'Équilibre financier', titre: b.frng >= 0 ? 'FRNG positif — Structure solide' : 'FRNG négatif — Déséquilibre structurel', detail: b.frng >= 0 ? `FRNG = ${fmtNum(b.frng)} : les ressources stables couvrent intégralement les emplois stables.` : `FRNG = ${fmtNum(b.frng)} : des emplois stables sont financés par des ressources CT — risque structurel.` });
-  // Trésorerie
-  diagnostics.push({ type: b.tn >= 0 ? 'FORCE' : 'RISQUE', cat: 'Liquidité', titre: b.tn >= 0 ? 'Trésorerie nette positive' : 'Trésorerie nette négative — Tension', detail: b.tn >= 0 ? `TN = ${fmtNum(b.tn)} : position de liquidité saine.` : `TN = ${fmtNum(b.tn)} : recours aux concours bancaires CT — surveiller le coût du découvert.` });
-  // Rentabilité
-  diagnostics.push({ type: margeNette > 0.05 ? 'FORCE' : margeNette > 0 ? 'NEUTRE' : 'FAIBLESSE', cat: 'Rentabilité', titre: margeNette > 0.05 ? 'Rentabilité nette solide (> 5%)' : margeNette > 0 ? 'Marge nette positive mais fragile' : 'Résultat net déficitaire', detail: `Marge nette = ${(margeNette*100).toFixed(1)}% — RN = ${fmtNum(s.resultatNet)}` });
-  // EBE
-  diagnostics.push({ type: margeEBE > 0.10 ? 'FORCE' : margeEBE > 0 ? 'NEUTRE' : 'RISQUE', cat: 'EBE', titre: margeEBE > 0.10 ? 'EBE satisfaisant (> 10%)' : margeEBE > 0 ? 'EBE positif mais insuffisant' : 'EBE négatif — Activité non rentable', detail: `Marge EBE = ${(margeEBE*100).toFixed(1)}% — EBE = ${fmtNum(s.ebe)}` });
-  // DSO
-  if (dso > 90) diagnostics.push({ type: 'FAIBLESSE', cat: 'Recouvrement', titre: 'DSO excessif — Risque crédit clients', detail: `Délai de recouvrement = ${fmtDays(dso)} — norme ≤ 60 j. Risque de trésorerie.` });
-  else diagnostics.push({ type: 'FORCE', cat: 'Recouvrement', titre: 'DSO maîtrisé', detail: `Délai de recouvrement = ${fmtDays(dso)} — dans les normes sectorielles.` });
-  // Autonomie
-  if (autoFinanc < 0.25) diagnostics.push({ type: 'RISQUE', cat: 'Structure', titre: 'Faible autonomie financière (< 25%)', detail: `CP / Total Passif = ${(autoFinanc*100).toFixed(1)}% — dépendance forte aux dettes.` });
-  else diagnostics.push({ type: 'FORCE', cat: 'Structure', titre: `Bonne autonomie financière (${(autoFinanc*100).toFixed(1)}%)`, detail: `Capitaux propres représentent ${(autoFinanc*100).toFixed(1)}% du passif total.` });
+  // 1. Structure
+  if (frng >= 0) {
+    diagItems.push(['FORCE', 'Équilibre Structurel', `FRNG excédentaire (${fmtDZD(frng)}). Les ressources stables financent intégralement le haut de bilan.`]);
+  } else {
+    diagItems.push(['RISQUE', 'Équilibre Structurel', `Déficit structurel de FRNG (${fmtDZD(frng)}). Des investissements à long terme sont financés par de la dette court terme.`]);
+  }
 
-  const colorMap = { FORCE: [5, 150, 105], FAIBLESSE: [220, 38, 38], RISQUE: [217, 119, 6], NEUTRE: [100, 116, 139] };
-  const bgMap    = { FORCE: [209, 250, 229], FAIBLESSE: [254, 226, 226], RISQUE: [254, 243, 199], NEUTRE: [241, 245, 249] };
-  const prefix   = { FORCE: '✓', FAIBLESSE: '✗', RISQUE: '△', NEUTRE: '→' };
+  // 2. Liquidité
+  if (tn >= 0) {
+    diagItems.push(['FORCE', 'Trésorerie & Cash', `Trésorerie nette positive (${fmtDZD(tn)}). L'entreprise dispose de marges de manœuvre immédiates.`]);
+  } else {
+    diagItems.push(['ALERTE', 'Trésorerie & Cash', `Tension de trésorerie nette (${fmtDZD(tn)}). Risque de dépendance envers les autorisations de découvert bancaire.`]);
+  }
 
-  diagnostics.forEach((d) => {
-    if (y > H - 40) { doc.addPage(); y = addPage('V. Diagnostic (suite)'); }
-    const col = colorMap[d.type];
-    const bg  = bgMap[d.type];
-    doc.setFillColor(...bg);
-    doc.roundedRect(12, y, W - 24, 22, 2, 2, 'F');
-    doc.setDrawColor(...col);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(12, y, W - 24, 22, 2, 2, 'S');
-    doc.setFillColor(...col);
-    doc.roundedRect(12, y, 4, 22, 1, 1, 'F');
+  // 3. Rentabilité
+  if (margeNette >= 0.05) {
+    diagItems.push(['FORCE', 'Rentabilité Nette', `Taux de marge nette solide (${fmtPct(margeNette)}). Excellente transformation du chiffre d'affaires en résultat net.`]);
+  } else if (rn >= 0) {
+    diagItems.push(['VIGILANCE', 'Rentabilité Nette', `Marge nette positive mais étroite (${fmtPct(margeNette)}). Sensibilité accrue aux hausses de coûts d'approvisionnement.`]);
+  } else {
+    diagItems.push(['RISQUE', 'Rentabilité Nette', `Résultat net déficitaire (${fmtDZD(rn)}). Destruction de valeur sur l'exercice nécessitant une révision des coûts.`]);
+  }
 
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...col);
-    doc.text(`${prefix[d.type]} ${d.type} — ${d.cat}`, 20, y + 7);
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.navy);
-    doc.text(d.titre, 20, y + 14);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.slate);
-    const lines = doc.splitTextToSize(d.detail, W - 38);
-    doc.text(lines[0], 20, y + 20);
+  // 4. Délais Clients
+  if (dso > 75) {
+    diagItems.push(['ALERTE', 'Recouvrement Clients', `DSO élevé (${fmtDays(dso)}). Risque d'impayés et alourdissement mécanique du BFR.`]);
+  } else {
+    diagItems.push(['FORCE', 'Recouvrement Clients', `DSO conforme (${fmtDays(dso)}). Le poste clients est recouvré dans des délais satisfaisants.`]);
+  }
 
-    y += 27;
+  // 5. Autonomie Financière
+  if (autFinanc >= 0.35) {
+    diagItems.push(['FORCE', 'Structure du Passif', `Forte autonomie financière (${fmtPct(autFinanc)}). Capacité d'endettement préservée auprès des banques.`]);
+  } else {
+    diagItems.push(['VIGILANCE', 'Structure du Passif', `Faible autonomie financière (${fmtPct(autFinanc)}). Renforcer les fonds propres par mise en réserve des résultats.`]);
+  }
+
+  const diagHead = [['STATUT', 'DIMENSION ÉVALUÉE', 'DIAGNOSTIC DÉTAILLÉ & RECOMMANDATIONS STRATÉGIQUES']];
+  const diagBody = diagItems.map(([type, dim, detail]) => [
+    type,
+    dim,
+    detail
+  ]);
+
+  y = drawBooktabsTable(doc, diagHead, diagBody, y, {
+    columnStyles: {
+      0: { fontStyle: 'bold', halign: 'center', cellWidth: 26 },
+      1: { fontStyle: 'bold', textColor: T.navy, cellWidth: 44 },
+      2: { cellWidth: W - margin * 2 - 70 }
+    },
+    willDrawCell: (data) => {
+      if (data.column.index === 0 && data.section === 'body') {
+        const val = data.cell.raw;
+        if (val === 'FORCE') data.cell.styles.textColor = T.darkGreen;
+        else if (val === 'RISQUE' || val === 'ALERTE') data.cell.styles.textColor = T.darkRed;
+        else data.cell.styles.textColor = T.darkAmber;
+      }
+    }
+  });
+
+  // Recommandations prioritaires
+  y = latexSubSection(doc, '5.1. Plan d\'Action Recommandé aux Décideurs', y);
+
+  const actions = [
+    '1. Optimisation du BFR : Réduire le délai moyen d\'encaissement client (DSO) par des relances préventives et négocier l\'alignement des délais fournisseurs (DPO).',
+    '2. Maîtrise des Charges d\'Exploitation : Suivre le ratio Charges de personnel / Valeur ajoutée pour maintenir un taux de marge d\'EBE supérieur à 12 %.',
+    '3. Renforcement de la Structure Financière : Prioriser la mise en réserve intégrale des bénéfices distribuables pour accroître l\'autonomie financière.',
+  ];
+
+  actions.forEach(act => {
+    doc.setFont('times', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...T.inkSecondary);
+    doc.text(act, margin + 2, y);
+    y += 5;
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 7 — AUDIT DES SOLDES SCF
+  // PAGE 7 — SECTION 6 : AUDIT DES SOLDES & ANOMALIES SCF
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
-  y = addPage('VI. Audit des Soldes SCF & Anomalies');
+  y = 22;
 
-  y = sectionTitle(doc, 'VI. Audit des Soldes — Anomalies Détectées (Règles SCF Algérie)', y);
+  y = latexSection(doc, '6', 'Audit des Soldes & Conformité SCF (Loi 07-11)', y);
 
-  const anomalies = [];
+  const anomaliesList = [];
+
   if (rows && rows.length > 0) {
-    // Règles d'audit rapides SCF
-    rows.forEach(row => {
-      if (!row || !row.compte || row.ignore) return;
-      const c   = row.compte.toString().trim();
+    rows.forEach(r => {
+      if (!r || !r.compte || r.ignore) return;
+      const c   = r.compte.toString().trim();
       const cl  = c[0];
       const p2  = c.slice(0, 2);
       const p3  = c.slice(0, 3);
-      const sd  = Math.abs(row.soldeFinDebit  || 0);
-      const sc  = Math.abs(row.soldeFinCredit || 0);
+      const sd  = Math.abs(r.soldeFinDebit || 0);
+      const sc  = Math.abs(r.soldeFinCredit || 0);
       const isD = sd > 0.01 && sc < 0.01;
       const isC = sc > 0.01 && sd < 0.01;
 
-      // Classe 1 hors 12/13 → créditeurs
-      if (cl === '1' && !['12','13'].includes(p2) && isD)
-        anomalies.push([c, row.libelle || '', 'DÉBITEUR ANORMAL', `Cp./réserves/emprunts doit être créditeur`, Math.round(sd).toLocaleString('fr-FR')]);
-      // Classe 5 caisse
-      if (['531','532','533','534'].includes(p3) && isC)
-        anomalies.push([c, row.libelle || '', 'CAISSE CRÉDITRICE', '⚠ Impossible physiquement — erreur de saisie', Math.round(sc).toLocaleString('fr-FR')]);
-      // Fournisseur débiteur (hors 409)
-      if (p2 === '40' && !['406','409'].includes(p3) && isD)
-        anomalies.push([c, row.libelle || '', 'FOURNISSEUR DÉBITEUR', 'Normalement créditeur (acompte ou trop-payé ?)', Math.round(sd).toLocaleString('fr-FR')]);
-      // Client créditeur (hors 419)
-      if (p2 === '41' && p3 !== '419' && isC)
-        anomalies.push([c, row.libelle || '', 'CLIENT CRÉDITEUR', 'Normalement débiteur (avoir non imputé ?)', Math.round(sc).toLocaleString('fr-FR')]);
-      // Compte 47 non soldé
-      if (p2 === '47' && (sd + sc) > 0.01)
-        anomalies.push([c, row.libelle || '', 'COMPTE ATTENTE', 'Compte 47x doit être soldé en fin de période', Math.round(sd + sc).toLocaleString('fr-FR')]);
-      // Classe 6 créditrice (hors 609)
-      if (cl === '6' && p3 !== '609' && isC)
-        anomalies.push([c, row.libelle || '', 'CHARGE CRÉDITRICE', 'Compte de charge doit être débiteur', Math.round(sc).toLocaleString('fr-FR')]);
-      // Classe 7 débitrice (hors 709)
-      if (cl === '7' && p3 !== '709' && isD)
-        anomalies.push([c, row.libelle || '', 'PRODUIT DÉBITEUR', 'Compte de produit doit être créditeur', Math.round(sd).toLocaleString('fr-FR')]);
+      // 1. Caisse créditrice
+      if (['531','532','533','534'].includes(p3) && isC) {
+        anomaliesList.push([c, r.libelle || 'Caisse', 'CAISSE CRÉDITRICE', 'Impossibilité matérielle (Loi 07-11)', fmtDZD(sc)]);
+      }
+      // 2. Fournisseurs débiteurs (hors 409)
+      if (p2 === '40' && !['406','409'].includes(p3) && isD) {
+        anomaliesList.push([c, r.libelle || 'Fournisseur', 'FOURNISSEUR DÉBITEUR', 'Solde inversé (acompte non reclassé ?)', fmtDZD(sd)]);
+      }
+      // 3. Clients créditeurs (hors 419)
+      if (p2 === '41' && p3 !== '419' && isC) {
+        anomaliesList.push([c, r.libelle || 'Client', 'CLIENT CRÉDITEUR', 'Solde inversé (avoir non imputé ?)', fmtDZD(sc)]);
+      }
+      // 4. Comptes 47x non soldés
+      if (p2 === '47' && (sd + sc) > 0.01) {
+        anomaliesList.push([c, r.libelle || 'Attente', 'COMPTE D\'ATTENTE NON SOLDÉ', 'Régularisation requise avant arrêté', fmtDZD(sd + sc)]);
+      }
+      // 5. Charges créditrices (hors 609)
+      if (cl === '6' && p3 !== '609' && isC) {
+        anomaliesList.push([c, r.libelle || 'Charge', 'CHARGE CRÉDITRICE', 'Compte classe 6 anormalement créditeur', fmtDZD(sc)]);
+      }
+      // 6. Produits débiteurs (hors 709)
+      if (cl === '7' && p3 !== '709' && isD) {
+        anomaliesList.push([c, r.libelle || 'Produit', 'PRODUIT DÉBITEUR', 'Compte classe 7 anormalement débiteur', fmtDZD(sd)]);
+      }
     });
   }
 
-  if (anomalies.length === 0) {
-    doc.setFillColor(...C.greenLight);
-    doc.roundedRect(12, y, W - 24, 18, 2, 2, 'F');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...C.green);
-    doc.text('✓  Aucune anomalie détectée — Tous les soldes sont conformes aux règles SCF Algérie.', 20, y + 11);
-    y += 24;
+  const conformiteScore = rows.length > 0 ? Math.round(((rows.length - anomaliesList.length) / rows.length) * 100) : 100;
+
+  y = latexKpiRow(doc, [
+    { label: 'Lignes de Balance Contrôlées', val: `${rows.length} comptes`, sub: 'Périmètre exhaustif SCF', status: 'normal' },
+    { label: 'Anomalies Détectées', val: `${anomaliesList.length} anomalies`, sub: anomaliesList.length === 0 ? '✓ Aucune anomalie' : 'À régulariser', status: anomaliesList.length === 0 ? 'ok' : 'danger' },
+    { label: 'Taux de Conformité SCF', val: `${conformiteScore} %`, sub: conformiteScore >= 95 ? '✓ Excellente régularité' : 'Contrôle approfondi', status: conformiteScore >= 95 ? 'ok' : 'danger' },
+  ], y);
+
+  if (anomaliesList.length === 0) {
+    y = latexMathBox(
+      doc,
+      '\\text{Audit des Soldes SCF : Conforme à 100\\%}',
+      'Toutes les natures de comptes (classes 1 à 7) respectent rigoureusement les sens normaux de soldes prévus par le Système Comptable Financier.',
+      y,
+      18
+    );
   } else {
-    const auditHead = [['COMPTE', 'LIBELLÉ', 'TYPE ANOMALIE', 'EXPLICATION', 'MONTANT (DZD)']];
-    y = drawTable(doc, auditHead, anomalies.slice(0, 40), y, {
+    y = latexSubSection(doc, '6.1. Relevé Détaillé des Écritures et Soldes Inversés', y);
+
+    const auditHead = [['COMPTE', 'INTITULÉ DU COMPTE', 'NATURE DE L\'ANOMALIE', 'EXPLICATION NORMATIVE', 'MONTANT (DZD)']];
+    const auditBody = anomaliesList.slice(0, 30);
+
+    y = drawBooktabsTable(doc, auditHead, auditBody, y, {
       columnStyles: {
-        0: { halign: 'left', cellWidth: 18 },
-        1: { halign: 'left', cellWidth: 45 },
-        2: { halign: 'left', cellWidth: 30 },
-        3: { halign: 'left' },
-        4: { halign: 'right', cellWidth: 28 },
-      },
-      willDrawCell: (data) => {
-        if (data.column.index === 2) {
-          const t = data.cell.text[0] || '';
-          if (t.includes('CAISSE') || t.includes('ANORMAL')) data.cell.styles.textColor = C.red;
-          else data.cell.styles.textColor = C.amber;
-          data.cell.styles.fontStyle = 'bold';
-        }
+        0: { fontStyle: 'bold', cellWidth: 20 },
+        1: { cellWidth: 40 },
+        2: { fontStyle: 'bold', textColor: T.darkRed, cellWidth: 38 },
+        3: { cellWidth: 48 },
+        4: { halign: 'right', fontStyle: 'bold', cellWidth: 28 },
       }
     });
 
-    if (anomalies.length > 40) {
+    if (anomaliesList.length > 30) {
+      doc.setFont('times', 'italic');
       doc.setFontSize(7.5);
-      doc.setTextColor(...C.slate);
-      doc.text(`... et ${anomalies.length - 40} autres anomalies non affichées. Voir onglet Audit Balance dans l'application.`, 12, y);
+      doc.setTextColor(...T.inkMuted);
+      doc.text(`... et ${anomaliesList.length - 30} autres anomalies supplémentaires consultables dans l'onglet Audit Balance de la plateforme.`, margin, y);
     }
   }
 
-  // Résumé statistique
-  y += 6;
-  doc.setFillColor(...C.slateLight);
-  doc.roundedRect(12, y, W - 24, 18, 2, 2, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...C.navy);
-  doc.text(`Statistiques de la balance : ${rows.length} lignes importées  ·  ${anomalies.length} anomalie(s) détectée(s)  ·  Score conformité : ${Math.round(((rows.length - anomalies.length) / Math.max(rows.length, 1)) * 100)} %`, 20, y + 10);
-
   // ──────────────────────────────────────────────────────────────────
-  // MISE À JOUR DES EN-TÊTES avec le bon nombre de pages
+  // APPLICATION DES EN-TÊTES & PIEDS DE PAGE STYLE FANCYHDR
   // ──────────────────────────────────────────────────────────────────
   const totalPages = doc.internal.getNumberOfPages();
-  const pageTitles = [
-    'Rapport Financier Annuel — BAIQ',
-    'I. Équilibre Financier & Bilan Fonctionnel',
-    'II. Soldes Intermédiaires de Gestion (SIG — TCR)',
-    'III. Ratios de Liquidité, Rentabilité & Activité',
-    'IV. Comparatif Pluriannuel N vs N-1',
-    'V. Diagnostic — Forces, Faiblesses & Risques',
-    'VI. Audit des Soldes SCF & Anomalies',
-  ];
+  applyLatexHeaderFooter(doc, totalPages, dossierName, 'N');
 
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    // Récrire le numéro de page dans l'en-tête (hors page de garde)
-    if (p > 1) {
-      doc.setFillColor(...C.navy);
-      doc.rect(W - 40, 0, 40, 22, 'F');
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${p} / ${totalPages}`, W - 12, 14, { align: 'right' });
-    }
-  }
-
-  // ── Sauvegarder le PDF ────────────────────────────────────────────
-  const fileName = `BAIQ_Rapport_Financier_${nomDossier.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}_${new Date().toISOString().slice(0,10)}.pdf`;
+  // Téléchargement du fichier
+  const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+  const fileName = `BAIQ_Rapport_Financier_LaTeX_${cleanName}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(fileName);
   return fileName;
 }
