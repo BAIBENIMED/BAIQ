@@ -31,7 +31,12 @@ export function AIView({ data, geminiKey }) {
   const solv = analysis?.solvabilite || {};
   const sec  = analysis?.secteur || {};
 
-  const fmt = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DZD';
+  const fmt = (v) => {
+    if (v === null || v === undefined || isNaN(v)) return '0 DZD';
+    const num = Math.round(Number(v));
+    const sign = num < 0 ? '-' : '';
+    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
+  };
   const pct = (v) => `${((v || 0) * 100).toFixed(1)} %`;
 
   const [chatMessages, setChatMessages] = useState(() => {

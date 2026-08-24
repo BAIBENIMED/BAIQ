@@ -30,7 +30,9 @@ const T = {
 // ── Fonctions Utilitaires de Formatage ─────────────────────────────────
 const fmtDZD = (v) => {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  return Math.round(v).toLocaleString('fr-FR') + ' DZD';
+  const num = Math.round(Number(v));
+  const sign = num < 0 ? '-' : '';
+  return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
 };
 
 const fmtPct = (v, d = 1) => {

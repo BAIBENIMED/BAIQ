@@ -11,7 +11,12 @@ import { calculateAltmanZScore } from './solvabiliteEngine';
 const safe = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 const pct  = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
 const days = (v) => `${Math.round(v || 0)} jours`;
-const fmtDZD = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DZD';
+const fmtDZD = (v) => {
+  if (v === null || v === undefined || isNaN(v)) return '0 DZD';
+  const num = Math.round(Number(v));
+  const sign = num < 0 ? '-' : '';
+  return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
+};
 const fmtNum = (v, d = 1) => (v != null && isFinite(v) ? Number(v).toFixed(d) : '—');
 
 /* ─── Moteur d'Analyse Approfondie ─────────────────────────── */
@@ -445,7 +450,11 @@ export function runAIAnalysis(data) {
 
 function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, rotS, margeNette, margeEBE, caf, secteur, profil, evolutions, nbForces, nbFaiblesses, totalCashLibérable, solv }) {
   const pct_ = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
-  const fmt_ = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 });
+  const fmt_ = (v) => {
+    const num = Math.round(Number(v || 0));
+    const sign = num < 0 ? '-' : '';
+    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`;
+  };
 
   const companyName = profil.nomEntreprise ? `**${profil.nomEntreprise}**` : "l'entreprise";
   const intro = `Diagnostic financier approfondi de ${companyName} (${secteur.label}) : santé globale évaluée à ${niveau.emoji} **${niveau.label}** (${scoreGlobal}/100).\n\n`;
@@ -739,7 +748,11 @@ export function buildGeminiContext(data, analysisResult) {
   const p = analysisResult.profil || {};
   const sec = analysisResult.secteur || {};
   const solv = analysisResult.solvabilite || {};
-  const fmt = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DZD';
+  const fmt = (v) => {
+    const num = Math.round(Number(v || 0));
+    const sign = num < 0 ? '-' : '';
+    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
+  };
   const pct_ = (v) => `${(v * 100).toFixed(1)}%`;
 
   return `Tu es un Directeur Financier (DAF) et Commissaire aux Comptes de premier rang, expert incontesté du Système Comptable Financier algérien (SCF, Loi 07-11 / Décret 08-156) et des pratiques bancaires en Algérie (Banque d'Algérie).

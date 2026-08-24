@@ -19,7 +19,12 @@ const KpiRow = ({ label, value, sub, ok }) => (
 );
 
 export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '' }) {
-  const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => (v || 0).toLocaleString('fr-FR') + ' DZD');
+  const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => {
+    if (v === null || v === undefined || isNaN(v)) return '0 DZD';
+    const num = Math.round(Number(v));
+    const sign = num < 0 ? '-' : '';
+    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
+  });
   const [reportType, setReportType] = useState('audit_diagnostic');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
