@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { exportFinancialWorkbook } from '../utils/excelExporter';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
-import { generateGeminiReport } from '../utils/aiEngine';
+import { generateGeminiReport, generateLocalStructuredReport } from '../utils/aiEngine';
 import { generateFullPDF } from '../utils/pdfExporter';
 
 /* ═══════════════════════════════════════════════════════════
@@ -45,8 +45,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
 
   // Identifiant unique du dossier / balance courante (anonyme)
   const dossierId = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}` : 'default';
+  const reportSlotKey = `${dossierId}_${reportType}`;
 
-  // Rapport sauvegardé pour ce dossier
+  // Rapports sauvegardés par dossier et par type
   const [savedReports, setSavedReports] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('baiq_saved_ai_reports') || '{}');
@@ -55,8 +56,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     }
   });
 
-  const currentReportEntry = savedReports[dossierId] || null;
-  const geminiReportText   = currentReportEntry?.text || '';
+  const currentReportEntry = savedReports[reportSlotKey] || null;
+  const localReportText    = data ? generateLocalStructuredReport(data, reportType) : '';
+  const displayedReportText = currentReportEntry?.text || localReportText;
   const hasUsedQuota       = Boolean(currentReportEntry);
 
   const effectiveKey = geminiKey || localKey;
@@ -74,10 +76,11 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
       const result = await generateGeminiReport(data, reportType, effectiveKey);
       const updated = {
         ...savedReports,
-        [dossierId]: {
+        [reportSlotKey]: {
           text: result,
           type: reportType,
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
+          isGemini: true
         }
       };
       setSavedReports(updated);
@@ -89,17 +92,17 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     }
   };
 
-  // Réinitialiser le quota pour ce dossier si l'utilisateur le demande explicitement
+  // Réinitialiser le rapport généré pour ce type
   const handleResetQuota = () => {
     const updated = { ...savedReports };
-    delete updated[dossierId];
+    delete updated[reportSlotKey];
     setSavedReports(updated);
     localStorage.setItem('baiq_saved_ai_reports', JSON.stringify(updated));
   };
 
   const handleCopyReport = () => {
-    if (!geminiReportText) return;
-    navigator.clipboard.writeText(geminiReportText);
+    if (!displayedReportText) return;
+    navigator.clipboard.writeText(displayedReportText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -471,7 +474,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               <span>{hasUsedQuota ? 'Quota utilisé (1/1)' : 'Quota : 1 rapport dispo'}</span>
             </div>
 
-            {geminiReportText && (
+            {displayedReportText && (
               <>
                 <button
                   onClick={handleCopyReport}
@@ -492,7 +495,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               </>
             )}
 
-            {hasUsedQuota ? (
+            {currentReportEntry?.isGemini ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   onClick={() => setShowConfirmModal(true)}
@@ -510,10 +513,10 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                     gap: 6,
                     cursor: 'pointer'
                   }}
-                  title="Débloquer et régénérer un nouveau rapport pour ce dossier"
+                  title="Régénérer une nouvelle version avec Gemini"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f59e0b' }}>lock_open</span>
-                  Débloquer &amp; Régénérer
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f59e0b' }}>refresh</span>
+                  Régénérer Gemini
                 </button>
               </div>
             ) : (
@@ -537,8 +540,8 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                   opacity: isGenerating ? 0.7 : 1
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{isGenerating ? 'hourglass_top' : 'bolt'}</span>
-                {isGenerating ? 'Génération en cours...' : 'Générer avec Gemini'}
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{isGenerating ? 'hourglass_top' : 'auto_awesome'}</span>
+                {isGenerating ? 'Génération...' : 'Augmenter avec Gemini'}
               </button>
             )}
           </div>
@@ -689,23 +692,23 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 Gemini analyse votre balance et vos états financiers...
               </h4>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
-                Diagnostic de l'équilibre financier (FRNG/BFR/TN), calcul des marges SCF et formulation des recommandations prioritaires.
+                Diagnostic approfondi de l'équilibre financier (FRNG/BFR/TN), calcul des ratios SCF et formulation des recommandations stratégiques.
               </p>
               <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
-          ) : geminiReportText ? (
+          ) : displayedReportText ? (
             <div style={{
               background: 'var(--surface-alt)',
-              borderRadius: 10,
-              padding: '24px',
+              borderRadius: 12,
+              padding: '28px',
               border: '1px solid var(--border)',
-              lineHeight: 1.7,
+              lineHeight: 1.75,
               fontSize: '0.86rem',
               color: 'var(--text)',
               whiteSpace: 'pre-wrap',
-              fontFamily: 'Inter, system-ui, sans-serif'
+              fontFamily: 'Inter, -apple-system, system-ui, sans-serif'
             }}>
-              {geminiReportText}
+              {displayedReportText}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px dashed var(--border)' }}>
@@ -714,15 +717,8 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 Prêt pour l'analyse financière augmentée par IA
               </h4>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 540, margin: '0 auto 16px' }}>
-                Cliquez sur <strong>"Générer avec Gemini"</strong> pour obtenir un audit exécutif sur-mesure, un plan de redressement chiffré et des recommandations stratégiques basées sur les normes SCF Algérie.
+                Sélectionnez un type de rapport ci-dessus pour afficher le diagnostic complet.
               </p>
-              <button
-                onClick={handleGenerateGeminiReport}
-                className="btn btn-primary"
-                style={{ borderRadius: 8, padding: '8px 20px', fontSize: '0.82rem', fontWeight: 800 }}
-              >
-                Lancer le diagnostic Gemini
-              </button>
             </div>
           )}
         </div>

@@ -462,6 +462,186 @@ function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, r
   return intro + activite + equilibre + cash + solvabiliteStr + conclusion;
 }
 
+/* ─── Générateur de Rapports Structurés Locaux Immédiats ─── */
+export function generateLocalStructuredReport(data, reportType = 'audit_diagnostic') {
+  if (!data) return '';
+  const a = runAIAnalysis(data);
+  const m = a.metriques;
+  const diag = a.diagnosticAvance || {};
+  const solv = a.solvabilite || {};
+  const sec = a.secteur || {};
+  const b = data.bilan || {};
+  const s = data.sig || {};
+
+  const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const company = a.profil?.nomEntreprise || 'Entité sous revue';
+
+  if (reportType === 'audit_diagnostic') {
+    return `# 📊 RAPPORT D'AUDIT & DIAGNOSTIC FINANCIER COMPLET
+**Entité** : ${company} | **Secteur** : ${sec.label} | **Date** : ${dateStr}
+**Référentiel** : Système Comptable Financier (SCF Algérie — Loi 07-11 / Décret 08-156)
+
+---
+
+### 1. SYNTHÈSE MANAGÉRIALE & SCORE GLOBAL
+- **Score Global de Santé Financière** : **${a.scoreGlobal} / 100 — ${a.niveau.emoji} Situation ${a.niveau.label}**
+- **Score Banque d'Algérie (Centrale des Risques)** : **${solv.bancaire?.scoreBA || 14} / 20** (${solv.bancaire?.ratingBA || 'Favorable'})
+- **Modèle Altman Z'' (EM-Score)** : **${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'} — Risque de défaillance : ${solv.risqueDefaillance || 'Faible'})
+
+${a.resume}
+
+---
+
+### 2. ÉQUILIBRE FONCTIONNEL DU BILAN & TRÉSORERIE
+- **Fonds de Roulement Net Global (FRNG)** : **${fmtDZD(b.frng)}**
+  * ${(b.frng || 0) >= 0 ? '✓ Les capitaux stables couvrent intégralement les immobilisations durables et dégagent un excédent de financement structurel.' : '✗ Déficit de FRNG : Les investissements durables sont financés par de la dette court terme.'}
+- **Besoin en Fonds de Roulement (BFR)** : **${fmtDZD(b.bfr)}** (soit **${Math.round(m.bfrJCA)} jours de CA**)
+- **Trésorerie Nette (TN = FRNG - BFR)** : **${fmtDZD(b.tn)}**
+  * ${(b.tn || 0) >= 0 ? '✓ Position de liquidité autonome sans recours aux découverts bancaires.' : '✗ Tension de liquidité : dépendance envers les autorisations de découvert bancaire.'}
+- **Capacité d'Autofinancement (CAF)** : **${fmtDZD(diag.caf)}** (${pct(diag.tauxCAF)} du CA)
+- **Capacité d'Extinction de la Dette (Dettes LT / CAF)** : **${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' an(s)' : 'N/D'}** (${diag.capaciteRemboursementLabel})
+
+---
+
+### 3. FORMATION DU RÉSULTAT & PARTAGE DE LA VALEUR AJOUTÉE (TCR)
+- **Chiffre d'Affaires Net HT** : **${fmtDZD(s.chiffreAffaires)}**
+- **Valeur Ajoutée (VA)** : **${fmtDZD(s.valeurAjoutee)}** (${pct(m.tauxVA)} du CA — Norme secteur : ${sec.benchmarks?.tauxVA?.norme || '≥25%'})
+- **Excédent Brut d'Exploitation (EBE)** : **${fmtDZD(s.ebe)}** (${pct(m.margeEBE)} du CA — Norme secteur : ${sec.benchmarks?.margeEBE?.norme || '≥10%'})
+- **Résultat d'Exploitation (EBIT)** : **${fmtDZD(s.resultatExploitation)}** (${pct(m.margeOper)} du CA)
+- **Résultat Net de l'Exercice** : **${fmtDZD(s.resultatNet)}** (${pct(m.margeNette)} du CA)
+
+| Partage de la Richesse Créée (VA) | Montant Estimé | Taux (%) | Norme / Appréciation |
+|---|---|---|---|
+| Rémunération du Personnel (63) | ${fmtDZD(s.chargesPersonnel)} | ${pct(diag.partPersonnel)} | ${diag.partPersonnel <= 0.65 ? '✓ Équilibré (≤ 65%)' : '△ Prépondérant (> 65%)'} |
+| Contribution État & Impôts (64 + 695) | ${fmtDZD((s.impotsTaxes || 0) + (s.impotsBenefices || s.impotsSurResultats || 0))} | ${pct(diag.partEtat)} | Prélèvements obligatoires |
+| Rémunération des Prêteurs (66) | ${fmtDZD(s.chargesFinancieres)} | ${pct(diag.partPreteurs)} | Coût de l'endettement |
+| Autofinancement & Maintien (CAF) | ${fmtDZD(diag.caf)} | ${pct(diag.partEntreprise)} | Richesse conservée |
+
+---
+
+### 4. DÉLAIS DE ROTATION & POTENTIEL DE CASH LIBÉRABLE
+- **Délai Clients (DSO)** : **${Math.round(m.dso)} jours** (Norme sectorielle : ${sec.benchmarks?.dso?.norme || '≤ 60j'})
+- **Délai Fournisseurs (DPO)** : **${Math.round(m.dpo)} jours** (Norme sectorielle : ${sec.benchmarks?.dpo?.norme || '45-75j'})
+- **Rotation des Stocks** : **${Math.round(m.rotS)} jours** (Norme sectorielle : ${sec.benchmarks?.rotationStocks?.norme || '≤ 90j'})
+
+💰 **Potentiel de Cash Mobilisable sur le BFR : ${fmtDZD(diag.totalCashLibérable)}**
+- Gain sur accélération du recouvrement clients (DSO) : **${fmtDZD(diag.gainDSO)}**
+- Gain sur déstockage des références dormantes : **${fmtDZD(diag.gainStock)}**
+
+---
+
+### 5. FORCES & VULNÉRABILITÉS MAJEURES
+${a.forces.slice(0, 4).map((f, i) => `✓ **Force ${i + 1}** [${f.cat}] : ${f.titre}\n  ${f.detail}`).join('\n')}
+
+${a.faiblesses.slice(0, 4).map((f, i) => `✗ **Alerte ${i + 1}** [${f.severite.toUpperCase()}] : ${f.titre}\n  ${f.detail}`).join('\n')}
+`;
+  }
+
+  if (reportType === 'recommendations_plan') {
+    return `# 🎯 PLAN D'ACTION STRATÉGIQUE & FEUILLE DE ROUTE OPÉRATIONNELLE DAF
+**Entité** : ${company} | **Secteur** : ${sec.label} | **Date** : ${dateStr}
+**Objectif Global** : Sécurisation de la trésorerie, allègement du BFR et consolidation de la marge nette.
+
+---
+
+### 1. PHASE 1 : ACTIONS D'URGENCE IMMÉDIATE (0 À 30 JOURS)
+${a.recommandations.filter(r => r.priorite === 1 || r.urgence === 'critique').map((r, i) => `
+#### 🔴 Action 1.${i + 1} : ${r.action}
+- **Horizon** : Immédiat (0-15 jours) | **Catégorie** : ${r.categorie}
+- **Diagnostic** : ${r.detail}
+- **Impact Attendu** : ${r.gainEstime || 'Sécurisation immédiate'}
+- **Étapes d'Exécution** :
+${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
+`).join('')}
+
+---
+
+### 2. PHASE 2 : ACTIONS À COURT TERME (1 À 3 MOIS)
+${a.recommandations.filter(r => r.priorite === 2 || r.urgence === 'haute').map((r, i) => `
+#### 🟠 Action 2.${i + 1} : ${r.action}
+- **Horizon** : Court terme (1-3 mois) | **Catégorie** : ${r.categorie}
+- **Diagnostic** : ${r.detail}
+- **Impact Attendu** : ${r.gainEstime || 'Optimisation BFR'}
+- **Étapes d'Exécution** :
+${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
+`).join('')}
+
+---
+
+### 3. PHASE 3 : ACTIONS STRATÉGIQUES DE MOYEN TERME (3 À 12 MOIS)
+${a.recommandations.filter(r => r.priorite === 3 || r.urgence === 'moyenne' || r.urgence === 'basse').map((r, i) => `
+#### 🔵 Action 3.${i + 1} : ${r.action}
+- **Horizon** : 3 à 12 mois | **Catégorie** : ${r.categorie}
+- **Diagnostic** : ${r.detail}
+- **Impact Attendu** : ${r.gainEstime || 'Haut de bilan'}
+- **Étapes d'Exécution** :
+${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
+`).join('')}
+
+---
+
+### 4. TABLEAU DE BORD DAF & 6 INDICATEURS CLÉS DE SUIVI
+| KPI Stratégique | Valeur Actuelle | Cible Normative | Fréquence de Suivi |
+|---|---|---|---|
+| Délai Clients (DSO) | ${Math.round(m.dso)} jours | ≤ 60 jours | Hebdomadaire |
+| Rotation des Stocks | ${Math.round(m.rotS)} jours | ≤ 90 jours | Mensuelle |
+| Délai Fournisseurs (DPO) | ${Math.round(m.dpo)} jours | 45 à 60 jours | Mensuelle |
+| Taux de Marge d'EBE | ${pct(m.margeEBE)} | ≥ 10.0 % | Mensuelle |
+| Trésorerie Nette (TN) | ${fmtDZD(b.tn)} | > 0 DZD | Hebdomadaire |
+| Ratio Dettes / CAF | ${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(1) + ' ans' : 'N/D'} | ≤ 3.5 ans | Trimestrielle |
+`;
+  }
+
+  if (reportType === 'banque_credit') {
+    return `# 🏦 NOTE D'INSTRUCTION BANCAIRE & DOSSIER DE CRÉDIT
+**Entité** : ${company} | **Secteur** : ${sec.label} | **Date** : ${dateStr}
+**Destinataire** : Direction des Engagements / Comité de Crédit Bancaire
+**Référentiel** : Banque d'Algérie (Centrale des Risques) & Ratios Prudentiels
+
+---
+
+### 1. SCORE OFFICIEL BANQUE D'ALGÉRIE & SYNTHÈSE DU RISQUE
+- **Score Global Centrale des Risques** : **${solv.bancaire?.scoreBA || 14} / 20 points**
+- **Profil Emprunteur** : **${solv.bancaire?.ratingBA || 'Favorable'}** (Statut dossier : **${solv.bancaire?.statutCredit || 'FAVORABLE'}**)
+- **Modèle Altman Z'' (EM-Score)** : **${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'})
+- **Probabilité de Défaillance Estimée** : **${solv.risqueDefaillance || 'Faible'}**
+
+| Pilier de Notation Banque d'Algérie | Indicateur Calculé | Score Attribué | Barème Max | Appréciation |
+|---|---|---|---|---|
+| Autonomie Financière (CP / DLT) | ${solv.bancaire?.detailsBA?.autonomie?.val ? solv.bancaire.detailsBA.autonomie.val.toFixed(2) : 'N/D'} | ${solv.bancaire?.detailsBA?.autonomie?.score || 4} pts | 5.0 pts | ${solv.bancaire?.detailsBA?.autonomie?.score >= 4 ? 'Solide' : 'À surveiller'} |
+| Rentabilité Brute (Marge EBE) | ${pct(m.margeEBE)} | ${solv.bancaire?.detailsBA?.rentabilite?.score || 4} pts | 5.0 pts | ${m.margeEBE >= 0.10 ? 'Satisfaisante' : 'Moyenne'} |
+| Liquidité Générale (AC / DCT) | ${m.liq.toFixed(2)}x | ${solv.bancaire?.detailsBA?.liquidite?.score || 4} pts | 5.0 pts | ${m.liq >= 1.2 ? 'Sécurisée' : 'Tendue'} |
+| Couverture des Frais Financiers | ${solv.bancaire?.couvertureChargesFin ? solv.bancaire.couvertureChargesFin.toFixed(1) + 'x' : '99x'} | ${solv.bancaire?.detailsBA?.couverture?.score || 4} pts | 5.0 pts | ${solv.bancaire?.couvertureChargesFin >= 3 ? 'Large couverture' : 'Sensible'} |
+
+---
+
+### 2. CAPACITÉ DE REMBOURSEMENT & COUVERTURE DU SERVICE DE LA DETTE
+- **Capacité d'Autofinancement (CAF)** : **${fmtDZD(diag.caf)}** (${pct(diag.tauxCAF)} du CA)
+- **Dettes Financières à Moyen/Long Terme** : **${fmtDZD(solv.bancaire?.dettesFinancieresLT || 0)}**
+- **Capacité d'Extinction de la Dette (Dettes / CAF)** : **${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' an(s)' : '0 an'}** (Norme bancaire : ≤ 3.5 ans)
+- **Capacité d'Endettement Additionnelle Maximale** : **${fmtDZD(solv.bancaire?.capaciteEndettementMax || 0)}** (selon la règle des 3.5 × EBE)
+
+---
+
+### 3. STRUCTURE DES GARANTIES & PATRIMOINE MOBILISABLE
+- **Actifs Non Courants Nets (Immobilisations)** : **${fmtDZD(b.emploisStables)}** (Assiette hypothécaire potentielle)
+- **Actif Circulant (Stocks + Créances clients)** : **${fmtDZD(b.actifCirculant)}** (Gage sur stocks / nantissement créances)
+- **Trésorerie Active & Disponibilités** : **${fmtDZD(b.tresorerieActive)}**
+
+---
+
+### 4. AVIS MOTIVÉ DU COMITÉ DE CRÉDIT
+- **Recommandation** : **${solv.bancaire?.statutCredit === 'FAVORABLE' ? 'AVIS FAVORABLE' : 'AVIS FAVORABLE SOUS CONDITIONS'}**
+- **Lignes Conseillées** : Autorisation de lignes de crédit d'exploitation (facilité de caisse, escompte, crédit documentaire) ou crédit d'investissement adossé à la CAF.
+- **Covenants Recommandés** :
+  * Maintien d'un ratio Capitaux Propres / Total Bilan supérieur à 30%.
+  * Transmission semestrielle des situations comptables et reporting de balance âgée clients.
+`;
+  }
+
+  return '';
+}
+
 /* ─── Construction du Contexte pour Gemini ─── */
 export function buildGeminiContext(data, analysisResult) {
   if (!data || !analysisResult) return '';
