@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { runAIAnalysis, buildGeminiContext } from '../utils/aiEngine';
+import { runAIAnalysis, buildGeminiContext, generateGeminiReport } from '../utils/aiEngine';
 
 /* ═══════════════════════════════════════════════════════════
-   FINANALYZE — Moteur IA Financier
-   Analyse locale intelligente + Chat Gemini (si clé configurée)
+   BAIQ — Assistant & Diagnostic IA Financier Approfondi
+   Analyse multidimensionnelle (SCF Algérie — Loi 07-11)
    ═══════════════════════════════════════════════════════════ */
 
 const SEVERITE_STYLE = {
@@ -12,26 +12,33 @@ const SEVERITE_STYLE = {
   moyen:    { bg: '#fffbeb', border: '#fde68a', color: '#92400e', label: 'MODÉRÉ',    icon: 'info'         },
   faible:   { bg: '#f0fdf4', border: '#86efac', color: '#166534', label: 'FAIBLE',    icon: 'check_circle' },
 };
+
 const URGENCE_STYLE = {
-  critique: { color: '#dc2626', bg: '#fee2e2', label: '🔴 CRITIQUE' },
-  haute:    { color: '#ea580c', bg: '#fff7ed', label: '🟠 HAUTE'    },
-  moyenne:  { color: '#d97706', bg: '#fffbeb', label: '🟡 MOYENNE'  },
-  basse:    { color: '#059669', bg: '#f0fdf4', label: '🟢 BASSE'    },
+  critique: { color: '#dc2626', bg: '#fee2e2', label: '🔴 CRITIQUE (0-15j)' },
+  haute:    { color: '#ea580c', bg: '#fff7ed', label: '🟠 HAUTE (30j)'      },
+  moyenne:  { color: '#d97706', bg: '#fffbeb', label: '🟡 MOYENNE (90j)'    },
+  basse:    { color: '#059669', bg: '#f0fdf4', label: '🟢 STRATÉGIQUE (1 an)' },
 };
 
 export function AIView({ data, geminiKey }) {
-  const [activeTab, setActiveTab]     = useState('analyse');
+  const [activeTab, setActiveTab]     = useState('diagnostic');
   const [inputText, setInputText]     = useState('');
   const [isLoading, setIsLoading]     = useState(false);
   const chatEndRef = useRef(null);
 
   const analysis = data ? runAIAnalysis(data) : null;
+  const diag = analysis?.diagnosticAvance || {};
+  const solv = analysis?.solvabilite || {};
+  const sec  = analysis?.secteur || {};
+
+  const fmt = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DZD';
+  const pct = (v) => `${((v || 0) * 100).toFixed(1)} %`;
 
   const [chatMessages, setChatMessages] = useState(() => {
     if (data && analysis) {
       return [{
         role: 'assistant',
-        text: `**Bonjour ! Je suis votre Assistant IA Financier BAIQ.**\n\nJ'ai analysé vos données comptables. Voici un résumé rapide :\n\n${analysis.resume}\n\n💡 Posez-moi n'importe quelle question sur votre situation financière : *"Pourquoi mon BFR est élevé ?"*, *"Comment améliorer ma marge ?"*, *"Quel est le risque principal ?"*...`,
+        text: `**Bonjour ! Je suis votre Conseiller Financier IA BAIQ.**\n\nJ'ai réalisé un diagnostic approfondi de votre balance comptable. Voici les conclusions fondamentales :\n\n${analysis.resume}\n\n💡 Cliquez sur une question thématique ci-dessous ou posez-moi n'importe quelle question sur vos comptes, votre BFR, vos marges ou votre solvabilité bancaire.`,
         time: new Date()
       }];
     }
@@ -46,7 +53,7 @@ export function AIView({ data, geminiKey }) {
   const callGemini = async (userMessage) => {
     if (!geminiKey) return null;
     const context = buildGeminiContext(data, analysis);
-    const prompt  = context + `\n\n## QUESTION DE L'UTILISATEUR\n${userMessage}\n\nRéponds de manière structurée, professionnelle et en français. Utilise des titres, des listes à puces et mets en gras les chiffres et points importants.`;
+    const prompt  = context + `\n\n## QUESTION DE L'UTILISATEUR\n${userMessage}\n\nRéponds de manière structurée, hautement professionnelle et en français d'affaires. Utilise des titres, des calculs chiffrés en DZD, des listes à puces et cite les comptes SCF appropriés.`;
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
@@ -63,43 +70,28 @@ export function AIView({ data, geminiKey }) {
     }
   };
 
-  /* ── Local AI response (sans API) ── */
+  /* ── Local AI response enrichie ── */
   const buildLocalResponse = (msg) => {
     const m   = msg.toLowerCase();
     const met = analysis?.metriques || {};
-    const fmt = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DA';
-    const pct = (v) => `${(v * 100).toFixed(1)}%`;
 
     if (m.includes('bfr') || m.includes('besoin'))
-      return `**Analyse du BFR (Besoin en Fonds de Roulement)**\n\nVotre BFR est de **${fmt(data?.bilan?.bfr)}**, soit **${Math.round(met.bfrJCA)} jours de CA**.\n\n**Composantes :**\n- DSO (délai clients) : ${Math.round(met.dso)} jours\n- DPO (délai fournisseurs) : ${Math.round(met.dpo)} jours\n- Rotation stocks : ${Math.round(met.rotS)} jours\n\n**Formule :** BFR = Stocks + Créances clients - Dettes fournisseurs\n\n${met.bfrJCA > 60 ? '⚠️ Votre BFR est élevé. Agissez sur les 3 leviers simultanément pour le réduire.' : '✅ Votre BFR est dans la norme acceptable.'}`;
+      return `**Diagnostic Approfondi du BFR (Besoin en Fonds de Roulement)**\n\n- BFR Total : **${fmt(data?.bilan?.bfr)}**, représentant **${Math.round(met.bfrJCA)} jours de CA** (Norme sectorielle : ${sec.benchmarks?.bfrJoursCA?.norme || '≤ 60j'}).\n- Délai clients (DSO) : **${Math.round(met.dso)} jours**\n- Délai fournisseurs (DPO) : **${Math.round(met.dpo)} jours**\n- Rotation des stocks : **${Math.round(met.rotS)} jours**\n\n💰 **Potentiel de Cash Libérable** : **${fmt(diag.totalCashLibérable)}**\n- Dont recouvrement clients : **${fmt(diag.gainDSO)}**\n- Dont surstockage : **${fmt(diag.gainStock)}**\n\n${met.bfrJCA > 60 ? '🚨 **Alerte BFR** : Votre cycle d\'exploitation consomme trop de liquidités. Activez le plan de recouvrement d\'urgence.' : '✅ Le BFR est sous contrôle et conforme aux standards sectoriels.'}`;
 
-    if (m.includes('marge') || m.includes('rentabilit') || m.includes('profit'))
-      return `**Analyse des Marges & Rentabilité**\n\n| Indicateur | Valeur | Norme |\n|---|---|---|\n| Marge EBE | ${pct(met.margeEBE)} | ≥ 10% |\n| Marge Opérationnelle | ${pct(met.margeOper)} | ≥ 5% |\n| Marge Nette | ${pct(met.margeNette)} | > 0% |\n| Taux Valeur Ajoutée | ${pct(met.tauxVA)} | > 20% |\n\n${met.margeNette > 0.05 ? '✅ Votre rentabilité est satisfaisante.' : met.margeNette > 0 ? '⚠️ La rentabilité est positive mais fragile. Surveillez vos charges.' : '🔴 Résultat déficitaire : plan de redressement urgent nécessaire.'}`;
+    if (m.includes('seuil') || m.includes('point mort') || m.includes('rentabil'))
+      return `**Analyse du Seuil de Rentabilité & Marges**\n\n- Chiffre d'Affaires Net : **${fmt(met.ca)}**\n- Seuil de Rentabilité (Point Mort en DA) : **${fmt(diag.seuilRentabilite)}**\n- Point Mort en Jours : **${diag.pointMortJours} jours de CA**\n- Marge de Sécurité : **${fmt(diag.margeSecurite)}** (${pct(diag.indiceSecurite)} du CA)\n\n| Agrégat | Montant | Taux sur CA | Norme Secteur |\n|---|---|---|---|\n| Valeur Ajoutée | ${fmt(met.va)} | ${pct(met.tauxVA)} | ${sec.benchmarks?.tauxVA?.norme || '≥ 25%'} |\n| EBE | ${fmt(met.ebe)} | ${pct(met.margeEBE)} | ${sec.benchmarks?.margeEBE?.norme || '≥ 10%'} |\n| Résultat Net | ${fmt(met.rnet)} | ${pct(met.margeNette)} | ${sec.benchmarks?.margeNette?.norme || '> 0%'} |\n\n${diag.pointMortJours <= 270 ? '✅ Votre point mort est atteint tôt dans l\'année, assurant une marge de sécurité solide.' : '⚠️ Le seuil de rentabilité est tardif. Une compression des coûts fixes (masse salariale, loyers, services 61/62) est requise.'}`;
 
-    if (m.includes('trésorer') || m.includes('tresor') || m.includes('liquidit'))
-      return `**Analyse de la Trésorerie & Liquidité**\n\n- Trésorerie Nette : **${fmt(data?.bilan?.tn)}** ${(data?.bilan?.tn || 0) >= 0 ? '✅' : '🔴'}\n- FRNG : **${fmt(data?.bilan?.frng)}** ${(data?.bilan?.frng || 0) >= 0 ? '✅' : '🔴'}\n- Liquidité Générale : **${met.liq.toFixed(2)}x** ${met.liq >= 1 ? '✅' : '🔴 (< 1 : RISQUE)'}\n\n${met.liq < 1 ? '🚨 **Alerte liquidité** : Votre actif circulant ne couvre pas vos dettes à court terme. Action urgente requise.' : met.liq < 1.5 ? '⚠️ La liquidité est correcte mais avec peu de marge de sécurité.' : '✅ Votre position de liquidité est confortable.'}`;
+    if (m.includes('caf') || m.includes('autofinancement') || m.includes('dette'))
+      return `**Capacité d'Autofinancement (CAF) & Désendettement**\n\n- CAF brute générée : **${fmt(diag.caf)}** (${pct(diag.tauxCAF)} du CA)\n- Ratio Dettes Financières / CAF : **${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' an(s)' : 'N/D'}**\n- Appréciation : **${diag.capaciteRemboursementLabel}**\n\n${diag.ratioDetteSurCAF <= 3.5 ? '✅ L\'entreprise dispose d\'une capacité de remboursement saine auprès des banques.' : '🚨 Endettement excessif face à la CAF actuelle. Priorité à l\'autofinancement et au désendettement.'}`;
 
-    if (m.includes('stock') || m.includes('rotation'))
-      return `**Analyse des Stocks & Rotation**\n\n- Délai d'écoulement : **${Math.round(met.rotS)} jours** (norme ≤ 90j) ${met.rotS <= 90 ? '✅' : '⚠️'}\n- Stock moyen : **${fmt(data?.ratios?.stockMoyen)}**\n- Vitesse de rotation : **${(data?.ratios?.tauxRotationStocks || 0).toFixed(1)}x / an**\n\n${met.rotS > 120 ? "🔴 Rotation très lente : risque d'obsolescence et coûts de stockage élevés." : met.rotS > 90 ? "⚠️ Rotation à optimiser : classement ABC et politique de réapprovisionnement." : '✅ La rotation des stocks est satisfaisante.'}`;
+    if (m.includes('banque') || m.includes('score') || m.includes('altman') || m.includes('crédit'))
+      return `**Notation Bancaire & Score de Solvabilité**\n\n🏦 **Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA || 14} / 20** — Profil : **${solv.bancaire?.ratingBA || 'Favorable'}**\n\n- Autonomie financière (CP / Dettes LT) : ${solv.bancaire?.detailsBA?.autonomie?.score || 4}/5 pts\n- Marge d'EBE : ${solv.bancaire?.detailsBA?.rentabilite?.score || 4}/5 pts\n- Liquidité générale : ${solv.bancaire?.detailsBA?.liquidite?.score || 4}/5 pts\n- Couverture des intérêts : ${solv.bancaire?.detailsBA?.couverture?.score || 4}/5 pts\n\n📊 **Modèle Altman Z'' (EM-Score) : ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'})\n- Risque de défaillance : **${solv.risqueDefaillance || 'Faible'}**`;
 
+    if (m.includes('audit') || m.includes('anomalie') || m.includes('scf') || m.includes('compte'))
+      return `**Audit de Conformité des Comptes SCF (Loi 07-11)**\n\n- Nombre d'irrégularités détectées : **${diag.anomaliesComptablesCount || 0}**\n- Caisse créditrice (53x) : ${diag.caisseCreditrice ? '🔴 **OUI — Anomalie matérielle critique**' : '🟢 **NON — Conforme**'}\n\n**Points de contrôle réguliers :**\n1. Vérifier l'apurement complet des comptes d'attente (471 à 478)\n2. Reclasser les fournisseurs débiteurs en 409 et clients créditeurs en 419\n3. Contrôler la concordance entre dotations 68x et amortissements 28x`;
 
-    if (m.includes('client') || m.includes('créance') || m.includes('recouvrement') || m.includes('dso'))
-      return `**Analyse du Recouvrement Clients (DSO)**\n\n- DSO : **${Math.round(met.dso)} jours** (norme ≤ 60j) ${met.dso <= 60 ? '✅' : '⚠️'}\n- Créances clients : **${fmt(data?.ratios?.creancesClients)}**\n- Vitesse de rotation créances : **${(data?.ratios?.tauxRotationCreances || 0).toFixed(1)}x / an**\n\n${met.dso > 90 ? '🔴 DSO critique : mettre en place un système de relance automatique et réviser les conditions de crédit.' : met.dso > 60 ? '⚠️ DSO élevé : intensifier les relances et proposer des escomptes pour paiement anticipé.' : '✅ Le délai de recouvrement est dans la norme.'}`;
-
-    if (m.includes('fournisseur') || m.includes('dpo'))
-      return `**Analyse des Délais Fournisseurs (DPO)**\n\n- DPO : **${Math.round(met.dpo)} jours** (norme 30-90j) ${met.dpo >= 30 && met.dpo <= 90 ? '✅' : '⚠️'}\n- Dettes fournisseurs : **${fmt(data?.ratios?.dettesFournisseurs)}**\n\n${met.dpo < 30 && met.dpo > 0 ? '⚠️ Vous payez trop tôt vos fournisseurs. Négociez des délais de 45 à 60 jours pour améliorer votre trésorerie.' : met.dpo > 90 ? '⚠️ Délai excessif : risque de tensions avec les fournisseurs.' : '✅ Les délais fournisseurs sont équilibrés.'}`;
-
-    if (m.includes('score') || m.includes('santé') || m.includes('état') || m.includes('global'))
-      return `**Score de Santé Financière Global**\n\n🎯 **Score Global : ${analysis.scoreGlobal}/100 — ${analysis.niveau.emoji} ${analysis.niveau.label}**\n\n| Dimension | Score |\n|---|---|\n| Rentabilité | ${Math.round(analysis.scores.rentabilite)}/100 |\n| Liquidité | ${Math.round(analysis.scores.liquidite)}/100 |\n| Structure | ${Math.round(analysis.scores.structure)}/100 |\n| Activité | ${Math.round(analysis.scores.activite)}/100 |\n| Productivité | ${Math.round(analysis.scores.productivite)}/100 |\n\n**Forces :** ${analysis.forces.length} identifiées\n**Faiblesses :** ${analysis.faiblesses.length} identifiées\n\nConsultez l'onglet **Analyse Complète** pour le détail.`;
-
-    if (m.includes('recommand') || m.includes('conseil') || m.includes('action') || m.includes('améliorer'))
-      return `**Recommandations Prioritaires**\n\n${analysis.recommandations.slice(0, 3).map((rec, i) => `**${i + 1}. ${rec.action}** [${rec.urgence.toUpperCase()}]\n${rec.detail.substring(0, 200)}...`).join('\n\n')}\n\nConsultez l'onglet **Recommandations** pour le plan d'action complet.`;
-
-    if (m.includes('autonomie') || m.includes('fonds propres') || m.includes('endett'))
-      return `**Analyse de la Structure Financière**\n\n- Autonomie Financière : **${pct(met.autFin)}** (norme ≥ 30%) ${met.autFin >= 0.3 ? '✅' : '⚠️'}\n- FRNG : **${fmt(data?.bilan?.frng)}** ${(data?.bilan?.frng || 0) >= 0 ? '✅' : '🔴'}\n\n${met.autFin < 0.2 ? '🔴 Dépendance excessive aux dettes : augmentation de capital recommandée en urgence.' : met.autFin < 0.3 ? '⚠️ Renforcer les fonds propres par mise en réserve des bénéfices.' : '✅ L\'autonomie financière est satisfaisante.'}`;
-
-    // Réponse générique
-    return `Je n'ai pas de réponse spécifique à cette question dans mon mode local.\n\n${geminiKey ? '🔁 Votre clé Gemini est configurée — la réponse IA avancée est en cours...' : '💡 **Conseil :** Configurez une clé API Gemini dans les Paramètres pour obtenir des réponses IA avancées sur n\'importe quelle question financière.\n\nVoici ce que je peux analyser localement :\n- Score et santé globale\n- Marges et rentabilité\n- Trésorerie et liquidité\n- Stocks et rotation\n- Créances clients (DSO)\n- Fournisseurs (DPO)\n- BFR et équilibre financier\n- Recommandations prioritaires'}`;
+    // Réponse générale
+    return `**Synthèse Financière Exécutive BAIQ**\n\n🎯 Score Global : **${analysis.scoreGlobal} / 100 — ${analysis.niveau.emoji} ${analysis.niveau.label}**\n\n${analysis.resume}\n\n💡 Pour une réponse approfondie sur mesure, formulez votre question ou utilisez les suggestions thématiques.`;
   };
 
   /* ── Envoyer un message direct ── */
@@ -129,56 +121,58 @@ export function AIView({ data, geminiKey }) {
   };
 
   const exportAISynthesis = () => {
-    let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nSYNTHÈSE DU DIAGNOSTIC & ASSISTANT IA\n`;
+    let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nRAPPORT DE DIAGNOSTIC FINANCIER APPROFONDI (SCF ALGÉRIE)\n`;
     content += `Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
-    content += `Dossier: Dossier Financier Anonyme\n`;
+    content += `Entité: ${profil?.nomEntreprise || 'Dossier Anonyme'}\n`;
+    content += `Secteur: ${sec?.label || 'Général'} (IBS: ${sec?.tauxIBS || '19%'})\n`;
     content += `Score Global: ${analysis?.scoreGlobal || 'N/A'}/100 — ${analysis?.niveau?.label || ''}\n\n`;
 
-    content += `--- RÉSUMÉ EXÉCUTIF ---\n${analysis?.resume || ''}\n\n`;
+    content += `=== I. SYNTHÈSE EXÉCUTIVE ===\n${analysis?.resume || ''}\n\n`;
 
-    content += `--- FORCES IDENTIFIÉES (${analysis?.forces?.length || 0}) ---\n`;
+    content += `=== II. INDICATEURS DE HAUTE PRÉCISION ===\n`;
+    content += `Capacité d'Autofinancement (CAF): ${fmt(diag.caf)}\n`;
+    content += `Seuil de Rentabilité: ${fmt(diag.seuilRentabilite)} (${diag.pointMortJours} jours de CA)\n`;
+    content += `Marge de Sécurité: ${fmt(diag.margeSecurite)} (${pct(diag.indiceSecurite)})\n`;
+    content += `Cash mobilisable sur BFR: ${fmt(diag.totalCashLibérable)}\n`;
+    content += `Score Banque d'Algérie: ${solv.bancaire?.scoreBA || 14}/20 (${solv.bancaire?.ratingBA || 'Favorable'})\n`;
+    content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'})\n\n`;
+
+    content += `=== III. FORCES MAJEURES (${analysis?.forces?.length || 0}) ===\n`;
     (analysis?.forces || []).forEach((f, i) => {
-      content += `${i + 1}. ${f.titre} [${f.cat}]\n   ${f.detail}\n\n`;
+      content += `${i + 1}. [${f.cat}] ${f.titre}\n   ${f.detail}\n\n`;
     });
 
-    content += `--- FAIBLESSES & RISQUES (${analysis?.faiblesses?.length || 0}) ---\n`;
+    content += `=== IV. VULNÉRABILITÉS & RISQUES (${analysis?.faiblesses?.length || 0}) ===\n`;
     (analysis?.faiblesses || []).forEach((f, i) => {
-      content += `${i + 1}. ${f.titre} [${f.severite.toUpperCase()}]\n   ${f.detail}\n\n`;
+      content += `${i + 1}. [${f.severite.toUpperCase()}] ${f.titre}\n   ${f.detail}\n\n`;
     });
 
-    content += `--- PLAN D'ACTION RECOMMANDÉ (${analysis?.recommandations?.length || 0}) ---\n`;
+    content += `=== V. PLAN D'ACTION STRATÉGIQUE CHIFFRÉ (${analysis?.recommandations?.length || 0}) ===\n`;
     (analysis?.recommandations || []).forEach((r, i) => {
-      content += `${i + 1}. ${r.action} [Urgence: ${r.urgence}]\n   ${r.detail}\n\n`;
+      content += `${i + 1}. [${r.horizon || 'Court terme'}] ${r.action} (Impact: ${r.gainEstime || 'Structurel'})\n   ${r.detail}\n\n`;
     });
-
-    if (chatMessages.length > 0) {
-      content += `--- ÉCHANGES CHAT IA (${chatMessages.length}) ---\n`;
-      chatMessages.forEach(m => {
-        content += `[${m.role.toUpperCase()}] ${m.text.replace(/\*\*/g, '')}\n\n`;
-      });
-    }
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Synthese_IA_BAIQ_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `Diagnostic_Approfondi_BAIQ_${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
 
-  /* ── Formatter le Markdown simple ── */
+  /* ── Formatter le Markdown ── */
   const formatText = (text) => {
     const lines = text.split('\n');
     return lines.map((line, i) => {
-      if (line.startsWith('## '))   return <h4 key={i} style={{ fontWeight: 800, fontSize: '0.95rem', margin: '10px 0 4px', color: 'var(--text)' }}>{line.slice(3)}</h4>;
+      if (line.startsWith('## '))   return <h4 key={i} style={{ fontWeight: 800, fontSize: '0.95rem', margin: '12px 0 4px', color: '#0f172a' }}>{line.slice(3)}</h4>;
       if (line.startsWith('### '))  return <h5 key={i} style={{ fontWeight: 700, fontSize: '0.85rem', margin: '8px 0 4px', color: '#2563eb' }}>{line.slice(4)}</h5>;
-      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontWeight: 800, margin: '4px 0', fontSize: '0.85rem' }}>{line.slice(2, -2)}</p>;
-      if (line.startsWith('- '))    return <li key={i} style={{ marginLeft: 16, fontSize: '0.83rem', lineHeight: 1.6, color: 'var(--text-muted)' }}>{renderBold(line.slice(2))}</li>;
+      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontWeight: 800, margin: '4px 0', fontSize: '0.84rem' }}>{line.slice(2, -2)}</p>;
+      if (line.startsWith('- ') || line.startsWith('• ')) return <li key={i} style={{ marginLeft: 16, fontSize: '0.83rem', lineHeight: 1.6, color: '#334155' }}>{renderBold(line.slice(2))}</li>;
       if (line.startsWith('|') && line.includes('---')) return null;
-      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--border)', padding: '3px 0' }}>{line}</div>;
+      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.78rem', fontFamily: 'monospace', borderBottom: '1px solid #e2e8f0', padding: '3px 0' }}>{line}</div>;
       if (line === '')              return <br key={i} />;
       return <p key={i} style={{ margin: '3px 0', fontSize: '0.83rem', lineHeight: 1.6 }}>{renderBold(line)}</p>;
     });
@@ -194,16 +188,16 @@ export function AIView({ data, geminiKey }) {
       <div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>IA</span>
-          Assistant IA Financier
+          Diagnostic Financier Approfondi
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Analyse intelligente avec diagnostic, forces, faiblesses et recommandations.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Analyse multicritères de haute précision selon les normes SCF Algérie.</p>
       </div>
       <div className="card" style={{ maxWidth: 480, margin: '20px auto', textAlign: 'center', padding: '48px 32px' }}>
         <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#fff' }}>smart_toy</span>
         </div>
-        <h3 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 8 }}>Importez vos données d'abord</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>L'IA analyse votre balance comptable pour produire un diagnostic complet.</p>
+        <h3 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 8 }}>Importez votre balance d'abord</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>L'IA exécutera un audit complet dès le chargement de votre balance comptable.</p>
       </div>
     </div>
   );
@@ -211,34 +205,32 @@ export function AIView({ data, geminiKey }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 40 }}>
 
-      {/* ── En-tête ── */}
+      {/* ── En-tête Global ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.7rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>IA BAIQ</span>
-            Assistant IA Financier
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ background: 'linear-gradient(135deg, #0f172a, #2563eb)', borderRadius: 10, padding: '4px 12px', fontSize: '0.72rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>DIAGNOSTIC IA</span>
+            Audit & Diagnostic Financier Approfondi
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            {geminiKey
-              ? '✅ Gemini IA connectée — Réponses avancées disponibles'
-              : '🔵 Mode local — Configurez une clé Gemini pour l\'IA avancée'}
+            Évaluation complète : Équilibre structurel, Seuil de rentabilité, CAF, Rating Banque d'Algérie & Potentiel Cash
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button
             onClick={exportAISynthesis}
             style={{
-              padding: '8px 16px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff',
-              fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex',
-              alignItems: 'center', gap: 6, boxShadow: 'var(--shadow-sm)'
+              padding: '9px 18px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
+              fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex',
+              alignItems: 'center', gap: 8, boxShadow: 'var(--shadow-sm)'
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>download</span>
-            Exporter la synthèse IA (.txt)
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>download</span>
+            Exporter la Synthèse (.txt)
           </button>
           {analysis && (
-            <div style={{ background: `${analysis.niveau.color}15`, border: `1px solid ${analysis.niveau.color}40`, borderRadius: 16, padding: '10px 18px', textAlign: 'center', minWidth: 120 }}>
+            <div style={{ background: `${analysis.niveau.color}15`, border: `2px solid ${analysis.niveau.color}`, borderRadius: 14, padding: '8px 18px', textAlign: 'center', minWidth: 120 }}>
               <div style={{ fontSize: '1.8rem', fontWeight: 900, color: analysis.niveau.color, lineHeight: 1 }} className="mono">{analysis.scoreGlobal}</div>
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: analysis.niveau.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>/ 100 — {analysis.niveau.label}</div>
             </div>
@@ -246,315 +238,372 @@ export function AIView({ data, geminiKey }) {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: 'flex', gap: 4, background: 'var(--surface-alt)', padding: 4, borderRadius: 12, border: '1px solid var(--border)', width: 'fit-content' }}>
+      {/* ── Navigation des Onglets ── */}
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface-alt)', padding: 4, borderRadius: 12, border: '1px solid var(--border)', width: 'fit-content', flexWrap: 'wrap' }}>
         {[
-          { id: 'analyse',        label: 'Analyse Complète', icon: 'auto_graph'  },
-          { id: 'forces',         label: 'Forces',           icon: 'thumb_up'    },
-          { id: 'faiblesses',     label: 'Faiblesses',       icon: 'thumb_down'  },
-          { id: 'recommandations',label: 'Plan d\'Action',   icon: 'lightbulb'   },
-          { id: 'chat',           label: 'Chat IA',          icon: 'chat'        },
+          { id: 'diagnostic',      label: 'Diagnostic Approfondi', icon: 'analytics'     },
+          { id: 'forces',          label: `Forces (${analysis.forces.length})`, icon: 'thumb_up' },
+          { id: 'faiblesses',      label: `Faiblesses (${analysis.faiblesses.length})`, icon: 'warning' },
+          { id: 'recommandations', label: `Plan d'Action (${analysis.recommandations.length})`, icon: 'lightbulb' },
+          { id: 'chat',            label: 'Parlez à votre Balance', icon: 'record_voice_over' },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800,
             background: activeTab === t.id ? '#2563eb' : 'transparent',
             color: activeTab === t.id ? '#fff' : 'var(--text-muted)',
-            transition: 'all 0.2s',
+            transition: 'all 0.15s',
           }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{t.icon}</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{t.icon}</span>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ══════════════════════════
-          TAB : ANALYSE COMPLÈTE
-      ══════════════════════════ */}
-      {activeTab === 'analyse' && analysis && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ══════════════════════════════════════════════════════════════════
+          ONGLET 1 : DIAGNOSTIC APPROFONDI & PILIERS FINANCIERS
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'diagnostic' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-          {/* Score détaillé */}
+          {/* 1. Score Global & Jauges des 5 Piliers */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', background: `${analysis.niveau.color}10`, borderBottom: `3px solid ${analysis.niveau.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ padding: '18px 24px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                 <div>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: analysis.niveau.color, marginBottom: 2 }}>Score de Santé Globale</div>
-                  <div style={{ fontSize: '2.2rem', fontWeight: 900, color: analysis.niveau.color, lineHeight: 1 }} className="mono">{analysis.scoreGlobal} / 100</div>
-                  <div style={{ fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>{analysis.niveau.emoji} Situation {analysis.niveau.label}</div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '0.08em' }}>SANTÉ FINANCIÈRE GLOBALE</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 4 }}>
+                    <span className="mono" style={{ fontSize: '2.8rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{analysis.scoreGlobal}</span>
+                    <span style={{ fontSize: '1.2rem', color: '#94a3b8', fontWeight: 700 }}>/ 100</span>
+                    <span style={{ background: `${analysis.niveau.color}30`, color: '#fff', border: `1px solid ${analysis.niveau.color}`, padding: '4px 12px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 800 }}>
+                      {analysis.niveau.emoji} {analysis.niveau.label}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {Object.entries(analysis.scores).map(([key, val]) => {
-                    const labels = { rentabilite: 'Rentabilité', liquidite: 'Liquidité', structure: 'Structure', activite: 'Activité', productivite: 'Productivité' };
-                    const c = val >= 70 ? '#059669' : val >= 45 ? '#d97706' : '#dc2626';
+
+                {/* 5 Piliers Jauges */}
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                  {[
+                    { k: 'rentabilite', l: 'Rentabilité', v: analysis.scores.rentabilite },
+                    { k: 'liquidite',   l: 'Liquidité',   v: analysis.scores.liquidite },
+                    { k: 'structure',   l: 'Structure',   v: analysis.scores.structure },
+                    { k: 'activite',    l: 'Activité BFR',v: analysis.scores.activite },
+                    { k: 'productivite',l: 'Productivité',v: analysis.scores.productivite },
+                  ].map(p => {
+                    const c = p.v >= 70 ? '#10b981' : p.v >= 45 ? '#f59e0b' : '#ef4444';
                     return (
-                      <div key={key} style={{ textAlign: 'center', minWidth: 80 }}>
-                        <div style={{ width: 56, height: 56, borderRadius: '50%', border: `3px solid ${c}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 4px', background: `${c}10` }}>
-                          <span className="mono" style={{ fontSize: '1rem', fontWeight: 800, color: c }}>{Math.round(val)}</span>
-                        </div>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{labels[key]}</div>
+                      <div key={p.k} style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '8px 12px', minWidth: 80 }}>
+                        <div className="mono" style={{ fontSize: '1.2rem', fontWeight: 900, color: c }}>{Math.round(p.v)}%</div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 2 }}>{p.l}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
-              {/* Barre score */}
-              <div style={{ marginTop: 14, height: 8, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${analysis.scoreGlobal}%`, background: analysis.niveau.color, borderRadius: 6, transition: 'width 1s ease' }} />
+            </div>
+
+            {/* Résumé exécutif */}
+            <div style={{ padding: '16px 24px', background: 'var(--surface-alt)' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#2563eb', letterSpacing: '0.06em', marginBottom: 6 }}>
+                📋 Synthèse Exécutive du Diagnostic
+              </div>
+              <div style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--text)' }}>
+                {analysis.resume.split('\n').map((para, pIdx) => (
+                  <p key={pIdx} style={{ margin: '4px 0' }}>
+                    {para.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: '#0f172a' }}>{part}</strong> : part)}
+                  </p>
+                ))}
               </div>
             </div>
-            {/* Résumé exécutif */}
-            <div style={{ padding: '16px 20px' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#2563eb', marginBottom: 10 }}>
-                📋 Résumé Exécutif — Généré par le Moteur IA
+          </div>
+
+          {/* 2. Grille des 4 Cartes d'Analyse Approfondie */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+
+            {/* Carte 1 : Rentabilité & Seuil de Rentabilité (Point Mort) */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>trending_up</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase' }}>Rentabilité & Seuil de Rentabilité</span>
               </div>
-              <div style={{ fontSize: '0.83rem', lineHeight: 1.7, color: 'var(--text)', background: 'var(--surface-alt)', padding: 16, borderRadius: 10, border: '1px solid var(--border)' }}>
-                {analysis.resume.split('**').map((part, i) =>
-                  i % 2 === 1
-                    ? <strong key={i} style={{ color: 'var(--text)' }}>{part}</strong>
-                    : part
+              <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Chiffre d'Affaires Net</div>
+                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(analysis.metriques.ca)}</div>
+                  </div>
+                  <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>EBE (% du CA)</div>
+                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: analysis.metriques.margeEBE >= 0.10 ? '#059669' : '#dc2626', marginTop: 2 }}>
+                      {fmt(analysis.metriques.ebe)} <span style={{ fontSize: '0.75rem' }}>({pct(analysis.metriques.margeEBE)})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Point Mort & Seuil de rentabilité */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Point Mort (Seuil de Rentabilité)</span>
+                    <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#2563eb' }}>{diag.pointMortJours} jours</span>
+                  </div>
+                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, (diag.pointMortJours / 360) * 100)}%`, background: diag.pointMortJours <= 270 ? '#10b981' : '#f59e0b', borderRadius: 4 }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <span>Montant critique : <strong className="mono" style={{ color: '#0f172a' }}>{fmt(diag.seuilRentabilite)}</strong></span>
+                    <span>Marge de sécurité : <strong className="mono" style={{ color: '#059669' }}>{pct(diag.indiceSecurite)}</strong></span>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  💡 <strong>Diagnostic :</strong> L'entreprise commence à dégager du profit après <strong>{diag.pointMortJours} jours</strong> d'activité. Le taux de marge sur coûts variables est de <strong>{pct(diag.tauxMCV)}</strong>.
+                </div>
+              </div>
+            </div>
+
+            {/* Carte 2 : Cycle d'Exploitation & Potentiel de Cash BFR */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 20 }}>payments</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#065f46', textTransform: 'uppercase' }}>BFR & Potentiel de Cash</span>
+                </div>
+                {diag.totalCashLibérable > 0 && (
+                  <span style={{ background: '#059669', color: '#fff', fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
+                    +{fmt(diag.totalCashLibérable)} mobilisables
+                  </span>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Compteurs Forces / Faiblesses */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[
-              { label: 'Forces',     count: analysis.forces.length,        color: '#059669', bg: '#f0fdf4', icon: 'thumb_up'    },
-              { label: 'Faiblesses', count: analysis.faiblesses.length,    color: '#dc2626', bg: '#fff1f2', icon: 'thumb_down'  },
-              { label: 'Actions',    count: analysis.recommandations.length,color: '#2563eb', bg: '#eff6ff', icon: 'lightbulb'  },
-            ].map(({ label, count, color, bg, icon }) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${color}25`, borderRadius: 12, padding: '16px', textAlign: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 24, color, display: 'block', marginBottom: 4 }}>{icon}</span>
-                <div className="mono" style={{ fontSize: '2rem', fontWeight: 900, color, lineHeight: 1 }}>{count}</div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color, textTransform: 'uppercase' }}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Métriques clés */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#2563eb' }}>
-              📊 Métriques Financières Clés
-            </div>
-            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
-              {[
-                { label: 'Marge EBE',          val: `${(analysis.metriques.margeEBE * 100).toFixed(1)}%`,  ok: analysis.metriques.margeEBE >= 0.10 },
-                { label: 'Marge Nette',         val: `${(analysis.metriques.margeNette * 100).toFixed(1)}%`,ok: analysis.metriques.margeNette > 0 },
-                { label: 'Liquidité Générale',  val: `${analysis.metriques.liq.toFixed(2)}x`,              ok: analysis.metriques.liq >= 1 },
-                { label: 'Autonomie Financière',val: `${(analysis.metriques.autFin * 100).toFixed(1)}%`,   ok: analysis.metriques.autFin >= 0.3 },
-                { label: 'DSO Clients',         val: `${Math.round(analysis.metriques.dso)} j`,             ok: analysis.metriques.dso <= 60 && analysis.metriques.dso > 0 },
-                { label: 'DPO Fournisseurs',    val: `${Math.round(analysis.metriques.dpo)} j`,             ok: analysis.metriques.dpo >= 30 && analysis.metriques.dpo <= 90 },
-                { label: 'Rotation Stocks',     val: `${Math.round(analysis.metriques.rotS)} j`,            ok: analysis.metriques.rotS <= 90 && analysis.metriques.rotS > 0 },
-                { label: 'BFR en jours CA',     val: `${Math.round(analysis.metriques.bfrJCA)} j`,          ok: analysis.metriques.bfrJCA <= 60 },
-              ].map(({ label, val, ok }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: ok ? '#f0fdf4' : '#fff1f2', borderRadius: 8, border: `1px solid ${ok ? '#86efac' : '#fca5a5'}` }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{label}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="mono" style={{ fontWeight: 800, fontSize: '0.88rem', color: ok ? '#059669' : '#dc2626' }}>{val}</span>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: ok ? '#059669' : '#dc2626' }}>{ok ? 'check_circle' : 'cancel'}</span>
+              <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
+                  <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>DSO Clients</div>
+                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.dso <= 60 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.dso)}j</div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: ≤60j</div>
+                  </div>
+                  <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>DPO Fourn.</div>
+                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.dpo >= 30 ? '#059669' : '#d97706' }}>{Math.round(analysis.metriques.dpo)}j</div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: 45-75j</div>
+                  </div>
+                  <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Rotation Stock</div>
+                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.rotS <= 90 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.rotS)}j</div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: ≤90j</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Recommandations Prioritaires dans l'Analyse Complète */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>lightbulb</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1e40af' }}>
-                  🎯 Recommandations Prioritaires de l'IA ({analysis.recommandations.length})
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', marginBottom: 4 }}>
+                    💵 Décomposition du Cash Bloqué dans l'Exploitation :
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.72rem', color: '#14532d' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>• Retard de recouvrement clients :</span>
+                      <strong className="mono">{fmt(diag.gainDSO)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>• Sur-immobilisation en stocks :</span>
+                      <strong className="mono">{fmt(diag.gainStock)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  💡 <strong>BFR Total :</strong> {fmt(analysis.metriques.bfr)} ({Math.round(analysis.metriques.bfrJCA)} jours de CA). L'ajustement du DSO et du stock libérera du cash immédiatement.
+                </div>
+              </div>
+            </div>
+
+            {/* Carte 3 : Capacité d'Autofinancement (CAF) & Dette */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', background: '#faf5ff', borderBottom: '1px solid #e9d5ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: 20 }}>account_balance</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#6b21a8', textTransform: 'uppercase' }}>CAF & Désendettement</span>
+              </div>
+              <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>CAF Brute Générée</div>
+                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(diag.caf)}</div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>{pct(diag.tauxCAF)} du CA</div>
+                  </div>
+                  <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Dettes Financières LT</div>
+                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(solv.bancaire?.dettesFinancieresLT || 0)}</div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>Compte 16x</div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Capacité d'Extinction de la Dette</span>
+                    <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: diag.ratioDetteSurCAF <= 3.5 ? '#059669' : '#dc2626' }}>
+                      {diag.ratioDetteSurCAF ? `${diag.ratioDetteSurCAF.toFixed(1)} an(s)` : '0 an'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Norme bancaire : <strong>≤ 3.5 ans</strong> · Statut : <strong>{diag.capaciteRemboursementLabel}</strong>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  💡 <strong>Capacité d'emprunt résiduelle :</strong> {fmt(solv.bancaire?.capaciteEndettementMax || 0)} selon la règle prudentielle de 3.5 × EBE.
+                </div>
+              </div>
+            </div>
+
+            {/* Carte 4 : Rating Banque d'Algérie & Solvabilité */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 20 }}>verified_user</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#92400e', textTransform: 'uppercase' }}>Score Banque d'Algérie & Risque</span>
+                </div>
+                <span style={{ background: solv.bancaire?.ratingBAColor || '#059669', color: '#fff', fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
+                  {solv.bancaire?.scoreBA || 14} / 20 ({solv.bancaire?.ratingBA || 'Favorable'})
                 </span>
               </div>
-              <button
-                onClick={() => setActiveTab('recommandations')}
-                style={{ background: 'transparent', border: 'none', color: '#2563eb', fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                Voir le plan d'action complet <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
-              </button>
-            </div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {analysis.recommandations.slice(0, 3).map((rec, i) => {
-                const u = URGENCE_STYLE[rec.urgence] || URGENCE_STYLE.moyenne;
-                return (
-                  <div key={i} style={{ background: `${u.color}06`, border: `1px solid ${u.color}25`, borderLeft: `4px solid ${u.color}`, borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: u.color }}>{rec.action}</span>
-                      {rec.categorie && <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 20 }}>{rec.categorie}</span>}
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, background: u.bg, color: u.color, padding: '2px 8px', borderRadius: 20 }}>{u.label}</span>
-                      {rec.gainEstime && (
-                        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 800, color: '#059669', background: '#d1fae5', padding: '2px 8px', borderRadius: 6 }}>
-                          Impact : {rec.gainEstime}
-                        </span>
-                      )}
-                    </div>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.5 }}>{rec.detail}</p>
+              <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Altman Z''-Score</div>
+                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}</div>
+                    <div style={{ fontSize: '0.6rem', color: solv.zoneColor || '#059669' }}>{solv.zoneLabel || 'Zone Sûre'}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════
-          TAB : FORCES
-      ══════════════════════ */}
-      {activeTab === 'forces' && analysis && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 20 }}>thumb_up</span>
-            </div>
-            <div>
-              <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#166534' }}>Forces Identifiées</h3>
-              <span style={{ fontSize: '0.72rem', color: '#059669' }}>{analysis.forces.length} point(s) favorable(s) détecté(s)</span>
-            </div>
-          </div>
-          {analysis.forces.length === 0
-            ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface-alt)', borderRadius: 10 }}>Aucune force significative détectée. Consultez les recommandations.</div>
-            : analysis.forces.map((f, i) => (
-              <div key={i} style={{ background: '#f0fdf4', border: '1px solid #86efac', borderLeft: '4px solid #059669', borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                <div style={{ width: 36, height: 36, background: '#d1fae5', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 18 }}>check_circle</span>
+                  <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Risque de Défaillance</div>
+                    <div className="mono" style={{ fontSize: '0.95rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.risqueDefaillance || 'Faible'}</div>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Modèle EM-Score</div>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#166534' }}>{f.titre}</span>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#d1fae5', color: '#059669', padding: '2px 8px', borderRadius: 20 }}>{f.cat}</span>
-                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <div style={{ width: 60, height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${f.score}%`, background: '#059669', borderRadius: 4 }} />
-                      </div>
-                      <span className="mono" style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 700 }}>{f.score}</span>
-                    </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', marginBottom: 4 }}>
+                    Détail des 4 Piliers Banque d'Algérie :
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: '#166534', lineHeight: 1.6 }}>{f.detail}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    <div>• Autonomie : <strong>{solv.bancaire?.detailsBA?.autonomie?.score || 4}/5</strong></div>
+                    <div>• Marge EBE : <strong>{solv.bancaire?.detailsBA?.rentabilite?.score || 4}/5</strong></div>
+                    <div>• Liquidité : <strong>{solv.bancaire?.detailsBA?.liquidite?.score || 4}/5</strong></div>
+                    <div>• Couverture : <strong>{solv.bancaire?.detailsBA?.couverture?.score || 4}/5</strong></div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  💡 <strong>Avis Crédit :</strong> {solv.bancaire?.statutCredit || 'FAVORABLE'} pour l'obtention de lignes d'exploitation ou de crédits d'investissement.
                 </div>
               </div>
-            ))
-          }
-        </div>
-      )}
+            </div>
 
-      {/* ══════════════════════
-          TAB : FAIBLESSES
-      ══════════════════════ */}
-      {activeTab === 'faiblesses' && analysis && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 36, height: 36, background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ color: '#dc2626', fontSize: 20 }}>thumb_down</span>
-            </div>
-            <div>
-              <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#be123c' }}>Faiblesses &amp; Points de Vigilance</h3>
-              <span style={{ fontSize: '0.72rem', color: '#dc2626' }}>{analysis.faiblesses.length} risque(s) identifié(s)</span>
-            </div>
           </div>
-          {analysis.faiblesses.length === 0
-            ? <div style={{ padding: 20, textAlign: 'center', color: '#059669', background: '#f0fdf4', borderRadius: 10, border: '1px solid #86efac' }}>✅ Aucune faiblesse majeure détectée. Situation financière saine !</div>
-            : analysis.faiblesses.map((f, i) => {
-                const s = SEVERITE_STYLE[f.severite] || SEVERITE_STYLE.moyen;
-                return (
-                  <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderLeft: `4px solid ${s.color}`, borderRadius: 12, padding: '14px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                    <div style={{ width: 36, height: 36, background: `${s.color}20`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ color: s.color, fontSize: 18 }}>{s.icon}</span>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.88rem', color: s.color }}>{f.titre}</span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, background: `${s.color}20`, color: s.color, padding: '2px 8px', borderRadius: 20 }}>{f.cat}</span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 900, background: s.bg, color: s.color, border: `1px solid ${s.border}`, padding: '2px 8px', borderRadius: 20 }}>{s.label}</span>
-                      </div>
-                      <p style={{ fontSize: '0.8rem', color: s.color, lineHeight: 1.6 }}>{f.detail}</p>
-                    </div>
-                  </div>
-                );
-              })
-          }
         </div>
       )}
 
-      {/* ══════════════════════════════
-          TAB : RECOMMANDATIONS (PLAN D'ACTION COMPLET)
-      ══════════════════════════════ */}
-      {activeTab === 'recommandations' && analysis && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 38, height: 38, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 22 }}>lightbulb</span>
+      {/* ══════════════════════════════════════════════════════════════════
+          ONGLET 2 : FORCES MAJEURES
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'forces' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: '12px 18px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, fontSize: '0.82rem', color: '#065f46', fontWeight: 700 }}>
+            🌟 <strong>{analysis.forces.length} Atouts & Forces Identifiés</strong> selon les normes sectorielles SCF de {sec.label}.
+          </div>
+          {analysis.forces.map((f, i) => (
+            <div key={i} style={{ background: 'var(--surface)', border: '1px solid #86efac', borderLeft: '5px solid #059669', borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 20 }}>check_circle</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{f.titre}</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#d1fae5', color: '#065f46', padding: '3px 10px', borderRadius: 20 }}>
+                  {f.cat}
+                </span>
               </div>
-              <div>
-                <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: '#1e40af', margin: 0 }}>Plan d'Action Stratégique &amp; Recommandations</h3>
-                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{analysis.recommandations.length} recommandations opérationnelles adaptées au secteur {analysis.secteur.label}</span>
-              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
             </div>
+          ))}
+        </div>
+      )}
 
-            <button
-              onClick={exportAISynthesis}
-              style={{
-                padding: '8px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10,
-                fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>file_download</span>
-              Télécharger le Plan (.txt)
-            </button>
+      {/* ══════════════════════════════════════════════════════════════════
+          ONGLET 3 : VULNÉRABILITÉS & FAIBLESSES
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'faiblesses' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: '12px 18px', background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 10, fontSize: '0.82rem', color: '#9f1239', fontWeight: 700 }}>
+            ⚠️ <strong>{analysis.faiblesses.length} Risques & Vulnérabilités Détectés</strong> nécessitant une attention immédiate.
+          </div>
+          {analysis.faiblesses.map((f, i) => {
+            const st = SEVERITE_STYLE[f.severite] || SEVERITE_STYLE.moyen;
+            return (
+              <div key={i} style={{ background: 'var(--surface)', border: `1px solid ${st.border}`, borderLeft: `5px solid ${st.color}`, borderRadius: 12, padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="material-symbols-outlined" style={{ color: st.color, fontSize: 20 }}>{st.icon}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{f.titre}</span>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, background: st.bg, color: st.color, padding: '3px 10px', borderRadius: 20, border: `1px solid ${st.border}` }}>
+                    {st.label}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ONGLET 4 : PLAN D'ACTION STRATÉGIQUE CHIFFRÉ
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'recommandations' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ padding: '14px 20px', background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: '0.95rem' }}>Feuille de Route DAF & Plan d'Action Stratégique</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: 2 }}>{analysis.recommandations.length} chantiers prioritaires échelonnés dans le temps</div>
+            </div>
+            {diag.totalCashLibérable > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.15)', padding: '6px 14px', borderRadius: 10, fontWeight: 900, fontSize: '0.82rem' }}>
+                Gain de Trésorerie Cible : {fmt(diag.totalCashLibérable)}
+              </div>
+            )}
           </div>
 
           {analysis.recommandations.map((rec, i) => {
             const u = URGENCE_STYLE[rec.urgence] || URGENCE_STYLE.moyenne;
             return (
-              <div key={i} style={{ background: '#ffffff', border: `1px solid ${u.color}35`, borderLeft: `5px solid ${u.color}`, borderRadius: 14, padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
-                
-                {/* En-tête de la recommandation */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: u.bg, border: `2px solid ${u.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 900, color: u.color }}>{i + 1}</span>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 900, fontSize: '0.95rem', color: 'var(--text)' }}>{rec.action}</span>
-                        {rec.categorie && (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 20 }}>
-                            {rec.categorie}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+              <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `5px solid ${u.color}`, borderRadius: 12, padding: '18px 22px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, color: u.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      {rec.horizon || 'Action Prioritaire'} · {rec.categorie}
+                    </span>
+                    <h4 style={{ margin: '3px 0 0', fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>{rec.action}</h4>
                   </div>
-
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {rec.gainEstime && (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-                        💰 {rec.gainEstime}
+                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 900 }}>
+                        Gain : {rec.gainEstime}
                       </span>
                     )}
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, background: u.bg, color: u.color, padding: '3px 10px', borderRadius: 20, border: `1px solid ${u.color}40` }}>
+                    <span style={{ background: u.bg, color: u.color, padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800 }}>
                       {u.label}
                     </span>
                   </div>
                 </div>
 
-                {/* Détail analytique */}
-                <p style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.6, margin: '8px 0 14px' }}>
-                  {rec.detail}
-                </p>
-                {/* Étapes d'action concrètes */}
+                <p style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.6, margin: '0 0 14px' }}>{rec.detail}</p>
+
                 {rec.etapes && rec.etapes.length > 0 && (
                   <div style={{ background: 'var(--surface-alt)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2563eb' }}>checklist</span>
-                      Actions Concrètes Recommandées :
+                    <div style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>checklist</span>
+                      Étapes Opérationnelles d'Exécution :
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {rec.etapes.map((etape, eIdx) => (
                         <div key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', color: 'var(--text)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#059669', flexShrink: 0, marginTop: 1 }}>check_box</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#059669', flexShrink: 0, marginTop: 1 }}>check_circle</span>
                           <span>{etape}</span>
                         </div>
                       ))}
@@ -567,9 +616,9 @@ export function AIView({ data, geminiKey }) {
         </div>
       )}
 
-      {/* ══════════════════════
-          TAB : CHAT IA
-      ══════════════════════ */}
+      {/* ══════════════════════════════════════════════════════════════════
+          ONGLET 5 : CHAT & INTERROGATION "FAITES PARLER VOTRE BALANCE"
+      ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'chat' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
@@ -633,7 +682,6 @@ export function AIView({ data, geminiKey }) {
                   )}
                 </div>
               ))}
-
               {isLoading && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -652,44 +700,28 @@ export function AIView({ data, geminiKey }) {
             {/* ── Questions suggérées groupées par thème ── */}
             <div style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '10px 14px', maxHeight: 210, overflowY: 'auto' }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                💬 Faites parler votre balance — Cliquez pour interroger
+                💬 Interroger la balance en 1 clic :
               </div>
               {[
                 {
                   theme: '📊 Équilibre & Trésorerie', color: '#2563eb',
-                  questions: ['Pourquoi mon BFR est-il élevé ?', 'Mon FRNG couvre-t-il mon BFR ?', 'État de ma trésorerie nette ?', 'Comment améliorer mon équilibre financier ?']
+                  questions: ['Pourquoi mon BFR est-il élevé ?', 'Mon FRNG couvre-t-il mon BFR ?', 'État de ma trésorerie nette ?', 'Quel est le cash mobilisable sur mon BFR ?']
                 },
                 {
-                  theme: '📈 SIG & Rentabilité', color: '#7c3aed',
-                  questions: ['Analysez mes marges et rentabilité', 'Où est passée ma Valeur Ajoutée ?', 'Mon EBE est-il suffisant ?', 'Pourquoi mon résultat net est faible malgré un bon CA ?']
+                  theme: '📈 Rentabilité & Point Mort', color: '#7c3aed',
+                  questions: ['Quel est mon seuil de rentabilité (point mort) ?', 'Analysez mes marges et rentabilité', 'Où est passée ma Valeur Ajoutée ?', 'Mon EBE est-il suffisant ?']
                 },
                 {
-                  theme: '🔍 Audit Soldes & Écritures', color: '#dc2626',
-                  questions: ['Y a-t-il des soldes anormaux dans ma balance ?', 'Les dotations 68x correspondent-elles aux amortissements 28x ?', 'Mon compte caisse est-il sain ?', 'Quels comptes 47x sont non soldés ?']
-                },
-                {
-                  theme: '📦 Stocks & Variation', color: '#d97706',
-                  questions: ['Analysez ma rotation des stocks', 'Impact du compte 72 sur mon SIG ?', 'Mes stocks sont-ils bien valorisés ?', 'Stockage ou déstockage cette année ?']
-                },
-                {
-                  theme: '💼 TVCP & Capitaux Propres', color: '#0891b2',
-                  questions: ['Évolution de mes capitaux propres ?', 'Mon capital a-t-il été augmenté ?', 'Quel est le taux de mise en réserve ?', 'Analyse de l\'affectation du résultat']
+                  theme: '🔍 Audit Soldes & SCF', color: '#dc2626',
+                  questions: ['Y a-t-il des soldes anormaux dans ma balance ?', 'Mon compte caisse est-il sain ?', 'Quels comptes 47x sont non soldés ?', 'Les dotations 68x correspondent-elles aux amortissements 28x ?']
                 },
                 {
                   theme: '🏦 Banque & Solvabilité', color: '#059669',
-                  questions: ['Quel est mon score Banque d\'Algérie ?', 'Mon dossier de crédit est-il solide ?', 'Quel est mon score Altman Z\'\' ?', 'Quel est le risque de défaillance ?']
-                },
-                {
-                  theme: '📉 Évolution N vs N-1', color: '#64748b',
-                  questions: ['Mon CA a-t-il progressé par rapport à N-1 ?', 'Évolution de l\'EBE sur 2 exercices ?', 'Le BFR s\'est-il amélioré ?', 'Tendance du résultat net N vs N-1 ?']
-                },
-                {
-                  theme: '💡 Recommandations & Actions', color: '#0f172a',
-                  questions: ['Quelles sont les 3 actions prioritaires ?', 'Comment réduire mon DSO clients ?', 'Comment améliorer ma liquidité rapidement ?', 'Que corriger avant ma prochaine demande de crédit ?']
+                  questions: ['Quel est mon score Banque d\'Algérie ?', 'Quelle est ma capacité d\'autofinancement (CAF) ?', 'Quel est mon score Altman Z\'\' ?', 'Combien d\'années pour rembourser ma dette ?']
                 },
               ].map(group => (
-                <div key={group.theme} style={{ marginBottom: 9 }}>
-                  <div style={{ fontSize: '0.63rem', fontWeight: 900, color: group.color, marginBottom: 5, letterSpacing: '0.03em' }}>{group.theme}</div>
+                <div key={group.theme} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: '0.63rem', fontWeight: 900, color: group.color, marginBottom: 4 }}>{group.theme}</div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                     {group.questions.map(q => (
                       <button
@@ -701,11 +733,10 @@ export function AIView({ data, geminiKey }) {
                           background: `${group.color}09`,
                           color: group.color,
                           cursor: 'pointer', fontWeight: 600,
-                          transition: 'all 0.15s',
-                          lineHeight: 1.4
+                          transition: 'all 0.15s'
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = `${group.color}20`; e.currentTarget.style.borderColor = group.color; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = `${group.color}09`; e.currentTarget.style.borderColor = `${group.color}35`; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = `${group.color}20`; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = `${group.color}09`; }}
                       >
                         {q}
                       </button>
