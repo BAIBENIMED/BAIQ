@@ -18,6 +18,152 @@ const KpiRow = ({ label, value, sub, ok }) => (
   </div>
 );
 
+function renderInlineMarkdown(text) {
+  if (!text) return '';
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={idx} style={{ color: '#0f172a', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function MarkdownReportViewer({ content }) {
+  if (!content) return null;
+
+  const lines = content.split('\n');
+  const elements = [];
+  let tableBuffer = [];
+  let inTable = false;
+
+  const flushTable = (key) => {
+    if (tableBuffer.length === 0) return;
+    const headerRow = tableBuffer[0];
+    const dataRows = tableBuffer.slice(1);
+
+    const headers = headerRow.split('|').map(s => s.trim()).filter((s, i, a) => (i > 0 && i < a.length - 1) || (a.length <= 2 && s));
+
+    elements.push(
+      <div key={`tbl-${key}`} style={{ overflowX: 'auto', maxWidth: '100%', margin: '14px 0', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <thead>
+            <tr style={{ background: '#f1f5f9', borderBottom: '2px solid var(--border)' }}>
+              {headers.map((h, hIdx) => {
+                const isRight = hIdx > 0 && (h.includes('(DZD)') || h.includes('%') || h.includes('Montant') || h.includes('Valeur') || h.includes('Score') || h.includes('CA'));
+                return (
+                  <th key={hIdx} style={{ padding: '8px 12px', textAlign: isRight ? 'right' : 'left', fontWeight: 800, color: '#1e293b', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                    {h}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((r, rIdx) => {
+              const cells = r.split('|').map(s => s.trim()).filter((s, i, a) => (i > 0 && i < a.length - 1) || (a.length <= 2 && s));
+              const isEven = rIdx % 2 === 0;
+              return (
+                <tr key={rIdx} style={{ background: isEven ? 'transparent' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  {cells.map((c, cIdx) => {
+                    const isNum = c.includes('DZD') || c.includes('%') || !isNaN(Number(c.replace(/\s/g, '')));
+                    return (
+                      <td key={cIdx} style={{ padding: '7px 12px', textAlign: cIdx === 0 ? 'left' : (isNum ? 'right' : 'left'), color: '#334155', fontWeight: cIdx === 0 ? 600 : (isNum ? 700 : 400), fontFamily: isNum ? 'monospace' : 'inherit', whiteSpace: isNum ? 'nowrap' : 'normal' }}>
+                        {renderInlineMarkdown(c)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableBuffer = [];
+    inTable = false;
+  };
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+
+    // Table row detection
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (trimmed.includes('---')) {
+        return; // separator row
+      }
+      tableBuffer.push(trimmed);
+      inTable = true;
+      return;
+    } else if (inTable) {
+      flushTable(i);
+    }
+
+    if (!trimmed) {
+      elements.push(<div key={`br-${i}`} style={{ height: 6 }} />);
+      return;
+    }
+
+    if (trimmed === '---') {
+      elements.push(<hr key={`hr-${i}`} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />);
+      return;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      elements.push(
+        <h2 key={`h1-${i}`} style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          {trimmed.slice(2)}
+        </h2>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        <h3 key={`h3-${i}`} style={{ fontSize: '0.98rem', fontWeight: 800, color: '#1e3a8a', margin: '16px 0 8px', borderLeft: '4px solid #2563eb', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          {trimmed.slice(4)}
+        </h3>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith('#### ')) {
+      elements.push(
+        <h4 key={`h4-${i}`} style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: '10px 0 4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          {trimmed.slice(5)}
+        </h4>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('✓ ') || trimmed.startsWith('✗ ')) {
+      const isCheck = trimmed.startsWith('✓');
+      const isCross = trimmed.startsWith('✗');
+      elements.push(
+        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.83rem', color: '#334155', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
+          <span style={{ color: isCheck ? '#059669' : isCross ? '#dc2626' : '#2563eb', fontWeight: 800, flexShrink: 0 }}>
+            {isCheck ? '✓' : isCross ? '✗' : '•'}
+          </span>
+          <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+            {renderInlineMarkdown(trimmed.replace(/^[-*•✓✗]\s*/, ''))}
+          </span>
+        </div>
+      );
+      return;
+    }
+
+    elements.push(
+      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+
+  if (inTable) flushTable(lines.length);
+
+  return <div style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%', boxSizing: 'border-box' }}>{elements}</div>;
+}
+
 export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '' }) {
   const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => {
     if (v === null || v === undefined || isNaN(v)) return '0 DZD';
@@ -705,15 +851,18 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             <div style={{
               background: 'var(--surface-alt)',
               borderRadius: 12,
-              padding: '28px',
+              padding: '24px 28px',
               border: '1px solid var(--border)',
               lineHeight: 1.75,
               fontSize: '0.86rem',
               color: 'var(--text)',
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'Inter, -apple-system, system-ui, sans-serif'
+              fontFamily: 'Inter, -apple-system, system-ui, sans-serif',
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
             }}>
-              {displayedReportText}
+              <MarkdownReportViewer content={displayedReportText} />
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px dashed var(--border)' }}>
