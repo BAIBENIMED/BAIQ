@@ -78,8 +78,8 @@ export function AIView({ data, geminiKey }) {
     if (m.includes('bfr') || m.includes('besoin'))
       return `**Diagnostic Approfondi du BFR (Besoin en Fonds de Roulement)**\n\n- BFR Total : **${fmt(data?.bilan?.bfr)}**, représentant **${Math.round(met.bfrJCA)} jours de CA** (Norme sectorielle : ${sec.benchmarks?.bfrJoursCA?.norme || '≤ 60j'}).\n- Délai clients (DSO) : **${Math.round(met.dso)} jours**\n- Délai fournisseurs (DPO) : **${Math.round(met.dpo)} jours**\n- Rotation des stocks : **${Math.round(met.rotS)} jours**\n\n💰 **Potentiel de Cash Libérable** : **${fmt(diag.totalCashLibérable)}**\n- Dont recouvrement clients : **${fmt(diag.gainDSO)}**\n- Dont surstockage : **${fmt(diag.gainStock)}**\n\n${met.bfrJCA > 60 ? '🚨 **Alerte BFR** : Votre cycle d\'exploitation consomme trop de liquidités. Activez le plan de recouvrement d\'urgence.' : '✅ Le BFR est sous contrôle et conforme aux standards sectoriels.'}`;
 
-    if (m.includes('seuil') || m.includes('point mort') || m.includes('rentabil'))
-      return `**Analyse du Seuil de Rentabilité & Marges**\n\n- Chiffre d'Affaires Net : **${fmt(met.ca)}**\n- Seuil de Rentabilité (Point Mort en DA) : **${fmt(diag.seuilRentabilite)}**\n- Point Mort en Jours : **${diag.pointMortJours} jours de CA**\n- Marge de Sécurité : **${fmt(diag.margeSecurite)}** (${pct(diag.indiceSecurite)} du CA)\n\n| Agrégat | Montant | Taux sur CA | Norme Secteur |\n|---|---|---|---|\n| Valeur Ajoutée | ${fmt(met.va)} | ${pct(met.tauxVA)} | ${sec.benchmarks?.tauxVA?.norme || '≥ 25%'} |\n| EBE | ${fmt(met.ebe)} | ${pct(met.margeEBE)} | ${sec.benchmarks?.margeEBE?.norme || '≥ 10%'} |\n| Résultat Net | ${fmt(met.rnet)} | ${pct(met.margeNette)} | ${sec.benchmarks?.margeNette?.norme || '> 0%'} |\n\n${diag.pointMortJours <= 270 ? '✅ Votre point mort est atteint tôt dans l\'année, assurant une marge de sécurité solide.' : '⚠️ Le seuil de rentabilité est tardif. Une compression des coûts fixes (masse salariale, loyers, services 61/62) est requise.'}`;
+    if (m.includes('marge') || m.includes('va') || m.includes('valeur ajoutée') || m.includes('rentabil'))
+      return `**Analyse des Marges & Partage de la Valeur Ajoutée (SCF)**\n\n- Chiffre d'Affaires Net : **${fmt(met.ca)}**\n- Valeur Ajoutée (VA) : **${fmt(met.va)}** (${pct(met.tauxVA)} du CA)\n- EBE : **${fmt(met.ebe)}** (${pct(met.margeEBE)} du CA)\n- Résultat Net : **${fmt(met.rnet)}** (${pct(met.margeNette)})\n\n📊 **Partage de la Valeur Ajoutée :**\n- Part du Personnel (63) : **${pct(diag.partPersonnel)}**\n- Part de l'État (64 + 695) : **${pct(diag.partEtat)}**\n- Part des Prêteurs (66) : **${pct(diag.partPreteurs)}**\n- Autofinancement (CAF) : **${pct(diag.partEntreprise)}**\n\n${diag.partPersonnel <= 0.65 ? '✅ Le partage de la VA est équilibré et laisse une part saine pour l\'EBE et l\'autofinancement.' : '⚠️ Le facteur travail absorbe une part prépondérante de la VA (> 65%), comprimant la marge d\'EBE.'}`;
 
     if (m.includes('caf') || m.includes('autofinancement') || m.includes('dette'))
       return `**Capacité d'Autofinancement (CAF) & Désendettement**\n\n- CAF brute générée : **${fmt(diag.caf)}** (${pct(diag.tauxCAF)} du CA)\n- Ratio Dettes Financières / CAF : **${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' an(s)' : 'N/D'}**\n- Appréciation : **${diag.capaciteRemboursementLabel}**\n\n${diag.ratioDetteSurCAF <= 3.5 ? '✅ L\'entreprise dispose d\'une capacité de remboursement saine auprès des banques.' : '🚨 Endettement excessif face à la CAF actuelle. Priorité à l\'autofinancement et au désendettement.'}`;
@@ -131,8 +131,8 @@ export function AIView({ data, geminiKey }) {
 
     content += `=== II. INDICATEURS DE HAUTE PRÉCISION ===\n`;
     content += `Capacité d'Autofinancement (CAF): ${fmt(diag.caf)}\n`;
-    content += `Seuil de Rentabilité: ${fmt(diag.seuilRentabilite)} (${diag.pointMortJours} jours de CA)\n`;
-    content += `Marge de Sécurité: ${fmt(diag.margeSecurite)} (${pct(diag.indiceSecurite)})\n`;
+    content += `Valeur Ajoutée (VA): ${fmt(analysis?.metriques?.va)} (${pct(analysis?.metriques?.tauxVA)})\n`;
+    content += `Part du Personnel dans la VA: ${pct(diag.partPersonnel)}\n`;
     content += `Cash mobilisable sur BFR: ${fmt(diag.totalCashLibérable)}\n`;
     content += `Score Banque d'Algérie: ${solv.bancaire?.scoreBA || 14}/20 (${solv.bancaire?.ratingBA || 'Favorable'})\n`;
     content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'})\n\n`;
@@ -213,7 +213,7 @@ export function AIView({ data, geminiKey }) {
             Audit & Diagnostic Financier Approfondi
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Évaluation complète : Équilibre structurel, Seuil de rentabilité, CAF, Rating Banque d'Algérie & Potentiel Cash
+            Évaluation complète : Équilibre structurel, Partage de la Valeur Ajoutée, CAF, Rating Banque d'Algérie & Potentiel Cash
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -319,43 +319,55 @@ export function AIView({ data, geminiKey }) {
           {/* 2. Grille des 4 Cartes d'Analyse Approfondie */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
 
-            {/* Carte 1 : Rentabilité & Seuil de Rentabilité (Point Mort) */}
+            {/* Carte 1 : Rentabilité & Partage de la Valeur Ajoutée */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '12px 18px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>trending_up</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase' }}>Rentabilité & Seuil de Rentabilité</span>
+                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>pie_chart</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase' }}>Rentabilité & Partage de la Valeur Ajoutée</span>
               </div>
               <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Chiffre d'Affaires Net</div>
-                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(analysis.metriques.ca)}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Valeur Ajoutée (VA)</div>
+                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(analysis.metriques.va)}</div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>{pct(analysis.metriques.tauxVA)} du CA</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>EBE (% du CA)</div>
                     <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: analysis.metriques.margeEBE >= 0.10 ? '#059669' : '#dc2626', marginTop: 2 }}>
                       {fmt(analysis.metriques.ebe)} <span style={{ fontSize: '0.75rem' }}>({pct(analysis.metriques.margeEBE)})</span>
                     </div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>Norme: {sec.benchmarks?.margeEBE?.norme || '≥10%'}</div>
                   </div>
                 </div>
 
-                {/* Point Mort & Seuil de rentabilité */}
+                {/* Décomposition du Partage de la Valeur Ajoutée */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Point Mort (Seuil de Rentabilité)</span>
-                    <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#2563eb' }}>{diag.pointMortJours} jours</span>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 8 }}>
+                    Répartition de la Richesse Créée (100% de la VA) :
                   </div>
-                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                    <div style={{ height: '100%', width: `${Math.min(100, (diag.pointMortJours / 360) * 100)}%`, background: diag.pointMortJours <= 270 ? '#10b981' : '#f59e0b', borderRadius: 4 }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    <span>Montant critique : <strong className="mono" style={{ color: '#0f172a' }}>{fmt(diag.seuilRentabilite)}</strong></span>
-                    <span>Marge de sécurité : <strong className="mono" style={{ color: '#059669' }}>{pct(diag.indiceSecurite)}</strong></span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.72rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#475569' }}>• Rémunération du Personnel (63) :</span>
+                      <strong className="mono" style={{ color: diag.partPersonnel <= 0.65 ? '#059669' : '#dc2626' }}>{pct(diag.partPersonnel)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#475569' }}>• Contribution État & Impôts (64 + 695) :</span>
+                      <strong className="mono" style={{ color: '#0f172a' }}>{pct(diag.partEtat)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#475569' }}>• Rémunération des Prêteurs (66) :</span>
+                      <strong className="mono" style={{ color: '#0f172a' }}>{pct(diag.partPreteurs)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#475569' }}>• Autofinancement & Maintien de l'Outil (CAF) :</span>
+                      <strong className="mono" style={{ color: '#2563eb' }}>{pct(diag.partEntreprise)}</strong>
+                    </div>
                   </div>
                 </div>
 
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  💡 <strong>Diagnostic :</strong> L'entreprise commence à dégager du profit après <strong>{diag.pointMortJours} jours</strong> d'activité. Le taux de marge sur coûts variables est de <strong>{pct(diag.tauxMCV)}</strong>.
+                  💡 <strong>Rentabilité des Capitaux :</strong> ROE (Rentabilité financière) : <strong>{pct(diag.roe)}</strong> · ROA (Rentabilité économique) : <strong>{pct(diag.roa)}</strong>.
                 </div>
               </div>
             </div>
@@ -708,8 +720,8 @@ export function AIView({ data, geminiKey }) {
                   questions: ['Pourquoi mon BFR est-il élevé ?', 'Mon FRNG couvre-t-il mon BFR ?', 'État de ma trésorerie nette ?', 'Quel est le cash mobilisable sur mon BFR ?']
                 },
                 {
-                  theme: '📈 Rentabilité & Point Mort', color: '#7c3aed',
-                  questions: ['Quel est mon seuil de rentabilité (point mort) ?', 'Analysez mes marges et rentabilité', 'Où est passée ma Valeur Ajoutée ?', 'Mon EBE est-il suffisant ?']
+                  theme: '📈 Marges & Valeur Ajoutée', color: '#7c3aed',
+                  questions: ['Comment est répartie ma Valeur Ajoutée ?', 'Analysez mes marges et rentabilité', 'Où est passée ma Valeur Ajoutée ?', 'Mon EBE est-il suffisant ?']
                 },
                 {
                   theme: '🔍 Audit Soldes & SCF', color: '#dc2626',

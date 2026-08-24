@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    BAIQ — Moteur d'Analyse IA & Diagnostic Financier Approfondi
    Diagnostic multidimensionnel de haute précision (SCF Algérie — Loi 07-11)
-   Analyse structurelle, rentabilité, seuil de rentabilité, CAF, effet de levier,
+   Analyse structurelle, rentabilité, partage de la VA, CAF, effet de levier,
    solvabilité Banque d'Algérie, Altman Z'' et plan d'action stratégique chiffré.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -34,7 +34,6 @@ export function runAIAnalysis(data) {
   const cchfin   = s.chargesFinancieres || 0;
   const impots   = s.impotsBenefices || s.impotsSurResultats || 0;
   const achats   = s.achatsConsommes || s.achats || s.consommationExercice || 0;
-  const servicesExt = s.servicesExterieurs || 0;
 
   // ── 2. Marges & Ratios de Performance Économique ──
   const margeEBE        = safe(ebe, ca);
@@ -58,27 +57,19 @@ export function runAIAnalysis(data) {
     ratioDetteSurCAF <= 3.5 ? 'Normale (2 à 3.5 ans)' :
     ratioDetteSurCAF <= 5.0 ? 'Tendue (3.5 à 5 ans)' : 'Critique (> 5 ans)';
 
-  // ── 4. Seuil de Rentabilité & Point Mort (Break-Even Analysis) ──
-  // Coûts variables = Achats consommés + 40% des services extérieurs
-  const coutsVariables = achats + (servicesExt * 0.40);
-  const margeCoutsVariables = Math.max(0, ca - coutsVariables);
-  const tauxMCV = safe(margeCoutsVariables, ca);
+  // ── 4. Partage & Répartition de la Valeur Ajoutée (SCF) ──
+  const partPersonnel    = safe(cpers, va);            // Facteur travail (Compte 63)
+  const partEtat         = safe(cimp + impots, va);    // Impôts & Taxes (64 + 695)
+  const partPreteurs     = safe(cchfin, va);           // Charges financières (66)
+  const partEntreprise   = safe(caf, va);              // Autofinancement & renouvellement
+  const partActionnaires = safe(rnet, va);             // Rémunération des capitaux propres
 
-  // Coûts fixes = Masse salariale + 60% services extérieurs + Impôts production + Dotations amort. + Charges fin.
-  const coutsFixes = cpers + (servicesExt * 0.60) + cimp + dotam + cchfin;
-  
-  // Seuil de rentabilité (SR) en DA et Point Mort en jours
-  const seuilRentabilite = tauxMCV > 0 ? safe(coutsFixes, tauxMCV) : 0;
-  const pointMortJours = ca > 0 ? Math.min(365, Math.round(safe(seuilRentabilite, ca) * 360)) : 0;
-  const margeSecurite = Math.max(0, ca - seuilRentabilite);
-  const indiceSecurite = safe(margeSecurite, ca);
-
-  // ── 5. Rentabilité des Capitaux & Effet de Levier ──
+  // ── 5. Rentabilité des Capitaux & Effet de Levier Financier ──
   const capitauxPropres = solv.bancaire?.capitauxPropres || (b.ressourcesStables ? b.ressourcesStables * 0.6 : 1);
   const actifTotal = (b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0) || 1;
-  const roe = safe(rnet, capitauxPropres); // Return on Equity
-  const roa = safe(reop, actifTotal);     // Return on Assets
-  const effetLevier = roe - roa;
+  const roe = safe(rnet, capitauxPropres); // Return on Equity (Rentabilité Financière)
+  const roa = safe(reop, actifTotal);     // Return on Assets (Rentabilité Économique)
+  const effetLevier = roe - roa;          // Effet de levier financier
 
   // ── 6. Équilibre Fonctionnel & Trésorerie ──
   const liq    = r.liquiditeGenerale    || 0;
@@ -204,7 +195,7 @@ export function runAIAnalysis(data) {
     scoreGlobal >= 28 ? { label: 'Vulnérable & Préoccupante', color: '#f97316', emoji: '🟠' } :
                         { label: 'Critique & Risque Majeur', color: '#dc2626', emoji: '🔴' };
 
-  // ── 12. Forces Détaillées (Avec Impacts Stratégiques) ──
+  // ── 12. Forces Détaillées ──
   const forces = [];
   if (rnet > 0 && margeNette >= bm.margeNette.bon)
     forces.push({ titre: `Rentabilité nette de haut niveau (${pct(margeNette)})`, detail: `Génération d'un résultat net de ${fmtDZD(rnet)}, surpassant le benchmark sectoriel de ${bm.margeNette.norme}. Capacité avérée à transformer le CA en enrichissement des actionnaires.`, cat: 'Rentabilité', score: 95 });
@@ -212,7 +203,7 @@ export function runAIAnalysis(data) {
     forces.push({ titre: `Activité bénéficiaire (${pct(margeNette)})`, detail: `Résultat net positif de ${fmtDZD(rnet)}. L'entreprise préserve sa rentabilité même si la marge nette reste perfectible face à la norme (${bm.margeNette.norme}).`, cat: 'Rentabilité', score: 65 });
 
   if (ebe > 0 && margeEBE >= bm.margeEBE.bon)
-    forces.push({ titre: `Excédent Brut d'Exploitation robuste (${pct(margeEBE)} du CA)`, detail: `EBE de ${fmtDZD(ebe)}. La marge brute d'exploitation couvre largement le renouvellement de l'outil industriel et les frais financiers.`, cat: 'EBE & Cash', score: 90 });
+    forces.push({ titre: `Excédent Brut d'Exploitation robuste (${pct(margeEBE)} du CA)`, detail: `EBE de ${fmtDZD(ebe)}. La marge brute d'exploitation couvre largement le renouvellement de l'outil de production et les frais financiers.`, cat: 'EBE & Cash', score: 90 });
 
   if (frng > 0)
     forces.push({ titre: `Équilibre structurel du bilan assuré (FRNG positif)`, detail: `FRNG de ${fmtDZD(frng)}. Les ressources durables financent 100% des immobilisations et dégagent un matelas de sécurité pour l'exploitation.`, cat: 'Équilibre Fonctionnel', score: 85 });
@@ -236,9 +227,9 @@ export function runAIAnalysis(data) {
     forces.push({ titre: `Capacité d'extinction de la dette rapide (${fmtNum(ratioDetteSurCAF)} an(s))`, detail: `La CAF générée permettrait de solder la totalité des dettes financières à long terme en moins de 2.5 ans.`, cat: 'Dette & Solvabilité', score: 89 });
 
   if (evolutions?.caGrowth > 0.05)
-    forces.push({ titre: `Dynamique commerciale positive (+${pct(evolutions.caGrowth)} de CA)`, detail: `Croissance confirmée par rapport à l'exercice précédent. Expansion de la part de marché.`, cat: 'Croissance', score: 90 });
+    forces.push({ titre: `Dynamique commerciale positive (+${pct(evolutions.caGrowth)} de CA)`, detail: `Croissance confirmée par rapport à l'exercice précédent. Expansion de l'activité.`, cat: 'Croissance', score: 90 });
 
-  // ── 13. Faiblesses Détaillées (Avec Risques & Vulnérabilités) ──
+  // ── 13. Faiblesses Détaillées ──
   const faiblesses = [];
   if (rnet <= 0)
     faiblesses.push({ titre: `Résultat net déficitaire (${fmtDZD(rnet)})`, detail: `Destruction de valeur sur l'exercice. L'entité n'a pas dégagé de profit pour rémunérer les capitaux propres ni consolider ses réserves.`, cat: 'Rentabilité', severite: 'critique' });
@@ -366,7 +357,7 @@ export function runAIAnalysis(data) {
       horizon: '1 à 6 mois',
       categorie: 'Marge & Rentabilité',
       action: `Rehaussement de la marge d'EBE vers la cible de ${bm.margeEBE.norme}`,
-      detail: `La marge d'EBE (${pct(margeEBE)}) doit être améliorée pour assurer un autofinancement sain. Le seuil de rentabilité est actuellement de ${fmtDZD(seuilRentabilite)} (${pointMortJours} jours).`,
+      detail: `La marge d'EBE (${pct(margeEBE)}) doit être améliorée pour assurer un autofinancement sain. Le poids salarial absorbe ${pct(poidsPersonnel)} de la VA.`,
       etapes: [
         'Auditer les consommations de matières et réduire les rebuts dans les comptes 601/602.',
         'Renégocier les contrats de sous-traitance et de prestations externes (Comptes 61/62).',
@@ -403,8 +394,8 @@ export function runAIAnalysis(data) {
 
   // ── 15. Synthèse Exécutive Structurée ──
   const resume = buildResume({
-    scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, liq, autFin, dso, rotS, bfrJCA,
-    margeNette, margeEBE, caf, seuilRentabilite, pointMortJours, secteur, profil, evolutions,
+    scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, rotS, bfrJCA,
+    margeNette, margeEBE, caf, secteur, profil, evolutions,
     nbForces: forces.length, nbFaiblesses: faiblesses.length, totalCashLibérable, solv
   });
 
@@ -421,13 +412,11 @@ export function runAIAnalysis(data) {
       tauxCAF,
       ratioDetteSurCAF,
       capaciteRemboursementLabel,
-      seuilRentabilite,
-      pointMortJours,
-      margeSecurite,
-      indiceSecurite,
-      coutsVariables,
-      coutsFixes,
-      tauxMCV,
+      partPersonnel,
+      partEtat,
+      partPreteurs,
+      partEntreprise,
+      partActionnaires,
       roe,
       roa,
       effetLevier,
@@ -448,19 +437,19 @@ export function runAIAnalysis(data) {
     metriques: {
       ca, va, ebe, reop, rnet, cpers, dotam, cchfin, caf, margeEBE, margeOper, margeNette,
       tauxVA, productivite, couvertureFin, liq, autFin, dso, dpo, rotS, bfrJCA, frng, bfr, tn,
-      caParSalarie, vaParSalarie, seuilRentabilite, pointMortJours, totalCashLibérable
+      caParSalarie, vaParSalarie, totalCashLibérable
     },
   };
 }
 
-function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, rotS, margeNette, margeEBE, caf, seuilRentabilite, pointMortJours, secteur, profil, evolutions, nbForces, nbFaiblesses, totalCashLibérable, solv }) {
+function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, rotS, margeNette, margeEBE, caf, secteur, profil, evolutions, nbForces, nbFaiblesses, totalCashLibérable, solv }) {
   const pct_ = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
   const fmt_ = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 });
 
   const companyName = profil.nomEntreprise ? `**${profil.nomEntreprise}**` : "l'entreprise";
   const intro = `Diagnostic financier approfondi de ${companyName} (${secteur.label}) : santé globale évaluée à ${niveau.emoji} **${niveau.label}** (${scoreGlobal}/100).\n\n`;
 
-  const activite = `• **Activité & Rentabilité** : CA de **${fmt_(ca)} DZD**${evolutions?.caGrowth ? ` (${evolutions.caGrowth > 0 ? '+' : ''}${pct_(evolutions.caGrowth)} vs N-1)` : ''}, EBE de **${fmt_(ebe)} DZD** (${pct_(margeEBE)} du CA) et Résultat Net de **${fmt_(rnet)} DZD** (${pct_(margeNette)}). Le seuil de rentabilité est atteint au bout de **${pointMortJours} jours** de CA (${fmt_(seuilRentabilite)} DZD).\n`;
+  const activite = `• **Activité & Rentabilité** : CA de **${fmt_(ca)} DZD**${evolutions?.caGrowth ? ` (${evolutions.caGrowth > 0 ? '+' : ''}${pct_(evolutions.caGrowth)} vs N-1)` : ''}, EBE de **${fmt_(ebe)} DZD** (${pct_(margeEBE)} du CA) et Résultat Net de **${fmt_(rnet)} DZD** (${pct_(margeNette)}).\n`;
 
   const equilibre = `• **Équilibre & Liquidité** : FRNG de **${fmt_(frng)} DZD** face à un BFR de **${fmt_(bfr)} DZD**, générant une Trésorerie Nette de **${fmt_(tn)} DZD**. Capacité d'autofinancement (CAF) : **${fmt_(caf)} DZD**.\n`;
 
@@ -509,16 +498,20 @@ Effectue une analyse financière approfondie, critique, chiffrée et ultra-rigou
 - Rotation Moyenne des Stocks : ${Math.round(m.rotS)} jours (Norme sectorielle : ${sec.benchmarks?.rotationStocks?.norme})
 - Cash potentiel mobilisable par optimisation du BFR : ${fmt(diag.totalCashLibérable)} (DSO : ${fmt(diag.gainDSO)}, Stocks : ${fmt(diag.gainStock)})
 
-## IV. RENTABILITÉ ÉCONOMIQUE, MARGES & SEUIL DE RENTABILITÉ
+## IV. RENTABILITÉ ÉCONOMIQUE, MARGES & PARTAGE DE LA VALEUR AJOUTÉE
 - Chiffre d'Affaires Net HT : ${fmt(s.chiffreAffaires)}
 - Valeur Ajoutée (VA) : ${fmt(s.valeurAjoutee)} (${pct_(m.tauxVA)} du CA - Norme : ${sec.benchmarks?.tauxVA?.norme})
-- Poids des Charges de Personnel (63) dans la VA : ${pct_(safe(s.chargesPersonnel, s.valeurAjoutee))}
+- Partage de la Valeur Ajoutée :
+  * Part du Personnel (63) : ${pct_(diag.partPersonnel)}
+  * Part de l'État (64 + 695) : ${pct_(diag.partEtat)}
+  * Part des Prêteurs (66) : ${pct_(diag.partPreteurs)}
+  * Part de l'Autofinancement (CAF) : ${pct_(diag.partEntreprise)}
+  * Part du Résultat Net : ${pct_(diag.partActionnaires)}
 - Excédent Brut d'Exploitation (EBE) : ${fmt(s.ebe)} (${pct_(m.margeEBE)} du CA - Norme : ${sec.benchmarks?.margeEBE?.norme})
 - Résultat d'Exploitation (EBIT) : ${fmt(s.resultatExploitation)} (${pct_(m.margeOper)} du CA)
 - Résultat Net Final : ${fmt(s.resultatNet)} (${pct_(m.margeNette)} du CA - Norme : ${sec.benchmarks?.margeNette?.norme})
-- Seuil de Rentabilité (Point Mort) : ${fmt(diag.seuilRentabilite)} (${diag.pointMortJours} jours de CA)
-- Marge de Sécurité : ${fmt(diag.margeSecurite)} (Indice : ${pct_(diag.indiceSecurite)})
 - Rentabilité des Capitaux Propres (ROE) : ${pct_(diag.roe)} | Rentabilité Économique (ROA) : ${pct_(diag.roa)}
+- Effet de Levier Financier (ROE - ROA) : ${pct_(diag.effetLevier)}
 
 ## V. SOLVABILITÉ, RATING BANQUE D'ALGÉRIE & RISQUE DE DÉFAILLANCE
 - Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA || 14} / 20 (Rating : ${solv.bancaire?.ratingBA || 'Favorable'})
@@ -567,10 +560,10 @@ Structure impérative du rapport :
 - Diagnostic de la couverture des emplois stables par les ressources durables
 - Analyse de la Capacité d'Autofinancement (CAF) et de la capacité d'extinction de la dette
 
-### 3. DIAGNOSTIC DE LA RENTABILITÉ & STRUCTURE DES COÛTS (SIG / TCR)
+### 3. DIAGNOSTIC DE LA RENTABILITÉ & PARTAGE DE LA VALEUR AJOUTÉE (SIG / TCR)
 - Analyse de la cascade des soldes intermédiaires : Chiffre d'affaires, Valeur Ajoutée, EBE, Résultat d'Exploitation, Résultat Net
-- Analyse du seuil de rentabilité (Point mort en DZD et en nombre de jours de CA) et marge de sécurité
-- Diagnostic du poids de la masse salariale (Charges de personnel / VA) et productivité
+- Analyse de la répartition de la Valeur Ajoutée (Personnel, État, Prêteurs, Autofinancement, Actionnaires)
+- Diagnostic de la rentabilité financière (ROE), économique (ROA) et de l'effet de levier
 
 ### 4. GESTION DU BFR & POTENTIEL DE TRÉSORERIE DÉBLOCABLE
 - Analyse croisée des 3 délais : DSO Clients, DPO Fournisseurs et Rotation des Stocks vs Normes Sectorielles
@@ -600,8 +593,7 @@ Structure impérative :
 
 ### 2. PLAN D'OPTIMISATION DE LA RENTABILITÉ & CHARGES (90 JOURS)
 - Analyse des postes de charges réductibles (Comptes 60, 61, 62)
-- Calcul de l'abaissement du point mort (${analysis?.diagnosticAvance?.pointMortJours || 0} jours)
-- Amélioration de la productivité du travail
+- Amélioration de la productivité du travail et maîtrise du ratio Charges de personnel / VA
 
 ### 3. PLAN DE RESTRUCTURATION DU BILAN & FONDS PROPRES (1 AN)
 - Consolidation du FRNG et refinancement des investissements
