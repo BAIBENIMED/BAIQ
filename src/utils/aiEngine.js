@@ -12,6 +12,7 @@ const safe = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 const pct  = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
 const days = (v) => `${Math.round(v || 0)} jours`;
 const fmtDZD = (v) => (v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DZD';
+const fmtNum = (v, d = 1) => (v != null && isFinite(v) ? Number(v).toFixed(d) : '—');
 
 /* ─── Moteur d'Analyse Approfondie ─────────────────────────── */
 export function runAIAnalysis(data) {
@@ -465,13 +466,15 @@ function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, r
 /* ─── Générateur de Rapports Structurés Locaux Immédiats ─── */
 export function generateLocalStructuredReport(data, reportType = 'audit_diagnostic') {
   if (!data) return '';
-  const a = runAIAnalysis(data);
-  const m = a.metriques;
-  const diag = a.diagnosticAvance || {};
-  const solv = a.solvabilite || {};
-  const sec = a.secteur || {};
-  const b = data.bilan || {};
-  const s = data.sig || {};
+  try {
+    const a = runAIAnalysis(data);
+    if (!a) return '';
+    const m = a.metriques || {};
+    const diag = a.diagnosticAvance || {};
+    const solv = a.solvabilite || {};
+    const sec = a.secteur || {};
+    const b = data.bilan || {};
+    const s = data.sig || {};
 
   const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
   const company = a.profil?.nomEntreprise || 'Entité sous revue';
@@ -640,6 +643,10 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
   }
 
   return '';
+  } catch (err) {
+    console.error('Erreur generateLocalStructuredReport:', err);
+    return '';
+  }
 }
 
 /* ─── Construction du Contexte pour Gemini ─── */
