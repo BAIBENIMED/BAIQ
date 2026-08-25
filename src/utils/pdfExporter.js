@@ -820,12 +820,12 @@ export async function generateFullPDF(data) {
       if (p2 === '47' && (sd + sc) > 0.01) {
         anomaliesList.push([c, r.libelle || 'Attente', 'COMPTE D\'ATTENTE NON SOLDÉ', 'Régularisation requise avant arrêté', fmtDZD(sd + sc)]);
       }
-      // 5. Charges créditrices (hors 609)
-      if (cl === '6' && p3 !== '609' && isC) {
+      // 5. Charges créditrices (hors 609, 619, 629, 603, 69x, 692)
+      if (cl === '6' && p3 !== '609' && p3 !== '619' && p3 !== '629' && p3 !== '603' && !c.startsWith('69') && !c.startsWith('692') && isC) {
         anomaliesList.push([c, r.libelle || 'Charge', 'CHARGE CRÉDITRICE', 'Compte classe 6 anormalement créditeur', fmtDZD(sc)]);
       }
-      // 6. Produits débiteurs (hors 709)
-      if (cl === '7' && p3 !== '709' && isD) {
+      // 6. Produits débiteurs (hors 709, 72x, 724)
+      if (cl === '7' && p3 !== '709' && !c.startsWith('72') && !c.startsWith('724') && isD) {
         anomaliesList.push([c, r.libelle || 'Produit', 'PRODUIT DÉBITEUR', 'Compte classe 7 anormalement débiteur', fmtDZD(sd)]);
       }
     });

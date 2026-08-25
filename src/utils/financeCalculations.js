@@ -372,6 +372,19 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
         diagnostic: isDeb ? 'Solde débiteur sur RRR obtenus.' : 'RRR obtenus réguliers (diminution des charges).'
       };
     }
+    // 692 — Participation des salariés aux résultats (MIXTE : Débiteur ou Créditeur admis)
+    // Créditeur admis en cas d'extourne, résultat déficitaire ou régularisation de provision
+    if (c.startsWith('692')) {
+      return {
+        classe: 6, classeLabel: '6 — Participation Salariés (Compte 692)', nature: 'Participation des salariés aux résultats de l\'entreprise', sensAttendu: 'MIXTE',
+        statut: 'CONFORME',
+        diagnostic: isDeb
+          ? 'Participation des salariés aux résultats (Charge régulière, solde débiteur).'
+          : isCred
+          ? 'Solde créditeur admis SCF : Extourne de provision, résultat déficitaire ou régularisation de la participation.'
+          : 'Participation des salariés soldée (Solde nul).'
+      };
+    }
     return {
       classe: 6, classeLabel: '6 — Charges d\'Exploitation/Financières', nature: 'Achats, services, personnel, dotations & impôts', sensAttendu: 'DÉBITEUR',
       statut: isCred ? 'ANOMALIE' : 'CONFORME',
@@ -397,6 +410,19 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
         classe: 7, classeLabel: '7 — Rabais accordés', nature: 'Rabais, remises et ristournes accordés par l\'entreprise', sensAttendu: 'DÉBITEUR',
         statut: isCred ? 'ATYPIQUE' : 'CONFORME',
         diagnostic: isCred ? 'Solde créditeur sur RRR accordés.' : isDeb ? 'RRR accordés réguliers (diminution du chiffre d\'affaires).' : 'Compte RRR accordés soldé (Solde nul).'
+      };
+    }
+    // 724 — Production immobilisée (Corporelles) : MIXTE — peut être débiteur
+    // (annulation de production immobilisée, correction d'imputation, mise au rebut en cours d'exercice)
+    if (c.startsWith('724')) {
+      return {
+        classe: 7, classeLabel: '7 — Production Immobilisée Corporelle (Compte 724)', nature: 'Production immobilisée — Immobilisations corporelles produites par l\'entreprise pour elle-même', sensAttendu: 'MIXTE',
+        statut: 'CONFORME',
+        diagnostic: isDeb
+          ? 'Solde débiteur admis SCF : Annulation ou correction de production immobilisée corporelle (compte correcteur).'
+          : isCred
+          ? 'Production immobilisée corporelle régulière (Produit interne, solde créditeur).'
+          : 'Compte de production immobilisée soldé (Solde nul).'
       };
     }
     return {
