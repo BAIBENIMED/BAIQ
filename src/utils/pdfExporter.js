@@ -479,9 +479,9 @@ export async function generateFullPDF(data) {
 
   // Rangée KPI LaTeX
   y = latexKpiRow(doc, [
-    { label: 'FRNG (Ressources - Emplois)', val: fmtDZD(frng), sub: frng >= 0 ? '✓ Excédent structurel' : '✗ Déficit structurel', status: frng >= 0 ? 'ok' : 'danger' },
+    { label: 'FRNG (Ressources - Emplois)', val: fmtDZD(frng), sub: frng >= 0 ? 'Excédent structurel' : 'Déficit structurel', status: frng >= 0 ? 'ok' : 'danger' },
     { label: 'BFR (Besoin en Fonds de Roulement)', val: fmtDZD(bfr), sub: `${fmtDays(bfrJours)} de CA HT`, status: 'normal' },
-    { label: 'Trésorerie Nette (TN)', val: fmtDZD(tn), sub: tn >= 0 ? '✓ Position de liquidité saine' : '✗ Recours aux concours CT', status: tn >= 0 ? 'ok' : 'danger' },
+    { label: 'Trésorerie Nette (TN)', val: fmtDZD(tn), sub: tn >= 0 ? 'Position de liquidité saine' : 'Recours aux concours CT', status: tn >= 0 ? 'ok' : 'danger' },
   ], y);
 
   y = latexSubSection(doc, '1.1. Tableau Synthétique des Masses Fonctionnelles', y);
@@ -580,20 +580,20 @@ export async function generateFullPDF(data) {
 
   const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'SEUIL CRITIQUE', 'APPRÉCIATION']];
   const liqBody = [
-    ['Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00', liqGen >= 1.2 ? '✓ Satisfaisant' : liqGen >= 1.0 ? '△ Limite' : '✗ Alerte sous-liquidité'],
-    ['Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(r.liquiditeReduite), '< 0.80', (r.liquiditeReduite || 0) >= 0.8 ? '✓ Conforme' : '△ Dépendance aux stocks'],
-    ['Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %', autFinanc >= 0.35 ? '✓ Excellente autonomie' : autFinanc >= 0.25 ? '△ Acceptable' : '✗ Dépendance aux dettes'],
-    ['Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', fmtNum(r.solvabilite), '< 1.50', (r.solvabilite || 0) >= 2.0 ? '✓ Solvable' : '△ À surveiller'],
-    ['Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x', safeDiv(ebe, s.chargesFinancieres) >= 3 ? '✓ Couverture large' : '✗ Tension de charge'],
+    ['Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00', liqGen >= 1.2 ? 'Satisfaisant' : liqGen >= 1.0 ? 'Limite' : 'Alerte sous-liquidité'],
+    ['Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(r.liquiditeReduite), '< 0.80', (r.liquiditeReduite || 0) >= 0.8 ? 'Conforme' : 'Dépendance aux stocks'],
+    ['Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %', autFinanc >= 0.35 ? 'Excellente autonomie' : autFinanc >= 0.25 ? 'Acceptable' : 'Dépendance aux dettes'],
+    ['Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', fmtNum(r.solvabilite), '< 1.50', (r.solvabilite || 0) >= 2.0 ? 'Solvable' : 'À surveiller'],
+    ['Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x', safeDiv(ebe, s.chargesFinancieres) >= 3 ? 'Couverture large' : 'Tension de charge'],
   ];
 
   y = drawBooktabsTable(doc, liqHead, liqBody, y, {
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 42 },
-      1: { fontStyle: 'italic', cellWidth: 54 },
+      1: { fontStyle: 'italic', cellWidth: 48 },
       2: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
-      3: { halign: 'center', cellWidth: 24 },
-      4: { cellWidth: 32 }
+      3: { halign: 'center', cellWidth: 26 },
+      4: { cellWidth: 36 }
     }
   });
 
@@ -601,18 +601,18 @@ export async function generateFullPDF(data) {
 
   const rentHead = [['RATIO DE RENTABILITÉ', 'VALEUR N', 'RÉFÉRENTIEL', 'ANALYSE DU RENDEMENT']];
   const rentBody = [
-    ['Taux de Valeur Ajoutée (VA / CA)', fmtPct(tauxVA), '≥ 25.0 %', tauxVA >= 0.30 ? '✓ Forte création de richesse brute' : '△ Poids élevé des achats consommés'],
-    ['Marge d\'EBE (EBE / CA)', fmtPct(margeEBE), '≥ 10.0 %', margeEBE >= 0.12 ? '✓ Excellente marge brute d\'exploitation' : '△ Marge opérationnelle comprimée'],
-    ['Marge Opérationnelle (RE / CA)', fmtPct(margeExploit), '≥ 6.0 %', margeExploit >= 0.08 ? '✓ Activité commerciale hautement rentable' : '△ Rentabilité opérationnelle modérée'],
-    ['Marge Nette Finale (RN / CA)', fmtPct(margeNette), '> 0.0 %', margeNette >= 0.05 ? '✓ Taux de profit net confortable' : rn >= 0 ? '△ Marge bénéficiaire étroite' : '✗ Exercice en perte nette'],
+    ['Taux de Valeur Ajoutée (VA / CA)', fmtPct(tauxVA), '>= 25.0 %', tauxVA >= 0.30 ? 'Forte création de richesse brute' : 'Poids élevé des achats consommés'],
+    ['Marge d\'EBE (EBE / CA)', fmtPct(margeEBE), '>= 10.0 %', margeEBE >= 0.12 ? 'Excellente marge brute d\'exploitation' : 'Marge opérationnelle comprimée'],
+    ['Marge Opérationnelle (RE / CA)', fmtPct(margeExploit), '>= 6.0 %', margeExploit >= 0.08 ? 'Activité commerciale hautement rentable' : 'Rentabilité opérationnelle modérée'],
+    ['Marge Nette Finale (RN / CA)', fmtPct(margeNette), '> 0.0 %', margeNette >= 0.05 ? 'Taux de profit net confortable' : rn >= 0 ? 'Marge bénéficiaire étroite' : 'Exercice en perte nette'],
   ];
 
   y = drawBooktabsTable(doc, rentHead, rentBody, y, {
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 55 },
-      1: { halign: 'right', fontStyle: 'bold', cellWidth: 25 },
-      2: { halign: 'center', cellWidth: 25 },
-      3: { cellWidth: 65 }
+      0: { fontStyle: 'bold', cellWidth: 52 },
+      1: { halign: 'right', fontStyle: 'bold', cellWidth: 24 },
+      2: { halign: 'center', cellWidth: 30 },
+      3: { cellWidth: 68 }
     }
   });
 
@@ -620,18 +620,18 @@ export async function generateFullPDF(data) {
 
   const actHead = [['CYCLE / DÉLAI D\'EXPLOITATION', 'VALEUR N', 'NORME SCF', 'IMPACT SUR LE CASH']];
   const actBody = [
-    ['DSO — Délai de Recouvrement Clients', fmtDays(dso), '≤ 60 j', dso <= 60 ? '✓ Recouvrement rapide et fluide' : '✗ Risque d\'immobilisation de cash client'],
-    ['DPO — Délai de Paiement Fournisseurs', fmtDays(dpo), '30 à 75 j', dpo >= 30 && dpo <= 75 ? '✓ Financement fournisseur équilibré' : '△ Décalage de règlement à optimiser'],
-    ['Rotation Moyenne des Stocks', fmtDays(rotStock), '≤ 90 j', rotStock <= 90 ? '✓ Vélocité satisfaisante des stocks' : '✗ Risque de surstockage et dépréciation'],
-    ['BFR Exprimé en Jours de Chiffre d\'Affaires', fmtDays(bfrJours), '≤ 60 j', bfrJours <= 60 ? '✓ Besoin en fonds de roulement maîtrisé' : '✗ BFR trop lourd nécessitant du cash'],
+    ['DSO — Délai de Recouvrement Clients', fmtDays(dso), '<= 60 j', dso <= 60 ? 'Recouvrement rapide et fluide' : 'Risque d\'immobilisation de cash client'],
+    ['DPO — Délai de Paiement Fournisseurs', fmtDays(dpo), '30 à 75 j', dpo >= 30 && dpo <= 75 ? 'Financement fournisseur équilibré' : 'Décalage de règlement à optimiser'],
+    ['Rotation Moyenne des Stocks', fmtDays(rotStock), '<= 90 j', rotStock <= 90 ? 'Vélocité satisfaisante des stocks' : 'Risque de surstockage et dépréciation'],
+    ['BFR Exprimé en Jours de Chiffre d\'Affaires', fmtDays(bfrJours), '<= 60 j', bfrJours <= 60 ? 'Besoin en fonds de roulement maîtrisé' : 'BFR trop lourd nécessitant du cash'],
   ];
 
   y = drawBooktabsTable(doc, actHead, actBody, y, {
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 65 },
+      0: { fontStyle: 'bold', cellWidth: 62 },
       1: { halign: 'right', fontStyle: 'bold', cellWidth: 24 },
-      2: { halign: 'center', cellWidth: 24 },
-      3: { cellWidth: 57 }
+      2: { halign: 'center', cellWidth: 28 },
+      3: { cellWidth: 60 }
     }
   });
 
@@ -835,8 +835,8 @@ export async function generateFullPDF(data) {
 
   y = latexKpiRow(doc, [
     { label: 'Lignes de Balance Contrôlées', val: `${rows.length} comptes`, sub: 'Périmètre exhaustif SCF', status: 'normal' },
-    { label: 'Anomalies Détectées', val: `${anomaliesList.length} anomalies`, sub: anomaliesList.length === 0 ? '✓ Aucune anomalie' : 'À régulariser', status: anomaliesList.length === 0 ? 'ok' : 'danger' },
-    { label: 'Taux de Conformité SCF', val: `${conformiteScore} %`, sub: conformiteScore >= 95 ? '✓ Excellente régularité' : 'Contrôle approfondi', status: conformiteScore >= 95 ? 'ok' : 'danger' },
+    { label: 'Anomalies Détectées', val: `${anomaliesList.length} anomalies`, sub: anomaliesList.length === 0 ? 'Aucune anomalie' : 'À régulariser', status: anomaliesList.length === 0 ? 'ok' : 'danger' },
+    { label: 'Taux de Conformité SCF', val: `${conformiteScore} %`, sub: conformiteScore >= 95 ? 'Excellente régularité' : 'Contrôle approfondi', status: conformiteScore >= 95 ? 'ok' : 'danger' },
   ], y);
 
   if (anomaliesList.length === 0) {
