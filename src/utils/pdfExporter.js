@@ -468,10 +468,10 @@ export async function generateFullPDF(data) {
 
   y = latexSection(doc, '1', 'Équilibre Financier & Bilan Fonctionnel (SCF)', y);
 
-  // Formule mathématique LaTeX
+  // Formule mathématique
   y = latexMathBox(
     doc,
-    '\\text{FRNG} = \\text{Ressources Stables} - \\text{Emplois Stables} \\qquad \\text{TN} = \\text{FRNG} - \\text{BFR}',
+    'FRNG = Ressources Stables - Emplois Stables     |     TN = FRNG - BFR',
     'Règle d\'or de l\'équilibre : Le Fonds de Roulement Net Global doit couvrir l\'intégralité du BFR d\'exploitation.',
     y,
     17
@@ -522,10 +522,10 @@ export async function generateFullPDF(data) {
 
   y = latexSection(doc, '2', 'Soldes Intermédiaires de Gestion (SIG / TCR SCF)', y);
 
-  // Formule mathématique SIG
+  // Formule SIG
   y = latexMathBox(
     doc,
-    '\\text{VA} = \\text{Production} - \\text{Consommations} \\qquad \\text{EBE} = \\text{VA} - \\text{Personnel (63)} - \\text{Impôts (64)}',
+    'VA = Production - Consommations     |     EBE = VA - Personnel (63) - Impôts (64)',
     'Décomposition en cascade des agrégats de rentabilité selon la nomenclature officielle Loi 07-11.',
     y,
     17
@@ -646,7 +646,7 @@ export async function generateFullPDF(data) {
   if (!dataN1) {
     y = latexMathBox(
       doc,
-      '\\text{Exercice Comparative } N-1 \\text{ : Non Fourni}',
+      'Exercice Comparatif N-1 : Non Fourni',
       'Pour activer l\'analyse comparative dynamique des flux et des soldes, veuillez importer la balance de l\'exercice N-1 dans l\'application.',
       y,
       20
@@ -842,7 +842,7 @@ export async function generateFullPDF(data) {
   if (anomaliesList.length === 0) {
     y = latexMathBox(
       doc,
-      '\\text{Audit des Soldes SCF : Conforme à 100\\%}',
+      'Audit des Soldes SCF : Conforme à 100 %',
       'Toutes les natures de comptes (classes 1 à 7) respectent rigoureusement les sens normaux de soldes prévus par le Système Comptable Financier.',
       y,
       18
