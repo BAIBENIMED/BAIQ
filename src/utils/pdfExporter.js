@@ -579,12 +579,29 @@ export async function generateFullPDF(data) {
   y = latexSubSection(doc, '3.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
 
   const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'SEUIL CRITIQUE', 'APPRÉCIATION']];
+  const liqRedVal = r.liquiditeReduite || 0;
+  const solvVal   = r.solvabilite    || 0;
   const liqBody = [
-    ['Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00', liqGen >= 1.2 ? 'Satisfaisant' : liqGen >= 1.0 ? 'Limite' : 'Alerte sous-liquidité'],
-    ['Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(r.liquiditeReduite), '< 0.80', (r.liquiditeReduite || 0) >= 0.8 ? 'Conforme' : 'Dépendance aux stocks'],
-    ['Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %', autFinanc >= 0.35 ? 'Excellente autonomie' : autFinanc >= 0.25 ? 'Acceptable' : 'Dépendance aux dettes'],
-    ['Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', fmtNum(r.solvabilite), '< 1.50', (r.solvabilite || 0) >= 2.0 ? 'Solvable' : 'À surveiller'],
-    ['Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x', safeDiv(ebe, s.chargesFinancieres) >= 3 ? 'Couverture large' : 'Tension de charge'],
+    [
+      'Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00',
+      liqGen >= 2.0 ? 'Très satisfaisante' : liqGen >= 1.2 ? 'Satisfaisante' : liqGen >= 1.0 ? 'Limite' : 'Alerte sous-liquidité'
+    ],
+    [
+      'Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(liqRedVal), '< 0.80',
+      liqRedVal >= 1.5 ? 'Très satisfaisante' : liqRedVal >= 1.0 ? 'Satisfaisante' : liqRedVal >= 0.8 ? 'Acceptable' : 'Dépendance aux stocks'
+    ],
+    [
+      'Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %',
+      autFinanc >= 0.50 ? 'Excellente autonomie' : autFinanc >= 0.35 ? 'Bonne autonomie' : autFinanc >= 0.25 ? 'Acceptable' : 'Dépendance aux dettes'
+    ],
+    [
+      'Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', solvVal > 0 ? fmtNum(solvVal) : '—', '< 1.50',
+      solvVal <= 0 ? 'Non calculable' : solvVal >= 2.0 ? 'Solvable' : solvVal >= 1.5 ? 'Limite' : 'Risque d\'insolvabilité'
+    ],
+    [
+      'Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x',
+      safeDiv(ebe, s.chargesFinancieres) >= 5 ? 'Couverture excellente' : safeDiv(ebe, s.chargesFinancieres) >= 3 ? 'Couverture large' : safeDiv(ebe, s.chargesFinancieres) >= 2 ? 'Couverture suffisante' : 'Tension de charge'
+    ],
   ];
 
   y = drawBooktabsTable(doc, liqHead, liqBody, y, {
