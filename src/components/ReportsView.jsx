@@ -551,30 +551,46 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff' }}>picture_as_pdf</span>
           </div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff' }}>Export PDF Professionnel — Rapport Annuel Complet (7 sections)</div>
+            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff' }}>Export PDF & Excel Professionnel — Rapport Annuel Complet</div>
             <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
-              Page de garde · Bilan fonctionnel · SIG/TCR · Ratios · Comparatif N-1 · Diagnostic Forces/Risques · Audit SCF
+              Page de garde · Bilan fonctionnel · SIG/TCR · Ratios · Rating Bancaire · Audit SCF · 6 Feuilles Excel
             </div>
           </div>
         </div>
-        <button
-          onClick={handleExportPDF}
-          disabled={isPdfGenerating || !data}
-          style={{
-            padding: '10px 22px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
-            background: isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
-            color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: isPdfGenerating ? 'wait' : 'pointer',
-            display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
-            transition: 'all 0.2s', flexShrink: 0
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-          onMouseLeave={e => e.currentTarget.style.background = isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)'}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-            {isPdfGenerating ? 'hourglass_empty' : 'download'}
-          </span>
-          {isPdfGenerating ? 'Génération PDF…' : 'Télécharger le PDF'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => exportFinancialWorkbook(data)}
+            disabled={!data}
+            style={{
+              padding: '10px 18px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
+              background: '#059669', color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
+              transition: 'all 0.2s', flexShrink: 0
+            }}
+            title="Télécharger le classeur Excel officiel SCF avec 6 feuilles de calcul"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>table_view</span>
+            Export Excel (.xlsx)
+          </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={isPdfGenerating || !data}
+            style={{
+              padding: '10px 22px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
+              background: isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
+              color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: isPdfGenerating ? 'wait' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
+              transition: 'all 0.2s', flexShrink: 0
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseLeave={e => e.currentTarget.style.background = isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)'}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+              {isPdfGenerating ? 'hourglass_empty' : 'download'}
+            </span>
+            {isPdfGenerating ? 'Génération PDF…' : 'Télécharger le PDF'}
+          </button>
+        </div>
       </div>
 
 

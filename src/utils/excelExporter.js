@@ -1,28 +1,38 @@
 /* ═══════════════════════════════════════════════════════════
-   FINANALYZE — Générateur d'Export Excel Multi-Feuilles (.xlsx)
+   BAIQ — Générateur d'Export Excel Multi-Feuilles (.xlsx)
    Classeur financier complet structuré selon les normes SCF Algérie
+   Feuilles :
+   1. Synthèse, Rating & Capacité d'Emprunt
+   2. Bilan Fonctionnel SCF (Actif & Passif)
+   3. Compte de Résultat (TCR & SIG par Nature)
+   4. Ratios & Benchmarks Sectoriels
+   5. Audit de Conformité SCF & Flux Croisés
+   6. Balance Générale des Comptes (Grand Livre)
    ═══════════════════════════════════════════════════════════ */
 
 import * as XLSX from 'xlsx';
 import { getSecteur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
+import { auditBalanceAccounts, auditCrossAccountMovements } from './financeCalculations';
 
-export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF.xlsx') {
+export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx') {
   if (!data) return false;
 
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 = null } = data;
   const secteur = getSecteur(profil.secteurId);
   const bm = secteur.benchmarks;
   const solv = calculateAltmanZScore(bilan, sig, rows);
+  const auditNatures = auditBalanceAccounts(rows);
+  const auditFlux = auditCrossAccountMovements(rows);
 
   const wb = XLSX.utils.book_new();
 
   /* ──────────────────────────────────────────────────────────
-     FEUILLE 1 : SYNTHÈSE & PROFIL D'ENTREPRISE
+     FEUILLE 1 : SYNTHÈSE, RATING CRÉDIT & CAPACITÉ D'EMPRUNT
      ────────────────────────────────────────────────────────── */
   const ws1Data = [
-    ['BAIQ — BALANCE AND FINANCIAL ANALYTICS — RAPPORT DE SYNTHÈSE FINANCIÈRE SCF (ALGÉRIE)'],
-    ['Généré le', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
+    ['BAIQ — BALANCE AND FINANCIAL ANALYTICS — CLASSEUR FINANCIER OFFICIEL SCF (ALGÉRIE)'],
+    ['Date d\'exportation', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
     [],
     ['1. PROFIL DE L\'ENTREPRISE'],
     ['Raison Sociale / Dossier', profil.nomEntreprise || 'Dossier Anonyme'],
@@ -31,46 +41,57 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
     ['Taux TVA Standard', secteur.tvaStandard],
     ['Effectif Salarié (ETP)', profil.effectif ? `${profil.effectif} ETP` : 'Non renseigné'],
     [],
-    ['2. ÉVALUATION DE SOLVABILITÉ & RISQUE (ALTMAN Z\'\')'],
-    ['Score Altman Z\'\' (Marchés émergents)', solv.zScore.toFixed(2)],
-    ['Rating de Crédit', solv.rating],
+    ['2. NOTATION DU RISQUE CRÉDIT & CAPACITÉ D\'ENDETTEMENT (BANQUE D\'ALGÉRIE / ALTMAN Z\'\')'],
+    ['Score Altman Z\'\' (Marchés émergents)', Number(solv.zScore.toFixed(2))],
+    ['Rating de Solvabilité Global', solv.rating],
     ['Zone de Risque', solv.zoneLabel],
     ['Probabilité de Défaillance', solv.risqueDefaillance],
     ['Score de Solvabilité Globale', `${solv.scoreSolvabilite} / 100`],
-    ['Statut Accord Crédit Bancaire', solv.bancaire.statutCredit],
+    ['Score Banque d\'Algérie', `${solv.bancaire.scoreBA} / 20 points`],
+    ['Avis d\'Accord Crédit Bancaire', solv.bancaire.statutCredit],
+    ['Capacité d\'Endettement Théorique Max (DZD)', Math.round(solv.bancaire.capaciteEndettementMax || 0)],
+    ['Règle Bancaire Appliquée', 'Dettes Financières LT ≤ 3.5 × EBE'],
+    ['Couverture des Charges Financières (EBE / Intérêts)', solv.bancaire.couvertureChargesFin >= 90 ? 'Aucune charge financière' : `${solv.bancaire.couvertureChargesFin.toFixed(2)}x`],
+    ['Dette Nette / EBE (Années de remboursement)', `${solv.bancaire.ratioDetteSurEBE.toFixed(2)} an(s)`],
     [],
-    ['3. GRANDS AGRÉGATS FINANCIERS (DZD)'],
-    ['Indicateur', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Variation (DZD)', 'Variation (%)'],
+    ['3. GRANDS AGRÉGATS FINANCIERS DE GESTION (DZD)'],
+    ['Indicateur Financier', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Variation (DZD)', 'Variation (%)'],
     ['Chiffre d\'Affaires (CA)', sig.chiffreAffaires || 0, dataN1?.sig?.chiffreAffaires || '', (sig.chiffreAffaires || 0) - (dataN1?.sig?.chiffreAffaires || 0), dataN1?.sig?.chiffreAffaires ? `${(((sig.chiffreAffaires || 0) - dataN1.sig.chiffreAffaires) / dataN1.sig.chiffreAffaires * 100).toFixed(1)}%` : ''],
     ['Valeur Ajoutée (VA)', sig.valeurAjoutee || 0, dataN1?.sig?.valeurAjoutee || '', (sig.valeurAjoutee || 0) - (dataN1?.sig?.valeurAjoutee || 0), ''],
     ['Excédent Brut d\'Exploitation (EBE)', sig.ebe || 0, dataN1?.sig?.ebe || '', (sig.ebe || 0) - (dataN1?.sig?.ebe || 0), ''],
+    ['Résultat Opérationnel (EBIT)', sig.resultatExploitation || 0, dataN1?.sig?.resultatExploitation || '', (sig.resultatExploitation || 0) - (dataN1?.sig?.resultatExploitation || 0), ''],
     ['Résultat Net de l\'Exercice', sig.resultatNet || 0, dataN1?.sig?.resultatNet || '', (sig.resultatNet || 0) - (dataN1?.sig?.resultatNet || 0), ''],
     ['Fonds de Roulement Net Global (FRNG)', bilan.frng || 0, dataN1?.bilan?.frng || '', (bilan.frng || 0) - (dataN1?.bilan?.frng || 0), ''],
     ['Besoin en Fonds de Roulement (BFR)', bilan.bfr || 0, dataN1?.bilan?.bfr || '', (bilan.bfr || 0) - (dataN1?.bilan?.bfr || 0), ''],
     ['Trésorerie Nette (TN)', bilan.tn || 0, dataN1?.bilan?.tn || '', (bilan.tn || 0) - (dataN1?.bilan?.tn || 0), ''],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
-  ws1['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 22 }, { wch: 20 }, { wch: 15 }];
+  ws1['!cols'] = [{ wch: 48 }, { wch: 25 }, { wch: 22 }, { wch: 20 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, ws1, 'Synthèse & Solvabilité');
 
   /* ──────────────────────────────────────────────────────────
      FEUILLE 2 : BILAN FONCTIONNEL
      ────────────────────────────────────────────────────────── */
+  const totActifN = (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0);
+  const totActifN1 = (dataN1?.bilan?.emploisStables || 0) + (dataN1?.bilan?.actifCirculant || 0) + (dataN1?.bilan?.tresorerieActive || 0);
+  const totPassifN = (bilan.ressourcesStables || 0) + (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0);
+  const totPassifN1 = (dataN1?.bilan?.ressourcesStables || 0) + (dataN1?.bilan?.passifCirculant || 0) + (dataN1?.bilan?.tresoreriePassive || 0);
+
   const ws2Data = [
     ['BILAN FONCTIONNEL CONDENSÉ (SCF ALGÉRIE)'],
     ['Devise : Dinars Algériens (DZD)'],
     [],
-    ['I. ACTIF (EMPLOIS)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Actif N (%)'],
-    ['Emplois Stables (Immobilisations Brutes)', bilan.emploisStables || 0, dataN1?.bilan?.emploisStables || '', `${(((bilan.emploisStables || 0) / ((bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['Actif Circulant (Stocks + Créances clients)', bilan.actifCirculant || 0, dataN1?.bilan?.actifCirculant || '', `${(((bilan.actifCirculant || 0) / ((bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['Trésorerie Active (Disponibilités & Banque)', bilan.tresorerieActive || 0, dataN1?.bilan?.tresorerieActive || '', `${(((bilan.tresorerieActive || 0) / ((bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['TOTAL ACTIF (EMPLOIS)', (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0), (dataN1?.bilan?.emploisStables || 0) + (dataN1?.bilan?.actifCirculant || 0) + (dataN1?.bilan?.tresorerieActive || 0) || '', '100.0%'],
+    ['I. ACTIF DU BILAN (EMPLOIS)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Actif N (%)'],
+    ['Emplois Stables (Actifs non courants bruts)', bilan.emploisStables || 0, dataN1?.bilan?.emploisStables || '', `${(((bilan.emploisStables || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
+    ['Actif Circulant d\'Exploitation (Stocks + Créances clients)', bilan.actifCirculant || 0, dataN1?.bilan?.actifCirculant || '', `${(((bilan.actifCirculant || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
+    ['Trésorerie Active (Disponibilités & Banques débitrices)', bilan.tresorerieActive || 0, dataN1?.bilan?.tresorerieActive || '', `${(((bilan.tresorerieActive || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
+    ['TOTAL GÉNÉRAL DE L\'ACTIF', totActifN, totActifN1 || '', '100.0%'],
     [],
-    ['II. PASSIF (RESSOURCES)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Passif N (%)'],
-    ['Ressources Stables (Capitaux Propres + Dettes LT)', bilan.ressourcesStables || 0, dataN1?.bilan?.ressourcesStables || '', `${(((bilan.ressourcesStables || 0) / ((bilan.ressourcesStables || 0) + (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['Passif Circulant (Fournisseurs + Dettes CT)', bilan.passifCirculant || 0, dataN1?.bilan?.passifCirculant || '', `${(((bilan.passifCirculant || 0) / ((bilan.ressourcesStables || 0) + (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['Trésorerie Passive (Découverts & Concours bancaires)', bilan.tresoreriePassive || 0, dataN1?.bilan?.tresoreriePassive || '', `${(((bilan.tresoreriePassive || 0) / ((bilan.ressourcesStables || 0) + (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0) || 1)) * 100).toFixed(1)}%`],
-    ['TOTAL PASSIF (RESSOURCES)', (bilan.ressourcesStables || 0) + (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0), (dataN1?.bilan?.ressourcesStables || 0) + (dataN1?.bilan?.passifCirculant || 0) + (dataN1?.bilan?.tresoreriePassive || 0) || '', '100.0%'],
+    ['II. PASSIF DU BILAN (RESSOURCES)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Passif N (%)'],
+    ['Ressources Stables (Capitaux Propres + Dettes LT + Amort.)', bilan.ressourcesStables || 0, dataN1?.bilan?.ressourcesStables || '', `${(((bilan.ressourcesStables || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
+    ['Passif Circulant d\'Exploitation (Fournisseurs + Dettes fiscales/sociales)', bilan.passifCirculant || 0, dataN1?.bilan?.passifCirculant || '', `${(((bilan.passifCirculant || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
+    ['Trésorerie Passive (Concours bancaires courants & soldes créditeurs)', bilan.tresoreriePassive || 0, dataN1?.bilan?.tresoreriePassive || '', `${(((bilan.tresoreriePassive || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
+    ['TOTAL GÉNÉRAL DU PASSIF', totPassifN, totPassifN1 || '', '100.0%'],
     [],
     ['III. ÉQUILIBRE FINANCIER STRUCTUREL', 'Montant N (DZD)', 'Formule de calcul', 'Interprétation'],
     ['Fonds de Roulement Net Global (FRNG)', bilan.frng || 0, 'Ressources Stables − Emplois Stables', (bilan.frng || 0) >= 0 ? 'Excédent de financement stable (Sécurisé)' : 'Déficit structurel (Risque)'],
@@ -78,7 +99,7 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
     ['Trésorerie Nette (TN)', bilan.tn || 0, 'FRNG − BFR = Trésorerie Active − Passive', (bilan.tn || 0) >= 0 ? 'Liquidités nettes disponibles' : 'Tension de trésorerie'],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
-  ws2['!cols'] = [{ wch: 45 }, { wch: 22 }, { wch: 22 }, { wch: 35 }];
+  ws2['!cols'] = [{ wch: 48 }, { wch: 22 }, { wch: 22 }, { wch: 38 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Bilan Fonctionnel');
 
   /* ──────────────────────────────────────────────────────────
@@ -90,10 +111,10 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
     [],
     ['Code', 'Rubrique du Compte de Résultat', 'Montant N (DZD)', '% du CA', 'Observations'],
     ['70', 'Ventes et produits annexes (Chiffre d\'affaires)', sig.c70 || sig.chiffreAffaires || 0, '100.0%', 'Base d\'activité'],
-    ['72', 'Variation des stocks de produits finis et en-cours', sig.c72 || 0, `${(((sig.c72 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Production stockée/déstockée'],
+    ['72', 'Variation des stocks de produits finis et en-cours', sig.c72 || 0, `${(((sig.c72 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Production stockée/déstockée (MIXTE)'],
     ['73', 'Production immobilisée', sig.c73 || 0, `${(((sig.c73 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Travaux faits par l\'entreprise pour elle-même'],
     ['74', 'Subventions d\'exploitation', sig.c74 || 0, `${(((sig.c74 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Aides d\'exploitation'],
-    ['I', 'PRODUCTION DE L\'EXERCICE (70 + 72 + 73 + 74)', sig.productionExercice || 0, `${(((sig.productionExercice || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Activité globale'],
+    ['I', 'PRODUCTION DE L\'EXERCICE (70 + 72 + 73 + 74)', sig.productionExercice || 0, `${(((sig.productionExercice || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Activité brute globale'],
     ['60', 'Achats consommés de matières et marchandises', -(sig.c60 || sig.achats || 0), `${(((sig.c60 || sig.achats || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Consommations directes'],
     ['61/62', 'Services extérieurs et autres consommations', -((sig.c61 || 0) + (sig.c62 || 0)), `${((((sig.c61 || 0) + (sig.c62 || 0)) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Prestations & sous-traitance'],
     ['II', 'CONSOMMATION DE L\'EXERCICE (60 + 61 + 62)', -(sig.consommationExercice || 0), `${(((sig.consommationExercice || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Charges consommées'],
@@ -105,18 +126,18 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
     ['65', 'Autres charges opérationnelles', -(sig.c65 || 0), '', 'Charges diverses'],
     ['68', 'Dotations aux amortissements et provisions', -(sig.c68_expl || sig.dotationsExploitation || 0), '', 'Dépréciation du capital'],
     ['78', 'Reprises sur provisions et pertes de valeur', sig.c78_expl || sig.reprisesExploitation || 0, '', 'Annulations de provisions'],
-    ['V', 'RÉSULTAT OPÉRATIONNEL', sig.resultatExploitation || 0, `${(((sig.resultatExploitation || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Performance pure'],
+    ['V', 'RÉSULTAT OPÉRATIONNEL (EBIT)', sig.resultatExploitation || 0, `${(((sig.resultatExploitation || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Performance pure d\'activité'],
     ['76/786', 'Produits financiers', sig.produitsFinanciers || 0, '', 'Placements & gains'],
     ['66/686', 'Charges financières', -(sig.chargesFinancieres || 0), '', 'Intérêts d\'emprunts'],
-    ['VI', 'RÉSULTAT FINANCIER', sig.resultatFinancier || 0, '', 'Coût de l\'endettement'],
+    ['VI', 'RÉSULTAT FINANCIER', sig.resultatFinancier || 0, '', 'Coût net de l\'endettement'],
     ['VII', 'RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', sig.rcai || 0, `${(((sig.rcai || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Résultat courant'],
     ['69', 'Impôts exigibles et différés (IBS)', -(sig.c69 || sig.impotsBenefices || 0), '', `Taux légal: ${secteur.tauxIBS}`],
     ['VIII', 'RÉSULTAT NET DES ACTIVITÉS ORDINAIRES', sig.resultatNetOrdinaire || 0, '', 'Bénéfice ordinaire'],
     ['77/67', 'Éléments extraordinaires', sig.resultatExtraordinaire || 0, '', 'Événements exceptionnels'],
-    ['IX', 'RÉSULTAT NET DE L\'EXERCICE', sig.resultatNet || 0, `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Bénéfice/Perte distribuable'],
+    ['IX', 'RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', sig.resultatNet || 0, `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Bénéfice net distribuable'],
   ];
   const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
-  ws3['!cols'] = [{ wch: 10 }, { wch: 48 }, { wch: 22 }, { wch: 15 }, { wch: 32 }];
+  ws3['!cols'] = [{ wch: 10 }, { wch: 48 }, { wch: 22 }, { wch: 15 }, { wch: 35 }];
   XLSX.utils.book_append_sheet(wb, ws3, 'TCR & SIG');
 
   /* ──────────────────────────────────────────────────────────
@@ -143,29 +164,90 @@ export function exportFinancialWorkbook(data, filename = 'Analyse_Financiere_SCF
   XLSX.utils.book_append_sheet(wb, ws4, 'Ratios & Benchmarks');
 
   /* ──────────────────────────────────────────────────────────
-     FEUILLE 5 : GRAND LIVRE / BALANCE GÉNÉRALE
+     FEUILLE 5 : AUDIT DES FLUX CROISÉS & NATURES SCF
      ────────────────────────────────────────────────────────── */
   const ws5Data = [
+    ['AUDIT DE CONFORMITÉ SCF & CONTRÔLE DES FLUX CROISÉS'],
+    ['Score Global de Conformité :', `${auditNatures.scoreCoherence} %`],
+    [],
+    ['1. CONTRÔLE DES JEUX D\'ÉCRITURES ET FLUX CROISÉS (7 RÈGLES SCF)'],
+    ['Cycle', 'Règle de Contrôle', 'Statut', 'Montant Source (DZD)', 'Montant Cible (DZD)', 'Écart (DZD)', 'Diagnostic'],
+  ];
+  (auditFlux.regles || []).forEach(r => {
+    ws5Data.push([
+      r.cycle || '',
+      r.titre || '',
+      r.statut || '',
+      Math.round(r.sourceVal || 0),
+      Math.round(r.cibleVal || 0),
+      Math.round(r.ecart || 0),
+      r.explication || ''
+    ]);
+  });
+
+  ws5Data.push([]);
+  ws5Data.push(['2. RELEVÉ DES ANOMALIES DE SOLDES INVERSÉS (CLASSES 1 À 7)']);
+  ws5Data.push(['Compte', 'Intitulé du Compte', 'Solde Débiteur (DZD)', 'Solde Créditeur (DZD)', 'Statut SCF', 'Observation Normative']);
+
+  const anomaliesNatures = (auditNatures.comptesAudit || []).filter(c => c.verification?.statut === 'ANOMALIE' || c.verification?.statut === 'ATYPIQUE');
+  if (anomaliesNatures.length === 0) {
+    ws5Data.push(['—', 'Aucune anomalie détectée sur l\'ensemble des comptes mouvementés.', 0, 0, 'CONFORME', 'Respect intégral des règles de soldes normaux SCF']);
+  } else {
+    anomaliesNatures.forEach(c => {
+      ws5Data.push([
+        c.compte || '',
+        c.libelle || '',
+        Math.round(c.deb || 0),
+        Math.round(c.cred || 0),
+        c.verification?.statut || '',
+        c.verification?.diagnostic || ''
+      ]);
+    });
+  }
+
+  const ws5 = XLSX.utils.aoa_to_sheet(ws5Data);
+  ws5['!cols'] = [{ wch: 18 }, { wch: 42 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 45 }];
+  XLSX.utils.book_append_sheet(wb, ws5, 'Audit SCF');
+
+  /* ──────────────────────────────────────────────────────────
+     FEUILLE 6 : GRAND LIVRE & BALANCE GÉNÉRALE
+     ────────────────────────────────────────────────────────── */
+  const ws6Data = [
     ['BALANCE GÉNÉRALE DES COMPTES (GRAND LIVRE)'],
     ['Compte', 'Intitulé du Compte', 'Solde Début Débit', 'Solde Début Crédit', 'Mouvement Débit', 'Mouvement Crédit', 'Solde Fin Débit', 'Solde Fin Crédit'],
   ];
+
+  let totSD = 0, totSC = 0, totMD = 0, totMC = 0, totFD = 0, totFC = 0;
+
   (rows || []).forEach(r => {
-    ws5Data.push([
+    const sd = Number(r.soldeDebutDebit) || 0;
+    const sc = Number(r.soldeDebutCredit) || 0;
+    const md = Number(r.mouvementDebit) || 0;
+    const mc = Number(r.mouvementCredit) || 0;
+    const fd = Number(r.soldeFinDebit) || 0;
+    const fc = Number(r.soldeFinCredit) || 0;
+
+    totSD += sd; totSC += sc; totMD += md; totMC += mc; totFD += fd; totFC += fc;
+
+    ws6Data.push([
       r.compte || '',
       r.libelle || '',
-      r.soldeDebutDebit || 0,
-      r.soldeDebutCredit || 0,
-      r.mouvementDebit || 0,
-      r.mouvementCredit || 0,
-      r.soldeFinDebit || 0,
-      r.soldeFinCredit || 0,
+      sd, sc, md, mc, fd, fc
     ]);
   });
-  const ws5 = XLSX.utils.aoa_to_sheet(ws5Data);
-  ws5['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, ws5, 'Balance des Comptes');
+
+  // Ligne de Totaux de contrôle
+  ws6Data.push([
+    'TOTAL GÉNÉRAL', 'Contrôle d\'équilibrage de balance',
+    totSD, totSC, totMD, totMC, totFD, totFC
+  ]);
+
+  const ws6 = XLSX.utils.aoa_to_sheet(ws6Data);
+  ws6['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws6, 'Balance des Comptes');
 
   // Téléchargement du fichier .xlsx
   XLSX.writeFile(wb, filename);
   return true;
 }
+
