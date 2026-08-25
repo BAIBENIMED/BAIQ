@@ -583,23 +583,23 @@ export async function generateFullPDF(data) {
   const solvVal   = r.solvabilite    || 0;
   const liqBody = [
     [
-      'Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), '< 1.00',
+      'Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), 'X > 1.00',
       liqGen >= 2.0 ? 'Très satisfaisante' : liqGen >= 1.2 ? 'Satisfaisante' : liqGen >= 1.0 ? 'Limite' : 'Alerte sous-liquidité'
     ],
     [
-      'Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(liqRedVal), '< 0.80',
+      'Liquidité Réduite', '(Créances + Dispo) / Passif Circulant', fmtNum(liqRedVal), 'X > 0.80',
       liqRedVal >= 1.5 ? 'Très satisfaisante' : liqRedVal >= 1.0 ? 'Satisfaisante' : liqRedVal >= 0.8 ? 'Acceptable' : 'Dépendance aux stocks'
     ],
     [
-      'Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), '< 25.0 %',
+      'Autonomie Financière', 'Capitaux Propres / Total Passif', fmtPct(autFinanc), 'X > 25.0 %',
       autFinanc >= 0.50 ? 'Excellente autonomie' : autFinanc >= 0.35 ? 'Bonne autonomie' : autFinanc >= 0.25 ? 'Acceptable' : 'Dépendance aux dettes'
     ],
     [
-      'Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', solvVal > 0 ? fmtNum(solvVal) : '—', '< 1.50',
+      'Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', solvVal > 0 ? fmtNum(solvVal) : '—', 'X > 1.50',
       solvVal <= 0 ? 'Non calculable' : solvVal >= 2.0 ? 'Solvable' : solvVal >= 1.5 ? 'Limite' : 'Risque d\'insolvabilité'
     ],
     [
-      'Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), '< 2.00 x',
+      'Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), 'X > 2.00 x',
       safeDiv(ebe, s.chargesFinancieres) >= 5 ? 'Couverture excellente' : safeDiv(ebe, s.chargesFinancieres) >= 3 ? 'Couverture large' : safeDiv(ebe, s.chargesFinancieres) >= 2 ? 'Couverture suffisante' : 'Tension de charge'
     ],
   ];
@@ -618,10 +618,10 @@ export async function generateFullPDF(data) {
 
   const rentHead = [['RATIO DE RENTABILITÉ', 'VALEUR N', 'RÉFÉRENTIEL', 'ANALYSE DU RENDEMENT']];
   const rentBody = [
-    ['Taux de Valeur Ajoutée (VA / CA)', fmtPct(tauxVA), '>= 25.0 %', tauxVA >= 0.30 ? 'Forte création de richesse brute' : 'Poids élevé des achats consommés'],
-    ['Marge d\'EBE (EBE / CA)', fmtPct(margeEBE), '>= 10.0 %', margeEBE >= 0.12 ? 'Excellente marge brute d\'exploitation' : 'Marge opérationnelle comprimée'],
-    ['Marge Opérationnelle (RE / CA)', fmtPct(margeExploit), '>= 6.0 %', margeExploit >= 0.08 ? 'Activité commerciale hautement rentable' : 'Rentabilité opérationnelle modérée'],
-    ['Marge Nette Finale (RN / CA)', fmtPct(margeNette), '> 0.0 %', margeNette >= 0.05 ? 'Taux de profit net confortable' : rn >= 0 ? 'Marge bénéficiaire étroite' : 'Exercice en perte nette'],
+    ['Taux de Valeur Ajoutée (VA / CA)', fmtPct(tauxVA), 'X > 25.0 %', tauxVA >= 0.30 ? 'Forte création de richesse brute' : 'Poids élevé des achats consommés'],
+    ['Marge d\'EBE (EBE / CA)', fmtPct(margeEBE), 'X > 10.0 %', margeEBE >= 0.12 ? 'Excellente marge brute d\'exploitation' : 'Marge opérationnelle comprimée'],
+    ['Marge Opérationnelle (RE / CA)', fmtPct(margeExploit), 'X > 6.0 %', margeExploit >= 0.08 ? 'Activité commerciale hautement rentable' : 'Rentabilité opérationnelle modérée'],
+    ['Marge Nette Finale (RN / CA)', fmtPct(margeNette), 'X > 0.0 %', margeNette >= 0.05 ? 'Taux de profit net confortable' : rn >= 0 ? 'Marge bénéficiaire étroite' : 'Exercice en perte nette'],
   ];
 
   y = drawBooktabsTable(doc, rentHead, rentBody, y, {
@@ -637,10 +637,10 @@ export async function generateFullPDF(data) {
 
   const actHead = [['CYCLE / DÉLAI D\'EXPLOITATION', 'VALEUR N', 'NORME SCF', 'IMPACT SUR LE CASH']];
   const actBody = [
-    ['DSO — Délai de Recouvrement Clients', fmtDays(dso), '<= 60 j', dso <= 60 ? 'Recouvrement rapide et fluide' : 'Risque d\'immobilisation de cash client'],
-    ['DPO — Délai de Paiement Fournisseurs', fmtDays(dpo), '30 à 75 j', dpo >= 30 && dpo <= 75 ? 'Financement fournisseur équilibré' : 'Décalage de règlement à optimiser'],
-    ['Rotation Moyenne des Stocks', fmtDays(rotStock), '<= 90 j', rotStock <= 90 ? 'Vélocité satisfaisante des stocks' : 'Risque de surstockage et dépréciation'],
-    ['BFR Exprimé en Jours de Chiffre d\'Affaires', fmtDays(bfrJours), '<= 60 j', bfrJours <= 60 ? 'Besoin en fonds de roulement maîtrisé' : 'BFR trop lourd nécessitant du cash'],
+    ['DSO — Délai de Recouvrement Clients', fmtDays(dso), 'X < 60 j', dso <= 60 ? 'Recouvrement rapide et fluide' : 'Risque d\'immobilisation de cash client'],
+    ['DPO — Délai de Paiement Fournisseurs', fmtDays(dpo), '30 < X < 75 j', dpo >= 30 && dpo <= 75 ? 'Financement fournisseur équilibré' : 'Décalage de règlement à optimiser'],
+    ['Rotation Moyenne des Stocks', fmtDays(rotStock), 'X < 90 j', rotStock <= 90 ? 'Vélocité satisfaisante des stocks' : 'Risque de surstockage et dépréciation'],
+    ['BFR Exprimé en Jours de Chiffre d\'Affaires', fmtDays(bfrJours), 'X < 60 j', bfrJours <= 60 ? 'Besoin en fonds de roulement maîtrisé' : 'BFR trop lourd nécessitant du cash'],
   ];
 
   y = drawBooktabsTable(doc, actHead, actBody, y, {
