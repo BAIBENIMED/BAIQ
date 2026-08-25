@@ -578,7 +578,7 @@ export async function generateFullPDF(data) {
 
   y = latexSubSection(doc, '3.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
 
-  const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'NORME SCF', 'APPRÉCIATION']];
+  const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'NORME', 'APPRÉCIATION']];
   const liqRedVal = r.liquiditeReduite || 0;
   const solvVal   = r.solvabilite    || 0;
   const liqBody = [
