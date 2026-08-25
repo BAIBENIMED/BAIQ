@@ -317,7 +317,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
                   </span>
                 </div>
                 <div className="mono" style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>
-                  {key === 'rentabilite' ? `${item.val.toFixed(1)}%` : item.val >= 90 ? 'N/A' : item.val.toFixed(2)}
+                  {item.displayVal || (key === 'rentabilite' ? `${item.val.toFixed(1)} %` : item.val >= 90 ? 'Sans dette LT (100%)' : item.val.toFixed(2))}
                 </div>
               </div>
             ))}

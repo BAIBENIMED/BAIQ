@@ -140,8 +140,12 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   const couvertureChargesFin = chargesFin > 0 ? Math.max(0, ebe / chargesFin) : 99;
 
   // ── Score Banque d'Algérie (Sur 20 Points) ──
+  const ca = (sig.chiffreAffaires !== undefined && sig.chiffreAffaires !== null && sig.chiffreAffaires > 0)
+    ? sig.chiffreAffaires
+    : (sig.c70 || sig.productionExercice || 0);
+
   const ratioAutonomie = dettesFinancieresLT > 0 ? capitauxPropres / dettesFinancieresLT : 99;
-  const ratioRentabilite = ebe / (sig.ventesProduction || sig.c70Total || 1);
+  const ratioRentabilite = ca > 0 ? (ebe / ca) : (ebe > 0 ? 0.20 : 0);
   const ratioLiquiditeGen = (bilan.actifCirculant || 0) / Math.max(1, dettesCourtTerme);
 
   const autonomieScore = ratioAutonomie >= 1.5 ? 5 : ratioAutonomie >= 1.0 ? 4 : ratioAutonomie >= 0.5 ? 2.5 : 1;
@@ -188,10 +192,30 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       ratingBA,
       ratingBAColor,
       detailsBA: {
-        autonomie: { val: ratioAutonomie, score: autonomieScore, label: 'Autonomie Financière (CP / DLT)' },
-        rentabilite: { val: ratioRentabilite * 100, score: rentabiliteScore, label: 'Taux de Marge EBE (EBE / CA)' },
-        liquidite: { val: ratioLiquiditeGen, score: liquiditeScore, label: 'Liquidité Générale (AC / DCT)' },
-        couverture: { val: couvertureChargesFin, score: couvertureScore, label: 'Couverture Intérêts (EBE / Charges Fin)' }
+        autonomie: {
+          val: ratioAutonomie,
+          displayVal: dettesFinancieresLT <= 0 ? 'Sans dette LT (100%)' : `${(ratioAutonomie).toFixed(2)}x`,
+          score: autonomieScore,
+          label: 'Autonomie Financière (CP / DLT)'
+        },
+        rentabilite: {
+          val: ratioRentabilite * 100,
+          displayVal: `${(ratioRentabilite * 100).toFixed(1)} %`,
+          score: rentabiliteScore,
+          label: 'Taux de Marge EBE (EBE / CA)'
+        },
+        liquidite: {
+          val: ratioLiquiditeGen,
+          displayVal: ratioLiquiditeGen.toFixed(2),
+          score: liquiditeScore,
+          label: 'Liquidité Générale (AC / DCT)'
+        },
+        couverture: {
+          val: couvertureChargesFin,
+          displayVal: chargesFin <= 0 ? 'Sans charge fin. (∞)' : `${couvertureChargesFin.toFixed(2)}x`,
+          score: couvertureScore,
+          label: 'Couverture Intérêts (EBE / Charges Fin)'
+        }
       }
     }
   };
