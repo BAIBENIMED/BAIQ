@@ -43,6 +43,7 @@ export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [analysisCount, setAnalysisCount] = useState(() => parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10));
   
   /* ── Moteur de Simulation ── */
   const [simulationEntries, setSimulationEntries] = useState([]);
@@ -68,8 +69,11 @@ export default function App() {
     localStorage.setItem('finanalyze_theme', nextTheme);
   };
 
-  const fmt = (v) =>
-    new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(v || 0) + ' ' + cur;
+  const fmt = (v) => {
+    const num = Math.round(Number(v) || 0);
+    const sign = num < 0 ? '-' : '';
+    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${cur}`;
+  };
 
   const fmtPct = (p) => {
     if (p === undefined || p === null || isNaN(p)) return '0.0%';
@@ -77,7 +81,13 @@ export default function App() {
     return `${prefix}${Number(p).toFixed(1)}%`;
   };
 
-  const onImported = (d) => { setData(d); setTab('dashboard'); };
+  const onImported = (d) => {
+    setData(d);
+    setTab('dashboard');
+    const newCount = (parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10)) + 1;
+    localStorage.setItem('baiq_analysis_count', String(newCount));
+    setAnalysisCount(newCount);
+  };
 
   const updateSecteur = (secteurId) => {
     setData(prev => prev ? {
@@ -386,8 +396,10 @@ export default function App() {
 
     // ── CLASSE 6 : Charges ───────────────────────────────────────────────────
     if (cl === '6') {
-      // EXCEPTION 609 : RRR obtenus sur achats (créditeur normal)
-      if (p3 === '609') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
+      // EXCEPTION 609/619/629 : RRR obtenus (créditeur normal)
+      if (p3 === '609' || p3 === '619' || p3 === '629') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
+      // EXCEPTION 692 : Participation salariés (MIXTE — créditeur admis : extourne, résultat déficitaire)
+      if (c.startsWith('692')) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
       // Tous les autres comptes de classe 6 → normalement débiteurs
       if (isC) return R('CRÉDITEUR ANORMAL', `Charge (${p2}x) : normalement débitrice — extourne, OD ou erreur d'imputation ? (vérifier si RRR 609)`, sc, 'badge-amber');
     }
@@ -396,6 +408,8 @@ export default function App() {
     if (cl === '7') {
       // EXCEPTION 709 : RRR accordés (débiteur normal)
       if (p3 === '709') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
+      // EXCEPTION 724 : Production immobilisée corporelle (MIXTE — débiteur admis : annulation, correction)
+      if (c.startsWith('724')) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
       // Tous les autres comptes de classe 7 → normalement créditeurs
       if (isD) return R('DÉBITEUR ANORMAL', `Produit (${p2}x) : normalement créditeur — extourne ou erreur d'imputation ? (vérifier si RRR 709)`, sd, 'badge-red');
     }
@@ -450,7 +464,7 @@ export default function App() {
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'whatif')      return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
     if (tab === 'methodology') return <CalculationsIndexView />;
-    if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} />;
+    if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
     if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
     if (tab === 'settings')    return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} />;
 
@@ -472,18 +486,37 @@ export default function App() {
     );
 
     const r = activeData?.ratios || {};
+    const b  = activeData?.bilan  || {};
+    const s  = activeData?.sig    || {};
+    const b1 = activeData?.dataN1?.bilan || {};
+    const s1 = activeData?.dataN1?.sig   || {};
+
+    const kpiTrend = (valN, valN1) => {
+      if (!valN1 || valN1 === 0) return { label: '—', up: true };
+      const pct = ((valN - valN1) / Math.abs(valN1)) * 100;
+      return { label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, up: pct >= 0 };
+    };
+
+    const frngTrend = kpiTrend(b.frng, b1.frng);
+    const bfrTrend  = kpiTrend(b.bfr,  b1.bfr);
+    const tnTrend   = kpiTrend(b.tn,   b1.tn);
+    const rnTrend   = kpiTrend(s.resultatNet, s1.resultatNet);
+
+    const kpiValues = [b.frng || 0, b.bfr || 0, b.tn || 0, s.resultatNet || 0];
+    const kpiMax = Math.max(...kpiValues.map(Math.abs), 1);
+    const kpiPct = (v) => Math.min(100, Math.round((Math.abs(v || 0) / kpiMax) * 100));
 
     return (
       <div className="fade-in space-y-6">
         {/* KPI Row 1 — Équilibre Financier */}
         <div className="kpi-grid">
           {[
-            { label:'FRNG', value: activeData?.bilan?.frng, color:'#2563eb', barColor:'#2563eb', pct:72, trend:'+4.2%', up:true },
-            { label:'BFR',  value: activeData?.bilan?.bfr,  color:'#0f172a', barColor:'#059669', pct:58, trend:'+12.8%', up:false },
-            { label:'Trésorerie Nette', value: activeData?.bilan?.tn, color:'#0f172a', barColor:'#d97706', pct:40, trend:'+1.5%', up:true },
-            { label:'Résultat Net', value: activeData?.sig?.resultatNet, color:'#059669', barColor:'#2563eb', pct:85, trend:'+8.1%', up:true },
+            { label:'FRNG', value: b.frng, color:'#2563eb', barColor:'#2563eb', pct: kpiPct(b.frng), trend: frngTrend.label, up: frngTrend.up },
+            { label:'BFR',  value: b.bfr,  color:'#0f172a', barColor:'#059669', pct: kpiPct(b.bfr),  trend: bfrTrend.label,  up: bfrTrend.up  },
+            { label:'Trésorerie Nette', value: b.tn, color:'#0f172a', barColor:'#d97706', pct: kpiPct(b.tn), trend: tnTrend.label, up: tnTrend.up },
+            { label:'Résultat Net', value: s.resultatNet, color:'#059669', barColor:'#2563eb', pct: kpiPct(s.resultatNet), trend: rnTrend.label, up: rnTrend.up },
           ].map((k,i) => {
-            const numFormatted = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(k.value || 0);
+            const numFormatted = Math.round(k.value || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
             const len = numFormatted.length;
             const adaptiveFontSize = len > 14 ? '1.05rem' : len > 11 ? '1.18rem' : len > 9 ? '1.3rem' : '1.45rem';
 
@@ -894,6 +927,16 @@ export default function App() {
             );
           })}
         </nav>
+        {/* COMPTEUR D'ANALYSES EXÉCUTÉES (100% Confidentiel - Simple entier local) */}
+        <div style={{ padding: '8px 12px', margin: '4px 10px 8px 10px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--primary)' }}>analytics</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)' }}>Analyses exécutées</span>
+          </div>
+          <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--primary)', background: 'rgba(37,99,235,0.1)', padding: '2px 8px', borderRadius: 6 }}>
+            {analysisCount}
+          </span>
+        </div>
         <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
           <button className={`nav-item ${tab==='settings'?'active':''}`} onClick={() => setTab('settings')}>
             <span className="material-symbols-outlined">settings</span>

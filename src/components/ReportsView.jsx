@@ -164,7 +164,7 @@ function MarkdownReportViewer({ content }) {
   return <div style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%', boxSizing: 'border-box' }}>{elements}</div>;
 }
 
-export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '' }) {
+export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '', isSimulationActive = false }) {
   const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => {
     if (v === null || v === undefined || isNaN(v)) return '0 DZD';
     const num = Math.round(Number(v));
@@ -185,7 +185,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     if (!data) return;
     setIsPdfGenerating(true);
     try {
-      await generateFullPDF(data);
+      await generateFullPDF(data, undefined, isSimulationActive);
     } catch (e) {
       console.error('Erreur export PDF:', e);
       alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));

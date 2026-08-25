@@ -304,6 +304,33 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 </span>
                 Masquer 0 DA
               </button>
+
+              {/* Export CSV Natures */}
+              <button
+                onClick={() => {
+                  const rowsToExport = filteredAccounts;
+                  const header = 'COMPTE;INTITULE;SOLDE_DEBIT;SOLDE_CREDIT;MOUV_DEBIT;MOUV_CREDIT;STATUT;DIAGNOSTIC';
+                  const body = rowsToExport.map(c =>
+                    `${c.compte};"${(c.libelle || '').replace(/"/g, '""')}";${c.deb || 0};${c.cred || 0};${c.mouvDeb || 0};${c.mouvCred || 0};${c.verification?.statut || ''};"${(c.verification?.diagnostic || '').replace(/"/g, '""')}"`
+                  ).join('\n');
+                  const blob = new Blob([`\uFEFF${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'audit_balance_natures_scf.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.74rem', fontWeight: 800,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  background: 'var(--surface-alt)', color: 'var(--text)', transition: 'all 0.15s'
+                }}
+                title="Exporter la liste filtrée au format CSV"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2563eb' }}>download</span>
+                Exporter CSV
+              </button>
             </div>
 
             {/* Search */}
@@ -479,6 +506,32 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 </button>
               );
             })}
+
+            {/* Export CSV Flux Croisés */}
+            <button
+              onClick={() => {
+                const header = 'CYCLE;REGLE;STATUT;MONTANT_SOURCE;MONTANT_CIBLE;ECART;EXPLICATION';
+                const body = filteredRegles.map(r =>
+                  `"${r.cycle}";"${(r.titre || '').replace(/"/g, '""')}";${r.statut};${r.sourceVal || 0};${r.cibleVal || 0};${r.ecart || 0};"${(r.explication || '').replace(/"/g, '""')}"`
+                ).join('\n');
+                const blob = new Blob([`\uFEFF${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'audit_flux_croises_scf.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              style={{
+                padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.74rem', fontWeight: 800,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto',
+                background: 'var(--surface-alt)', color: 'var(--text)', transition: 'all 0.15s'
+              }}
+              title="Exporter les règles et contrôles au format CSV"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#10b981' }}>download</span>
+              Exporter CSV
+            </button>
           </div>
 
           {/* Règles table */}

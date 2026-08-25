@@ -304,7 +304,7 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
 // ══════════════════════════════════════════════════════════════════════
 //  FONCTION PRINCIPALE D'EXPORTATION PDF STYLE LATEX
 // ══════════════════════════════════════════════════════════════════════
-export async function generateFullPDF(data) {
+export async function generateFullPDF(data, _unused, isSimulated = false) {
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 } = data || {};
   const r = ratios;
   const s = sig;
@@ -336,6 +336,12 @@ export async function generateFullPDF(data) {
   const dpo          = r.delaiFournisseurs || 0;
   const rotStock     = r.rotationStocks || 0;
   const bfrJours     = r.bfrJoursCA || 0;
+
+  // Solvabilité : calculer depuis le bilan si non disponible dans les ratios
+  const totalActif      = (b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0);
+  const totalDettesExig = (b.passifCirculant || 0) + (b.tresoreriePassive || 0) + (b.dettesMoyenLongTerme || 0);
+  const solvabiliteCalc = totalDettesExig > 0.01 ? safeDiv(totalActif, totalDettesExig) : 0;
+  const solvabiliteVal  = (r.solvabilite && r.solvabilite > 0) ? r.solvabilite : solvabiliteCalc;
 
   // Création du document jsPDF (Format A4 standardisé)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -459,6 +465,22 @@ export async function generateFullPDF(data) {
     doc.text(pageNum, W - margin, y, { align: 'right' });
     y += 5;
   });
+
+  // Bannière DONNÉES SIMULÉES
+  if (isSimulated) {
+    y += 4;
+    doc.setFillColor(255, 237, 213);
+    doc.rect(margin, y, W - margin * 2, 11, 'F');
+    doc.setDrawColor(234, 88, 12);
+    doc.setLineWidth(0.6);
+    doc.rect(margin, y, W - margin * 2, 11, 'S');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(154, 52, 18);
+    doc.text('ATTENTION : DONNEES SIMULEES (MODE WHAT-IF ACTIF) — NE PAS UTILISER POUR UN DEPOT OFFICIEL', W / 2, y + 7, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    y += 15;
+  }
 
   // ──────────────────────────────────────────────────────────────────
   // PAGE 2 — SECTION 1 : ÉQUILIBRE FINANCIER & BILAN FONCTIONNEL
@@ -595,8 +617,8 @@ export async function generateFullPDF(data) {
       autFinanc >= 0.50 ? 'Excellente autonomie' : autFinanc >= 0.35 ? 'Bonne autonomie' : autFinanc >= 0.25 ? 'Acceptable' : 'Dépendance aux dettes'
     ],
     [
-      'Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', solvVal > 0 ? fmtNum(solvVal) : '—', 'X > 1.50',
-      solvVal <= 0 ? 'Non calculable' : solvVal >= 2.0 ? 'Solvable' : solvVal >= 1.5 ? 'Limite' : 'Risque d\'insolvabilité'
+      'Solvabilité Générale', 'Total Actif / Total Dettes Exigibles', solvabiliteVal > 0 ? fmtNum(solvabiliteVal) : '—', 'X > 1.50',
+      solvabiliteVal <= 0 ? 'Non calculable' : solvabiliteVal >= 2.0 ? 'Solvable' : solvabiliteVal >= 1.5 ? 'Limite' : 'Risque d\'insolvabilité'
     ],
     [
       'Couverture Charges Fin.', 'EBE / Charges Financières', fmtNum(safeDiv(ebe, s.chargesFinancieres)), 'X > 2.00 x',
