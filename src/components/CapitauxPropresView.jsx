@@ -4,11 +4,13 @@ import {
   BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend 
 } from 'recharts';
 
+const EMPTY_ROWS = [];
+
 export function CapitauxPropresView({ data, fmt }) {
   const [activeSubTab, setActiveSubTab] = useState('matrice'); // 'matrice', 'details', 'graph'
   const [searchAccount, setSearchAccount] = useState('');
 
-  const rows = data?.rows || [];
+  const rows = data?.rows || EMPTY_ROWS;
   const sig  = data?.sig  || null;
   const dataN1 = data?.dataN1 || null;
 
@@ -259,7 +261,7 @@ export function CapitauxPropresView({ data, fmt }) {
                 </tr>
               </thead>
               <tbody>
-                {lignes.map((row, idx) => {
+                {lignes.map((row) => {
                   const isOuverture = row.id === 'ouverture';
                   const isCloture   = row.id === 'cloture';
                   const isResultat  = row.id === 'resultat_n';
@@ -406,11 +408,11 @@ export function CapitauxPropresView({ data, fmt }) {
               </div>
             </div>
 
-            <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e40af', marginBottom: 2 }}>
+            <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: isPositiveVar ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isPositiveVar ? '#86efac' : '#fca5a5'}` }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: isPositiveVar ? '#166534' : '#991b1b', marginBottom: 2 }}>
                 Variation Nette Totale : {fmtPct(kpis.pctVariation)}
               </div>
-              <div style={{ fontSize: '0.70rem', color: '#3b82f6' }}>
+              <div style={{ fontSize: '0.70rem', color: isPositiveVar ? '#16a34a' : '#dc2626' }}>
                 Les capitaux propres sont passés de <strong>{fmtCurrency(kpis.totalDebut)}</strong> à <strong>{fmtCurrency(kpis.totalFin)}</strong>.
               </div>
             </div>

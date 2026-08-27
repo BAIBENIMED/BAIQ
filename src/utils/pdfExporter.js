@@ -602,7 +602,6 @@ export async function generateFullPDF(data, _unused, isSimulated = false) {
 
   const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'NORME', 'APPRÉCIATION']];
   const liqRedVal = r.liquiditeReduite || 0;
-  const solvVal   = r.solvabilite    || 0;
   const liqBody = [
     [
       'Liquidité Générale', 'Actif Circulant / Passif Circulant', fmtNum(liqGen), 'X > 1.00',

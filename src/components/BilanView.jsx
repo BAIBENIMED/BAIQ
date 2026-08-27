@@ -6,6 +6,13 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
   const [viewMode, setViewMode] = useState('single'); // 'single', 'comparative', 'history'
 
+  // Ces hooks doivent être appelés inconditionnellement à chaque rendu (Rules of Hooks) :
+  // on utilise des initialiseurs paresseux qui tolèrent data/dataN1 absents.
+  const hasN1 = !!dataN1?.bilan;
+  const [frngN2, setFrngN2] = useState(() => hasN1 ? dataN1.bilan.frng * 0.9 : (data?.frng || 0) * 0.8);
+  const [bfrN2, setBfrN2] = useState(() => hasN1 ? dataN1.bilan.bfr * 0.85 : (data?.bfr || 0) * 0.75);
+  const [tnN2, setTnN2] = useState(() => hasN1 ? dataN1.bilan.tn * 0.95 : (data?.tn || 0) * 0.85);
+
   const fmt = (v) => formatCurrency ? formatCurrency(v) : (v || 0).toLocaleString('fr-FR');
   const fmtPct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
 
@@ -26,12 +33,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
     setDrawerState({ isOpen: true, title, accountPrefixes: prefixes, excludePrefixes: exclude });
   };
 
-  const hasN1 = !!dataN1?.bilan;
   const isComparative = viewMode === 'comparative';
-
-  const [frngN2, setFrngN2] = useState(hasN1 ? dataN1.bilan.frng * 0.9 : data.frng * 0.8);
-  const [bfrN2, setBfrN2] = useState(hasN1 ? dataN1.bilan.bfr * 0.85 : data.bfr * 0.75);
-  const [tnN2, setTnN2] = useState(hasN1 ? dataN1.bilan.tn * 0.95 : data.tn * 0.85);
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>

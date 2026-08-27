@@ -1,4 +1,7 @@
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip
+} from 'recharts';
 import { getSecteur } from '../utils/secteurs';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
 import { exportFinancialWorkbook } from '../utils/excelExporter';
@@ -158,6 +161,56 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
   const handleExportExcel = () => {
     exportFinancialWorkbook({ bilan, sig, ratios: data, rows, profil });
   };
+
+  const ca  = sig?.chiffreAffaires || data?.chiffreAffaires || 1;
+  const ebe = sig?.ebe || data?.ebe || 0;
+  const rn  = sig?.resultatNet || data?.resultatNet || 0;
+  const va  = sig?.valeurAjoutee || data?.valeurAjoutee || 0;
+
+  const radarData = [
+    {
+      subject: 'Marge EBE',
+      Entreprise: Math.min(100, Math.max(0, Math.round(((ebe / ca) / (bm.margeEBE.bon * 1.5)) * 100))),
+      Secteur: Math.min(100, Math.round((bm.margeEBE.bon / (bm.margeEBE.bon * 1.5)) * 100)),
+      valEntreprise: `${(((ebe / ca)) * 100).toFixed(1)}%`,
+      valSecteur: bm.margeEBE.norme
+    },
+    {
+      subject: 'Marge Nette',
+      Entreprise: Math.min(100, Math.max(0, Math.round(((rn / ca) / (bm.margeNette.bon * 1.5)) * 100))),
+      Secteur: Math.min(100, Math.round((bm.margeNette.bon / (bm.margeNette.bon * 1.5)) * 100)),
+      valEntreprise: `${(((rn / ca)) * 100).toFixed(1)}%`,
+      valSecteur: bm.margeNette.norme
+    },
+    {
+      subject: 'Taux de VA',
+      Entreprise: Math.min(100, Math.max(0, Math.round(((va / ca) / (bm.tauxVA.bon * 1.5)) * 100))),
+      Secteur: Math.min(100, Math.round((bm.tauxVA.bon / (bm.tauxVA.bon * 1.5)) * 100)),
+      valEntreprise: `${(((va / ca)) * 100).toFixed(1)}%`,
+      valSecteur: bm.tauxVA.norme
+    },
+    {
+      subject: 'Liquidité Gén.',
+      Entreprise: Math.min(100, Math.max(0, Math.round(((data.liquiditeGenerale || 0) / 2.0) * 100))),
+      Secteur: Math.min(100, Math.round((bm.liquiditeGenerale.bon / 2.0) * 100)),
+      valEntreprise: (data.liquiditeGenerale || 0).toFixed(2),
+      valSecteur: bm.liquiditeGenerale.norme
+    },
+    {
+      subject: 'Autonomie Fin.',
+      Entreprise: Math.min(100, Math.max(0, Math.round(((data.autonomieFinanciere || 0) / 0.6) * 100))),
+      Secteur: Math.min(100, Math.round((bm.autonomieFinanciere.bon / 0.6) * 100)),
+      valEntreprise: `${(((data.autonomieFinanciere || 0)) * 100).toFixed(1)}%`,
+      valSecteur: bm.autonomieFinanciere.norme
+    },
+    {
+      subject: 'Maîtrise BFR',
+      Entreprise: Math.max(0, Math.min(100, Math.round(100 - (((data.bfrJoursCA || 0) / (bm.bfrJoursCA.limite * 1.5)) * 100)))),
+      Secteur: Math.max(0, Math.min(100, Math.round(100 - ((bm.bfrJoursCA.bon / (bm.bfrJoursCA.limite * 1.5)) * 100)))),
+      valEntreprise: `${Math.round(data.bfrJoursCA || 0)} j`,
+      valSecteur: bm.bfrJoursCA.norme
+    },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28, paddingBottom: 40 }}>
@@ -422,6 +475,58 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             isPercentage={true}
             targetNorm={bm.margeNette.norme}
           />
+        </div>
+      </section>
+
+      {/* ── 🎯 NOUVELLE SECTION : RADAR D'ALIGNEMENT SECTORIEL (BENCHMARK ALGÉRIE) ── */}
+      <section className="card" style={{ padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(37, 99, 235, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>radar</span>
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)' }}>Radar d'Alignement Sectoriel (6 Piliers)</h3>
+              <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Superposition de l'empreinte financière sur la médiane du secteur {secteur.label}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.72rem', fontWeight: 700 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#2563eb' }}></span>
+              Votre Entreprise
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#a855f7' }}></span>
+              Médiane Secteur {secteur.label}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.1fr) minmax(280px, 1fr)', gap: 24, alignItems: 'center' }}>
+          <div style={{ height: 320, width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                <PolarGrid stroke="var(--border)" />
+                <PolarAngleAxis dataKey="subject" stroke="var(--text-muted)" fontSize={11} fontWeight={700} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--border)" fontSize={9} />
+                <Radar name="Votre Entreprise" dataKey="Entreprise" stroke="#2563eb" fill="#2563eb" fillOpacity={0.4} />
+                <Radar name="Moyenne Secteur" dataKey="Secteur" stroke="#a855f7" fill="#a855f7" fillOpacity={0.2} />
+                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {radarData.map((item, idx) => (
+              <div key={idx} style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.subject}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                  <span className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: '#2563eb' }}>{item.valEntreprise}</span>
+                  <span className="mono" style={{ fontSize: '0.70rem', color: '#a855f7', fontWeight: 700 }}>Norme : {item.valSecteur}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

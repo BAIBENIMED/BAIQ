@@ -80,10 +80,6 @@ export function AuditBalanceView({ rows, formatCurrency }) {
 
   const cycles = [...new Set((crossAudit.regles || []).map(r => r.cycle))];
 
-  // ── Score global ─────────────────────────────────────────────────────────
-  const scoreColor = audit.scoreCoherence >= 90 ? '#10b981' : audit.scoreCoherence >= 70 ? '#f59e0b' : '#ef4444';
-  const scoreBg    = audit.scoreCoherence >= 90 ? 'rgba(16, 185, 129, 0.15)' : audit.scoreCoherence >= 70 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)';
-
   const statutLabel = (s) => {
     if (s === 'CONFORME') return '✓ CONFORME';
     if (s === 'ANOMALIE') return '✕ ANOMALIE';
@@ -640,6 +636,199 @@ export function AuditBalanceView({ rows, formatCurrency }) {
  * MODAL DE DÉTAIL & POINTAGE — DESIGN & COULEURS HAUTE LISIBILITÉ
  * ═══════════════════════════════════════════════════════════════════════════
  */
+// ── Sous-composant table (déclaré au niveau module pour ne pas être recréé à chaque rendu) ──
+function AccountTable({
+  accounts, focus, sumTotal, isSource, checked, onToggle, onToggleAll,
+  label, totalVal, colLabel, getFocusAmount, fmtN, fmt, joinedMap, hasJointures
+}) {
+  const allChecked = accounts.length > 0 && accounts.every(a => checked.has(String(a.compte)));
+  const someChecked = !allChecked && accounts.some(a => checked.has(String(a.compte)));
+
+  const headerGradient = isSource
+    ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
+    : 'linear-gradient(135deg, #064e3b 0%, #059669 100%)';
+  const tagColor = isSource ? '#bfdbfe' : '#a7f3d0';
+  const codeColor = isSource ? '#60a5fa' : '#34d399';
+  const accentBorder = isSource ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+  const thBg = isSource ? '#0f2744' : '#0a2e22';
+
+  return (
+    <div style={{
+      border: `1px solid ${accentBorder}`,
+      borderRadius: 10,
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'var(--surface)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+      flex: '1 1 0%',
+      minWidth: 0,
+      minHeight: 0,
+      height: '100%'
+    }}>
+      {/* Card header — compact */}
+      <div style={{
+        padding: '6px 14px',
+        background: headerGradient,
+        color: '#ffffff',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottom: `1px solid ${accentBorder}`,
+        flexShrink: 0
+      }}>
+        <div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 900, color: tagColor, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>
+            {isSource ? '↗ FLUX SOURCE' : '↙ CONTREPARTIE'}
+          </div>
+          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#ffffff' }}>{label}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.58rem', color: tagColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TOTAL CONTRÔLÉ</div>
+          <div className="mono" style={{ fontSize: '1.02rem', fontWeight: 900, color: '#ffffff' }}>{fmt(totalVal)}</div>
+        </div>
+      </div>
+
+      {/* Table scrollable — fills full height */}
+      <div style={{
+        flex: '1 1 0%',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        minHeight: 0
+      }}>
+        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+          <thead>
+            <tr style={{ background: thBg, color: '#94a3b8', position: 'sticky', top: 0, zIndex: 2 }}>
+              <th style={{ width: '38px', padding: '6px 4px', borderBottom: `2px solid ${accentBorder}`, textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  ref={el => { if (el) el.indeterminate = someChecked; }}
+                  onChange={() => onToggleAll(allChecked)}
+                  style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
+                  title="Tout cocher / décocher"
+                />
+              </th>
+              <th style={{ width: '17%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>COMPTE</th>
+              <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: '#cbd5e1', borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>INTITULÉ DU COMPTE</th>
+              <th style={{ width: '27%', padding: '6px 10px', textAlign: 'right', fontWeight: 900, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>{colLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.length === 0 ? (
+              <tr>
+                <td colSpan="4" style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8', fontSize: '0.78rem' }}>
+                  {hasJointures
+                    ? '✓ Tous les comptes de ce côté sont rapprochés dans le tableau des jointures ci-dessous'
+                    : '⚪ Aucun compte avec mouvement > 0 DA'}
+                </td>
+              </tr>
+            ) : accounts.map((a, idx) => {
+              const amount     = getFocusAmount(a, focus);
+              const isChecked  = checked.has(String(a.compte));
+
+              let rowBg = idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)';
+              let borderLeft = '3px solid transparent';
+
+              if (isChecked) {
+                rowBg = isSource ? 'rgba(37, 99, 235, 0.22)' : 'rgba(16, 185, 129, 0.22)';
+                borderLeft = isSource ? '3px solid #3b82f6' : '3px solid #10b981';
+              }
+
+              return (
+                <tr key={idx}
+                  style={{
+                    borderBottom: '1px solid var(--border)',
+                    background: rowBg,
+                    borderLeft: borderLeft,
+                    cursor: 'pointer',
+                    transition: 'all 0.1s ease'
+                  }}
+                  onClick={() => onToggle(String(a.compte))}
+                  onMouseEnter={e => {
+                    if (!isChecked) {
+                      e.currentTarget.style.background = isSource ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isChecked) {
+                      e.currentTarget.style.background = rowBg;
+                    }
+                  }}
+                >
+                  <td style={{ padding: '5px 4px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => onToggle(String(a.compte))}
+                      style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
+                    />
+                  </td>
+                  <td className="mono" style={{ padding: '5px 8px', fontWeight: 800, color: codeColor, fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{a.compte}</span>
+                      {joinedMap.has(String(a.compte)) && (
+                        <span style={{
+                          fontSize: '0.56rem', fontWeight: 900, padding: '1px 4px', borderRadius: 3,
+                          background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid #059669'
+                        }}>
+                          ✓ #{joinedMap.get(String(a.compte))}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{
+                    padding: '5px 8px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: 'var(--text)',
+                    fontWeight: 600,
+                    maxWidth: 0,
+                    fontSize: '0.73rem'
+                  }} title={a.libelle}>
+                    {a.libelle}
+                  </td>
+                  <td className="mono" style={{
+                    padding: '5px 10px',
+                    textAlign: 'right',
+                    fontWeight: 800,
+                    color: 'var(--text)',
+                    whiteSpace: 'nowrap',
+                    fontSize: '0.8rem'
+                  }}>
+                    {fmtN(amount)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {accounts.length > 0 && (
+            <tfoot>
+              <tr style={{ background: thBg, borderTop: `2px solid ${accentBorder}` }}>
+                <td colSpan="2" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.73rem', color: '#ffffff' }}>
+                  TOTAL ({accounts.length} compte{accounts.length > 1 ? 's' : ''})
+                  {checked.size > 0 && (
+                    <span style={{ marginLeft: 8, fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: isSource ? '#2563eb' : '#059669', color: '#ffffff' }}>
+                      {checked.size} sélectionné{checked.size > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.68rem', color: tagColor, fontWeight: 800 }}>
+                  Solde net : <strong className="mono" style={{ color: '#ffffff', fontSize: '0.76rem' }}>{fmt(totalVal)}</strong>
+                </td>
+                <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#ffffff', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+                  {fmtN(sumTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function CrossAuditDetailModal({ rule, onClose, fmt }) {
   const [layoutMode, setLayoutMode] = useState('sideBySide');
   const [filterText, setFilterText] = useState('');
@@ -807,205 +996,14 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
   const resteSrcNonPointe   = Math.max(0, sumSrc - totalJointuresSrc);
   const resteTgtNonPointe   = Math.max(0, sumTgt - totalJointuresTgt);
 
-  // ── Sous-composant table ─────────────────────────────────────────────────
-  const AccountTable = ({ accounts, focus, sumTotal, isSource, checked, onToggle, label, totalVal, colLabel }) => {
-    const allChecked = accounts.length > 0 && accounts.every(a => checked.has(String(a.compte)));
-    const someChecked = !allChecked && accounts.some(a => checked.has(String(a.compte)));
-
-    const toggleAll = () => {
-      if (allChecked) {
-        if (isSource) setCheckedSrc(new Set());
-        else setCheckedTgt(new Set());
-      } else {
-        const next = new Set(accounts.map(a => String(a.compte)));
-        if (isSource) setCheckedSrc(next);
-        else setCheckedTgt(next);
-      }
-    };
-
-    const headerGradient = isSource
-      ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
-      : 'linear-gradient(135deg, #064e3b 0%, #059669 100%)';
-    const tagColor = isSource ? '#bfdbfe' : '#a7f3d0';
-    const codeColor = isSource ? '#60a5fa' : '#34d399';
-    const accentBorder = isSource ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)';
-    const thBg = isSource ? '#0f2744' : '#0a2e22';
-
-    return (
-      <div style={{
-        border: `1px solid ${accentBorder}`,
-        borderRadius: 10,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--surface)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-        flex: '1 1 0%',
-        minWidth: 0,
-        minHeight: 0,
-        height: '100%'
-      }}>
-        {/* Card header — compact */}
-        <div style={{
-          padding: '6px 14px',
-          background: headerGradient,
-          color: '#ffffff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: `1px solid ${accentBorder}`,
-          flexShrink: 0
-        }}>
-          <div>
-            <div style={{ fontSize: '0.6rem', fontWeight: 900, color: tagColor, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>
-              {isSource ? '↗ FLUX SOURCE' : '↙ CONTREPARTIE'}
-            </div>
-            <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#ffffff' }}>{label}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.58rem', color: tagColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TOTAL CONTRÔLÉ</div>
-            <div className="mono" style={{ fontSize: '1.02rem', fontWeight: 900, color: '#ffffff' }}>{fmt(totalVal)}</div>
-          </div>
-        </div>
-
-        {/* Table scrollable — fills full height */}
-        <div style={{
-          flex: '1 1 0%',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          minHeight: 0
-        }}>
-          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-            <thead>
-              <tr style={{ background: thBg, color: '#94a3b8', position: 'sticky', top: 0, zIndex: 2 }}>
-                <th style={{ width: '38px', padding: '6px 4px', borderBottom: `2px solid ${accentBorder}`, textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    ref={el => { if (el) el.indeterminate = someChecked; }}
-                    onChange={toggleAll}
-                    style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
-                    title="Tout cocher / décocher"
-                  />
-                </th>
-                <th style={{ width: '17%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>COMPTE</th>
-                <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: '#cbd5e1', borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>INTITULÉ DU COMPTE</th>
-                <th style={{ width: '27%', padding: '6px 10px', textAlign: 'right', fontWeight: 900, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>{colLabel}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.length === 0 ? (
-                <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8', fontSize: '0.78rem' }}>
-                    {jointures.length > 0
-                      ? '✓ Tous les comptes de ce côté sont rapprochés dans le tableau des jointures ci-dessous'
-                      : '⚪ Aucun compte avec mouvement > 0 DA'}
-                  </td>
-                </tr>
-              ) : accounts.map((a, idx) => {
-                const amount     = getFocusAmount(a, focus);
-                const isChecked  = checked.has(String(a.compte));
-
-                let rowBg = idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)';
-                let borderLeft = '3px solid transparent';
-
-                if (isChecked) {
-                  rowBg = isSource ? 'rgba(37, 99, 235, 0.22)' : 'rgba(16, 185, 129, 0.22)';
-                  borderLeft = isSource ? '3px solid #3b82f6' : '3px solid #10b981';
-                }
-
-                return (
-                  <tr key={idx}
-                    style={{
-                      borderBottom: '1px solid var(--border)',
-                      background: rowBg,
-                      borderLeft: borderLeft,
-                      cursor: 'pointer',
-                      transition: 'all 0.1s ease'
-                    }}
-                    onClick={() => onToggle(String(a.compte))}
-                    onMouseEnter={e => {
-                      if (!isChecked) {
-                        e.currentTarget.style.background = isSource ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)';
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!isChecked) {
-                        e.currentTarget.style.background = rowBg;
-                      }
-                    }}
-                  >
-                    <td style={{ padding: '5px 4px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => onToggle(String(a.compte))}
-                        style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
-                      />
-                    </td>
-                    <td className="mono" style={{ padding: '5px 8px', fontWeight: 800, color: codeColor, fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{a.compte}</span>
-                        {(isSource ? joinedSrcMap.has(String(a.compte)) : joinedTgtMap.has(String(a.compte))) && (
-                          <span style={{
-                            fontSize: '0.56rem', fontWeight: 900, padding: '1px 4px', borderRadius: 3,
-                            background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid #059669'
-                          }}>
-                            ✓ #{isSource ? joinedSrcMap.get(String(a.compte)) : joinedTgtMap.get(String(a.compte))}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '5px 8px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      color: 'var(--text)',
-                      fontWeight: 600,
-                      maxWidth: 0,
-                      fontSize: '0.73rem'
-                    }} title={a.libelle}>
-                      {a.libelle}
-                    </td>
-                    <td className="mono" style={{
-                      padding: '5px 10px',
-                      textAlign: 'right',
-                      fontWeight: 800,
-                      color: 'var(--text)',
-                      whiteSpace: 'nowrap',
-                      fontSize: '0.8rem'
-                    }}>
-                      {fmtN(amount)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            {accounts.length > 0 && (
-              <tfoot>
-                <tr style={{ background: thBg, borderTop: `2px solid ${accentBorder}` }}>
-                  <td colSpan="2" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.73rem', color: '#ffffff' }}>
-                    TOTAL ({accounts.length} compte{accounts.length > 1 ? 's' : ''})
-                    {checked.size > 0 && (
-                      <span style={{ marginLeft: 8, fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: isSource ? '#2563eb' : '#059669', color: '#ffffff' }}>
-                        {checked.size} sélectionné{checked.size > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.68rem', color: tagColor, fontWeight: 800 }}>
-                    Solde net : <strong className="mono" style={{ color: '#ffffff', fontSize: '0.76rem' }}>{fmt(totalVal)}</strong>
-                  </td>
-                  <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#ffffff', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
-                    {fmtN(sumTotal)}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
-    );
+  // Handlers "tout cocher / décocher" pour chaque bloc (source / cible)
+  const toggleAllSrc = (wasAllChecked) => {
+    if (wasAllChecked) setCheckedSrc(new Set());
+    else setCheckedSrc(new Set(srcAccounts.map(a => String(a.compte))));
+  };
+  const toggleAllTgt = (wasAllChecked) => {
+    if (wasAllChecked) setCheckedTgt(new Set());
+    else setCheckedTgt(new Set(tgtAccounts.map(a => String(a.compte))));
   };
 
   // ── Rendu modal ──────────────────────────────────────────────────────────
@@ -1238,13 +1236,17 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             <AccountTable
               accounts={srcAccounts} focus={rule.sourceFocus} sumTotal={sumSrc}
               colLabel={srcColLabel} label={rule.sourceLabel} totalVal={rule.sourceVal}
-              isSource={true} checked={checkedSrc} onToggle={toggleSrc}
+              isSource={true} checked={checkedSrc} onToggle={toggleSrc} onToggleAll={toggleAllSrc}
+              getFocusAmount={getFocusAmount} fmtN={fmtN} fmt={fmt}
+              joinedMap={joinedSrcMap} hasJointures={jointures.length > 0}
             />
             {hasCible && (
               <AccountTable
                 accounts={tgtAccounts} focus={rule.cibleFocus} sumTotal={sumTgt}
                 colLabel={tgtColLabel} label={rule.cibleLabel} totalVal={rule.cibleVal}
-                isSource={false} checked={checkedTgt} onToggle={toggleTgt}
+                isSource={false} checked={checkedTgt} onToggle={toggleTgt} onToggleAll={toggleAllTgt}
+                getFocusAmount={getFocusAmount} fmtN={fmtN} fmt={fmt}
+                joinedMap={joinedTgtMap} hasJointures={jointures.length > 0}
               />
             )}
           </div>
@@ -1285,6 +1287,14 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                     color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
                   }}>
                     Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteSrcNonPointe)} DA</strong>
+                  </span>
+                  <span style={{
+                    fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
+                    background: resteTgtNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    border: `1px solid ${resteTgtNonPointe > 1 ? '#dc2626' : '#059669'}`,
+                    color: resteTgtNonPointe > 1 ? '#fca5a5' : '#34d399'
+                  }}>
+                    Reste Cible : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteTgtNonPointe)} DA</strong>
                   </span>
                   <button
                     onClick={() => { setJointures([]); setNextJointureId(1); }}

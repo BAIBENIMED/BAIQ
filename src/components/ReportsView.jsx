@@ -243,14 +243,6 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     }
   };
 
-  // Réinitialiser le rapport généré pour ce type
-  const handleResetQuota = () => {
-    const updated = { ...savedReports };
-    delete updated[reportSlotKey];
-    setSavedReports(updated);
-    localStorage.setItem('baiq_saved_ai_reports', JSON.stringify(updated));
-  };
-
   const handleCopyReport = () => {
     if (!displayedReportText) return;
     navigator.clipboard.writeText(displayedReportText);
@@ -273,7 +265,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     </div>
   );
 
-  const { bilan, sig, ratios, rows, profil } = data;
+  const { bilan, sig, ratios, rows } = data;
   const r = ratios || {};
   const s = sig || {};
   const b = bilan || {};
@@ -665,7 +657,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             {currentReportEntry?.isGemini ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
-                  onClick={() => setShowConfirmModal(true)}
+                  onClick={handleGenerateGeminiReport}
                   className="btn"
                   style={{
                     background: 'rgba(255, 255, 255, 0.12)',
@@ -688,7 +680,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               </div>
             ) : (
               <button
-                onClick={() => setShowConfirmModal(true)}
+                onClick={handleGenerateGeminiReport}
                 disabled={isGenerating}
                 className="btn"
                 style={{

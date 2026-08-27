@@ -1455,6 +1455,8 @@ export const calculateSIG = (data) => {
     let c65 = 0; // Autres charges opérationnelles
     let c68_expl = 0; // Dotations aux amortissements/provisions (exploitation)
     let c78_expl = 0; // Reprises sur pertes de valeur et provisions (exploitation)
+    let c752 = 0; // Produits de cession d'immobilisations (sous-compte de 75, exclu de la CAF)
+    let c652 = 0; // VNC des immobilisations cédées (sous-compte de 65, exclu de la CAF)
 
     let c76 = 0; // Produits financiers
     let c66 = 0; // Charges financières
@@ -1482,7 +1484,7 @@ export const calculateSIG = (data) => {
         else if (c.startsWith('62'))  c62 += val;
         else if (c.startsWith('63'))  c63 += val; // Personnel en SCF
         else if (c.startsWith('64'))  c64 += val; // Impôts/Taxes en SCF
-        else if (c.startsWith('65'))  c65 += val;
+        else if (c.startsWith('65')) { c65 += val; if (c.startsWith('652')) c652 += val; }
         else if (c.startsWith('66'))  c66 += val;
         else if (c.startsWith('67'))  c67 += val;
         else if (c.startsWith('68')) {
@@ -1500,7 +1502,7 @@ export const calculateSIG = (data) => {
         else if (c.startsWith('72'))  c72 += val;
         else if (c.startsWith('73'))  c73 += val;
         else if (c.startsWith('74'))  c74 += val;
-        else if (c.startsWith('75'))  c75 += val;
+        else if (c.startsWith('75')) { c75 += val; if (c.startsWith('752')) c752 += val; }
         else if (c.startsWith('76'))  c76 += val;
         else if (c.startsWith('77'))  c77 += val;
         else if (c.startsWith('78')) {
@@ -1540,7 +1542,9 @@ export const calculateSIG = (data) => {
     const resultatNet = resultatNetOrdinaire + resultatExtraordinaire;
 
     // Capacité d'Autofinancement (CAF) selon la méthode soustractive SCF
-    const caf = ebe + c75 - c65 + c76 - c66 - c69;
+    // Exclut les produits de cession (752) et la VNC des éléments cédés (652), non récurrents,
+    // pour ne mesurer que la capacité d'autofinancement liée à l'activité normale.
+    const caf = ebe + (c75 - c752) - (c65 - c652) + c76 - c66 - c69;
 
     return {
       chiffreAffaires,
@@ -1567,7 +1571,7 @@ export const calculateSIG = (data) => {
       caf,
       achats: c60, // Achats consommés (Compte 60)
       // Détail des comptes de charges/produits pour les vues
-      c70, c72, c73, c74, c60, c61, c62, c63, c64, c75, c65, c68_expl, c78_expl, c76, c66, c69, c77, c67
+      c70, c72, c73, c74, c60, c61, c62, c63, c64, c75, c65, c68_expl, c78_expl, c76, c66, c69, c77, c67, c752, c652
     };
   }
 
@@ -1591,6 +1595,7 @@ export const calculateRatios = (bilan, sig, rows) => {
   let stockFinalTotal = 0;
   let capitauxPropres = 0;
   let dettesFinancieresLT = 0;
+  let provisionsRisques = 0;
 
   if (rows && Array.isArray(rows)) {
     rows.forEach(row => {
@@ -1622,9 +1627,14 @@ export const calculateRatios = (bilan, sig, rows) => {
         if (soldeNet > 0) dettesFournisseurs += soldeNet;
       }
 
-      // Capitaux Propres (Comptes 10, 11, 12, 13, 14, 15)
-      if (c.startsWith('10') || c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14') || c.startsWith('15')) {
+      // Capitaux Propres (Comptes 10, 11, 12, 13, 14 — hors compte 15 qui est une dette potentielle, cf. ci-dessous)
+      if (c.startsWith('10') || c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14')) {
         capitauxPropres += -solde;
+      }
+
+      // Provisions pour risques et charges (Compte 15) : dette potentielle, exclue des Capitaux Propres
+      if (c.startsWith('15')) {
+        provisionsRisques += -solde;
       }
 
       // Emprunts et dettes financières LT (Compte 16)
@@ -1670,7 +1680,9 @@ export const calculateRatios = (bilan, sig, rows) => {
 
   // Ratios de liquidité
   const liquiditeGenerale = denomLiquidite === 0 ? 0 : ((bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0)) / denomLiquidite;
-  const liquiditeReduite = denomLiquidite === 0 ? 0 : (creancesClients + (bilan.tresorerieActive || 0)) / denomLiquidite;
+  // Liquidité réduite = (Actif Circulant hors Stocks + Trésorerie Active) / Passif Circulant
+  // (et non les seules créances clients, qui ignorent les autres créances court terme : État, autres débiteurs...)
+  const liquiditeReduite = denomLiquidite === 0 ? 0 : (((bilan.actifCirculant || 0) - stocks) + (bilan.tresorerieActive || 0)) / denomLiquidite;
   const liquiditeImmediate = denomLiquidite === 0 ? 0 : (bilan.tresorerieActive || 0) / denomLiquidite;
 
   // Ratios de rentabilité et rendement
@@ -1681,7 +1693,8 @@ export const calculateRatios = (bilan, sig, rows) => {
   const roa = totalBilan === 0 ? 0 : re / totalBilan;
 
   // Structure et solvabilité
-  const autonomieFinanciere = totalBilan === 0 ? 0 : (bilan.ressourcesStables || 0) / totalBilan;
+  // Autonomie Financière = Capitaux Propres / Total Bilan (et non Ressources Stables, qui mélange capitaux propres et dettes LT)
+  const autonomieFinanciere = totalBilan === 0 ? 0 : capitauxPropres / totalBilan;
   const poidsPersonnel = va === 0 ? 0 : chargesPers / va;
   const couvertureChargesFin = chargesFin > 0 ? ebe / chargesFin : 99;
 
@@ -1711,6 +1724,7 @@ export const calculateRatios = (bilan, sig, rows) => {
     dettesFournisseurs,
     capitauxPropres,
     dettesFinancieresLT,
+    provisionsRisques,
     achats,
     chiffreAffaires: ca
   };
@@ -1921,6 +1935,7 @@ export function autoMatchAccounts(sourceAccounts = [], targetAccounts = [], sour
  * Calcul matriciel des mouvements de capitaux propres entre l'ouverture et la clôture.
  * ═══════════════════════════════════════════════════════════════
  */
+// eslint-disable-next-line no-unused-vars -- dataN1 réservé pour une future comparaison N/N-1 du TVCP ; non encore exploité, mais fait partie de la signature publique de la fonction.
 export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig = null) {
   if (!rows || !Array.isArray(rows) || rows.length === 0) {
     return {
@@ -1972,21 +1987,6 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
     }, 0);
   };
 
-  const getMouvements = (prefixes, exclude = []) => {
-    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
-    const exList = Array.isArray(exclude) ? exclude : [exclude];
-    let deb = 0, cred = 0;
-    c1Rows.forEach(r => {
-      const c = String(r.compte).trim();
-      if (exList.some(ex => c.startsWith(ex))) return;
-      if (pList.some(p => c.startsWith(p))) {
-        deb += safeNum(r.mouvementDebit);
-        cred += safeNum(r.mouvementCredit);
-      }
-    });
-    return { debit: deb, credit: cred, net: cred - deb };
-  };
-
   // 1. Capital social (101) - Capital souscrit non appelé (109)
   const cap101Deb = getSoldeDeb('101');
   const cap109Deb = getSoldeDeb('109'); // négatif si débiteur
@@ -2014,7 +2014,7 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
 
   // 5. Résultat net de l'exercice N-1 & N (120, 129, 12)
   const resNetAnterieur = getSoldeDeb('12'); // Résultat N-1 en début d'exercice N
-  let resNetExercice = 0;
+  let resNetExercice;
   if (sig && sig.resultatNet !== undefined && sig.resultatNet !== 0) {
     resNetExercice = sig.resultatNet;
   } else {

@@ -20,13 +20,13 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   const frng = bilan.frng || 0;
   const ebit = sig.resultatExploitation || (sig.ebe || 0) - (sig.dotationsExploitation || sig.c68_expl || 0);
   const ebe  = sig.ebe || 0;
-  const resultatNet = sig.resultatNet || 0;
 
   // Calcul des composantes des Capitaux Propres & Dettes
   let capital = 0;
   let reservesAndRetained = 0;
-  let capitauxPropres = 0;
+  let capitauxPropres;
   let dettesFinancieresLT = 0;
+  let provisionsRisques = 0;
   let dettesCourtTerme = (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0);
 
   if (rows && Array.isArray(rows)) {
@@ -39,9 +39,13 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       if (c.startsWith('10')) {
         capital += -solde;
       }
-      // Comptes 11, 12, 13, 14, 15 : Réserves, Report à nouveau, Résultat de l'exercice
-      else if (c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14') || c.startsWith('15')) {
+      // Comptes 11, 12, 13, 14 : Réserves, Report à nouveau, Résultat de l'exercice, Subventions
+      else if (c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14')) {
         reservesAndRetained += -solde;
+      }
+      // Compte 15 : Provisions pour risques et charges — dette potentielle, exclue des Capitaux Propres
+      else if (c.startsWith('15')) {
+        provisionsRisques += -solde;
       }
       // Compte 16 : Emprunts et dettes financières à long terme
       else if (c.startsWith('16')) {
@@ -59,7 +63,8 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     capitauxPropres = capital + reservesAndRetained;
   }
 
-  const totalDettes = Math.max(1, dettesCourtTerme + dettesFinancieresLT);
+  // Total Dettes = Dettes CT + Dettes Financières LT + Provisions (dette potentielle, cf. reclassement ci-dessus)
+  const totalDettes = Math.max(1, dettesCourtTerme + dettesFinancieresLT + provisionsRisques);
 
   // Ratios Altman
   const x1 = frng / totalBilan;
@@ -70,13 +75,13 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   const zScore = (6.56 * x1) + (3.26 * x2) + (6.72 * x3) + (1.05 * x4);
 
   // Interprétation Altman Z''
-  let zone = 'safe'; // 'safe', 'grey', 'distress'
-  let zoneLabel = 'Zone Saine (Solvabilité Élevée)';
-  let zoneColor = '#059669';
-  let zoneBg = '#f0fdf4';
-  let zoneBorder = '#86efac';
-  let risqueDefaillance = 'Très faible (< 5%)';
-  let rating = 'A+';
+  let zone; // 'safe', 'grey', 'distress'
+  let zoneLabel;
+  let zoneColor;
+  let zoneBg;
+  let zoneBorder;
+  let risqueDefaillance;
+  let rating;
 
   if (zScore >= 2.90) {
     rating = 'A+';
@@ -146,7 +151,8 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
 
   const ratioAutonomie = dettesFinancieresLT > 0 ? capitauxPropres / dettesFinancieresLT : 99;
   const ratioRentabilite = ca > 0 ? (ebe / ca) : (ebe > 0 ? 0.20 : 0);
-  const ratioLiquiditeGen = (bilan.actifCirculant || 0) / Math.max(1, dettesCourtTerme);
+  // Liquidité Générale = (Actif Circulant + Trésorerie Active) / Dettes CT — alignée sur calculateRatios.liquiditeGenerale
+  const ratioLiquiditeGen = ((bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0)) / Math.max(1, dettesCourtTerme);
 
   const autonomieScore = ratioAutonomie >= 1.5 ? 5 : ratioAutonomie >= 1.0 ? 4 : ratioAutonomie >= 0.5 ? 2.5 : 1;
   const rentabiliteScore = ratioRentabilite >= 0.20 ? 5 : ratioRentabilite >= 0.12 ? 4 : ratioRentabilite >= 0.07 ? 2.5 : 1;
@@ -184,6 +190,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       dettesNettes,
       ratioDetteSurEBE,
       dettesFinancieresLT,
+      provisionsRisques,
       capitauxPropres,
       capaciteEndettementMax,
       couvertureChargesFin,

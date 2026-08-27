@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { verifyAccountNature, auditBalanceAccounts, auditCrossAccountMovements } from '../utils/financeCalculations';
+import { verifyAccountNature } from '../utils/financeCalculations';
 
 // Cellule adaptative intelligente avec échelle de division et arrondi
 const NumCell = ({ val, isBold, color, activeDivisor = 1, rounding = 2, style = {} }) => {
@@ -66,10 +66,6 @@ export function BalanceView({ rows }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [pageSize, setPageSize] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeAuditTab, setActiveAuditTab] = useState('natures'); // 'natures' | 'flux'
-
-  const audit = rows && rows.length > 0 ? auditBalanceAccounts(rows) : null;
-  const crossAudit = rows && rows.length > 0 ? auditCrossAccountMovements(rows) : null;
 
   if (!rows || rows.length === 0) {
     return (
@@ -416,6 +412,30 @@ export function BalanceView({ rows }) {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{s.icon}</span>
                   {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 🔎 Filtre Audit (conformité de la nature des comptes) */}
+            <div style={{ display: 'flex', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 3, gap: 2 }}>
+              {[
+                { id: 'all',        label: 'Toutes natures', icon: 'apps' },
+                { id: 'anomalies',  label: 'Anomalies',      icon: 'dangerous' },
+                { id: 'atypiques',  label: 'Atypiques',      icon: 'warning' },
+                { id: 'conformes',  label: 'Conformes',      icon: 'check_circle' },
+              ].map(af => (
+                <button
+                  key={af.id}
+                  onClick={() => { setAuditFilter(af.id); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                    background: auditFilter === af.id ? '#c2410c' : 'transparent',
+                    color: auditFilter === af.id ? '#ffffff' : '#9a3412',
+                    transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{af.icon}</span>
+                  {af.label}
                 </button>
               ))}
             </div>

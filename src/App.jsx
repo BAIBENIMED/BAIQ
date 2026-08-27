@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie 
 } from 'recharts';
@@ -14,6 +14,10 @@ import { ReportsView } from './components/ReportsView';
 import { AIView } from './components/AIView';
 import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { CalculationsIndexView } from './components/CalculationsIndexView';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { PresentationView } from './components/PresentationView';
+import { exportFinancialWorkbook } from './utils/excelExporter';
+import { generateFullPDF } from './utils/pdfExporter';
 import { calculateStockEvolution } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
@@ -45,6 +49,21 @@ export default function App() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(() => parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10));
   
+  /* ── Recherche Avancée (Ctrl+K) & Mode Présentation DAF ── */
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   /* ── Moteur de Simulation ── */
   const [simulationEntries, setSimulationEntries] = useState([]);
   const [isSimulationActive, setIsSimulationActive] = useState(false);
@@ -645,6 +664,44 @@ export default function App() {
           </div>
         </div>
 
+        {/* Vue Annuelle : Produits (Cl. 7) vs Charges (Cl. 6) vs Résultat Net */}
+        <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>bar_chart</span>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Vue Annuelle : Produits vs Charges</h3>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Totaux cumulés des classes 7 et 6, et résultat net qui en découle</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-body">
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={annualTotals.bars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={80} />
+                  <Tooltip formatter={(val) => fmt(val)} contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                  <Bar dataKey="Montant" radius={[6, 6, 0, 0]} maxBarSize={90}>
+                    {annualTotals.bars.map((entry, index) => (
+                      <Cell key={`cell-annual-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, fontSize: '0.78rem' }}>
+              <span>Produits : <strong className="mono" style={{ color: '#2563eb' }}>{fmt(annualTotals.totP)}</strong></span>
+              <span>Charges : <strong className="mono" style={{ color: '#059669' }}>{fmt(annualTotals.totC)}</strong></span>
+              <span>Résultat Net : <strong className="mono" style={{ color: annualTotals.net >= 0 ? '#059669' : '#dc2626' }}>{fmt(annualTotals.net)}</strong></span>
+            </div>
+          </div>
+        </div>
+
         {/* Structure des Charges (Classe 6 — Cercle Fragmenté / Donut Chart) */}
         <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -1140,6 +1197,29 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── PALETTE DE COMMANDES (Ctrl+K) ── */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(id) => setTab(id)}
+        rows={activeData?.rows}
+        data={activeData}
+        onExportExcel={() => exportFinancialWorkbook(activeData)}
+        onExportPDF={() => generateFullPDF(activeData, undefined, isSimulationActive)}
+        onTogglePresentation={() => setIsPresentationOpen(true)}
+        isSimulationActive={isSimulationActive}
+        setIsSimulationActive={setIsSimulationActive}
+      />
+
+      {/* ── MODE PRÉSENTATION DAF (Plein Écran) ── */}
+      {isPresentationOpen && (
+        <PresentationView
+          data={activeData}
+          onClose={() => setIsPresentationOpen(false)}
+          formatCurrency={fmt}
+        />
       )}
     </div>
   );

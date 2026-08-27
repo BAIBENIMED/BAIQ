@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { runAIAnalysis, buildGeminiContext, generateGeminiReport } from '../utils/aiEngine';
+import { runAIAnalysis, buildGeminiContext } from '../utils/aiEngine';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Assistant & Diagnostic IA Financier Approfondi
@@ -128,7 +128,7 @@ export function AIView({ data, geminiKey }) {
   const exportAISynthesis = () => {
     let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nRAPPORT DE DIAGNOSTIC FINANCIER APPROFONDI (SCF ALGÉRIE)\n`;
     content += `Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
-    content += `Entité: ${profil?.nomEntreprise || 'Dossier Anonyme'}\n`;
+    content += `Entité: ${data?.profil?.nomEntreprise || 'Dossier Anonyme'}\n`;
     content += `Secteur: ${sec?.label || 'Général'} (IBS: ${sec?.tauxIBS || '19%'})\n`;
     content += `Score Global: ${analysis?.scoreGlobal || 'N/A'}/100 — ${analysis?.niveau?.label || ''}\n\n`;
 

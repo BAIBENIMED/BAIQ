@@ -311,6 +311,9 @@ export function StockView({ rows, ratios, formatCurrency }) {
             <span style={{ fontSize: '0.68rem', color: data.totalVariation <= 0 ? '#34d399' : '#fbbf24', display: 'block', marginTop: 2, fontWeight: 700 }}>
               Var : {data.totalVariation > 0 ? '+' : ''}{fmt(data.totalVariation)} ({fmtPct(data.totalPctVariation)})
             </span>
+            <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
+              Poids du stock / CA : {((data.totalFinal / chiffreAffaires) * 100).toFixed(1)} %
+            </span>
           </div>
 
           {/* 4. Statut Sécurité */}
@@ -1028,6 +1031,26 @@ export function StockView({ rows, ratios, formatCurrency }) {
                     💡 <strong>Double lecture SCF &amp; Gestion :</strong> Le débit du 72 diminue la Production de l'année (car vendue sur stocks antérieurs) et correspond analytiquement à une consommation directe de stock de produits finis.
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Rapprochement 603 (Variation Stocks Achats) vs 72 (Production Stockée) */}
+            <div style={{
+              marginTop: 14, padding: '12px 16px', borderRadius: 10,
+              background: Math.abs(comptesConcordance.net603 + comptesConcordance.net72) < 1 ? '#f0fdf4' : '#fffbeb',
+              border: `1px solid ${Math.abs(comptesConcordance.net603 + comptesConcordance.net72) < 1 ? '#86efac' : '#fde68a'}`
+            }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: Math.abs(comptesConcordance.net603 + comptesConcordance.net72) < 1 ? '#166534' : '#92400e', marginBottom: 4 }}>
+                Rapprochement Comptable : Compte 603 vs Compte 72
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-sub)' }}>
+                <span>Solde net 603 (achats) : <strong className="mono">{fmt(comptesConcordance.net603)}</strong></span>
+                <span>Solde net 72 (production) : <strong className="mono">{fmt(comptesConcordance.net72)}</strong></span>
+                <span>
+                  {Math.abs(comptesConcordance.net603 + comptesConcordance.net72) < 1
+                    ? '✓ Concordance vérifiée entre les deux méthodes de variation de stocks.'
+                    : `⚠ Écart de ${fmt(Math.abs(comptesConcordance.net603 + comptesConcordance.net72))} entre les deux méthodes — à vérifier.`}
+                </span>
               </div>
             </div>
 

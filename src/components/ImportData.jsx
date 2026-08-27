@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, File, Download, Play, Sparkles, FolderOpen, HelpCircle } from 'lucide-react';
+import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react';
 import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
 import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
@@ -318,20 +318,46 @@ export function ImportData({ onDataImported }) {
             </h4>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {SAMPLE_BALANCES.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => handleLoadSample(s)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff',
-                    fontSize: '0.70rem', fontWeight: 800, color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.badgeColor }}></span>
-                  {s.badge}
-                </button>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'stretch', borderRadius: 8, border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                  <button
+                    onClick={() => handleLoadSample(s)}
+                    title="Charger dans l'aperçu (vérifier avant de lancer)"
+                    style={{
+                      padding: '6px 12px', border: 'none', background: '#ffffff',
+                      fontSize: '0.70rem', fontWeight: 800, color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.badgeColor }}></span>
+                    {s.badge}
+                  </button>
+                  <button
+                    onClick={() => handleQuickLaunchSample(s)}
+                    title="Lancer directement l'analyse (sans aperçu)"
+                    style={{
+                      padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
+                      color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                  >
+                    <Play size={12} fill="currentColor" />
+                  </button>
+                  <button
+                    onClick={() => downloadSampleExcel(s.id)}
+                    title="Télécharger cet exemple au format Excel"
+                    style={{
+                      padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
+                      color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                  >
+                    <Download size={12} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
