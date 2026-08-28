@@ -1074,7 +1074,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 display: 'flex', alignItems: 'center', gap: 5
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{rule.ecart < 1 ? 'check_circle' : 'error'}</span>
-                <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>Écart : {fmtN(rule.ecart)} DA</span>
+                <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>Écart : {fmt(rule.ecart)}</span>
               </div>
             </div>
             <button
@@ -1179,7 +1179,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_link</span>
-                Créer Jointure #{nextJointureId} [{checkedSrc.size} ⇔ {checkedTgt.size}] ({fmtN(selSrcTotal)} ⇔ {fmtN(selTgtTotal)} DA {selEcart < 1 ? '✓ Équilibré' : `(Écart: ${fmtN(selEcart)})`})
+                Créer Jointure #{nextJointureId} [{checkedSrc.size} ⇔ {checkedTgt.size}] ({fmt(selSrcTotal)} ⇔ {fmt(selTgtTotal)} {selEcart < 1 ? '✓ Équilibré' : `(Écart: ${fmt(selEcart)})`})
               </button>
             )}
 
@@ -1275,10 +1275,10 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
               {jointures.length > 0 && (
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 5, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
-                    Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmtN(totalJointuresSrc)} DA</strong>
+                    Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmt(totalJointuresSrc)}</strong>
                   </span>
                   <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
-                    Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmtN(totalJointuresTgt)} DA</strong>
+                    Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmt(totalJointuresTgt)}</strong>
                   </span>
                   <span style={{
                     fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
@@ -1286,7 +1286,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                     border: `1px solid ${resteSrcNonPointe > 1 ? '#dc2626' : '#059669'}`,
                     color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
                   }}>
-                    Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteSrcNonPointe)} DA</strong>
+                    Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmt(resteSrcNonPointe)}</strong>
                   </span>
                   <span style={{
                     fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
@@ -1294,7 +1294,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                     border: `1px solid ${resteTgtNonPointe > 1 ? '#dc2626' : '#059669'}`,
                     color: resteTgtNonPointe > 1 ? '#fca5a5' : '#34d399'
                   }}>
-                    Reste Cible : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmtN(resteTgtNonPointe)} DA</strong>
+                    Reste Cible : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmt(resteTgtNonPointe)}</strong>
                   </span>
                   <button
                     onClick={() => { setJointures([]); setNextJointureId(1); }}

@@ -2002,6 +2002,14 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
   const resFin = getSoldeFin(['103', '106']);
   const varRes = resFin - resDeb;
 
+  // 2bis. Réserves seules (106), hors primes d'émission/fusion/apport (103).
+  // Le compte 103 correspond à une opération de capital (ex: augmentation de capital avec prime),
+  // sans lien avec l'affectation du résultat N-1. Le distinguer évite de confondre une entrée de
+  // capital frais avec une mise en réserve du résultat lors du calcul des dividendes ci-dessous.
+  const res106Deb = getSoldeDeb('106');
+  const res106Fin = getSoldeFin('106');
+  const varRes106 = res106Fin - res106Deb;
+
   // 3. Écarts d'évaluation & de réévaluation (105)
   const ecartDeb = getSoldeDeb('105');
   const ecartFin = getSoldeFin('105');
@@ -2033,8 +2041,10 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
   const varSubv = subvFin - subvDeb;
 
   // 7. Affectation du résultat antérieur (N-1)
-  // Le résultat antérieur est viré vers les réserves, le report à nouveau, et/ou distribué en dividendes
-  const affectationReserves = Math.max(0, varRes);
+  // Le résultat antérieur est viré vers les réserves, le report à nouveau, et/ou distribué en dividendes.
+  // Basé uniquement sur la variation du compte 106 (réserves) — pas sur 103 (primes d'émission),
+  // qui relève d'une opération de capital distincte et n'a pas à être confondue avec une affectation de résultat.
+  const affectationReserves = Math.max(0, varRes106);
   const affectationRAN = varRan;
   // Dividendes = Résultat antérieur - Affectation aux réserves - Affectation au RAN (si positif)
   let dividendes = 0;

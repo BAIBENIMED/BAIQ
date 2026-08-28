@@ -4,6 +4,7 @@ import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react
 import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
 import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 export function ImportData({ onDataImported }) {
   // ── Unified Company Profile (Secteur par défaut: Industrie / Production) ──
@@ -20,6 +21,7 @@ export function ImportData({ onDataImported }) {
   const [errorN, setErrorN] = useState(null);
   const [errorN1, setErrorN1] = useState(null);
   const [previewTarget, setPreviewTarget] = useState(null); // null, 'N' ou 'N-1'
+  useEscapeKey(Boolean(previewTarget), () => setPreviewTarget(null));
 
   // ── Multi-Dossiers localStorage ──
   const [savedDossiers, setSavedDossiers] = useState(() => {
@@ -29,6 +31,7 @@ export function ImportData({ onDataImported }) {
       return [];
     }
   });
+  const [saveError, setSaveError] = useState(null);
 
   const saveDossierToStorage = (payloadData) => {
     const dDate = new Date().toLocaleDateString('fr-FR');
@@ -41,11 +44,13 @@ export function ImportData({ onDataImported }) {
       data: payloadData,
     };
     const updated = [newDossier, ...savedDossiers];
-    setSavedDossiers(updated);
     try {
       localStorage.setItem('finanalyze_saved_dossiers', JSON.stringify(updated));
+      setSavedDossiers(updated);
+      setSaveError(null);
     } catch (e) {
       console.warn('Erreur sauvegarde localStorage:', e);
+      setSaveError("Le dossier n'a pas pu être sauvegardé (espace de stockage du navigateur saturé). Supprimez d'anciens dossiers puis réessayez, ou continuez sans sauvegarder — l'analyse en cours reste disponible.");
     }
   };
 
@@ -53,7 +58,11 @@ export function ImportData({ onDataImported }) {
     e.stopPropagation();
     const updated = savedDossiers.filter(d => d.id !== id);
     setSavedDossiers(updated);
-    localStorage.setItem('finanalyze_saved_dossiers', JSON.stringify(updated));
+    try {
+      localStorage.setItem('finanalyze_saved_dossiers', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Erreur suppression localStorage:', err);
+    }
   };
 
   const loadSavedDossier = (dossier) => {
@@ -214,6 +223,21 @@ export function ImportData({ onDataImported }) {
           <Sparkles size={14} /> Activités de Production par Défaut
         </div>
       </div>
+
+      {saveError && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10,
+          background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.78rem', marginBottom: 4
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>warning</span>
+          <span style={{ flex: 1 }}>{saveError}</span>
+          <button
+            onClick={() => setSaveError(null)}
+            style={{ border: 'none', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', lineHeight: 1, padding: 0 }}
+            aria-label="Fermer"
+          >×</button>
+        </div>
+      )}
 
       {/* Grid Principal : Profil à gauche, Import à droite */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
@@ -473,15 +497,60 @@ export function ImportData({ onDataImported }) {
       </div>
 
       {/* MODAL DE CONTRÔLE COMPTABLE */}
-      {previewTarget && (previewTarget === 'N' ? parsedN : parsedN1) && createPortal(
+      {previewTarget && (previewTarget === 'N' ? parsedN : parsedN1) && (() => {
+        const previewRows = previewTarget === 'N' ? parsedN : parsedN1;
+        const activeRows = previewRows.filter(r => !r.ignore);
+        const compteCounts = {};
+        activeRows.forEach(r => {
+          const c = String(r.compte || '').trim();
+          if (!c) return;
+          compteCounts[c] = (compteCounts[c] || 0) + 1;
+        });
+        const duplicateComptes = Object.keys(compteCounts).filter(c => compteCounts[c] > 1);
+        const totals = activeRows.reduce((acc, r) => ({
+          soldeDebutDebit:  acc.soldeDebutDebit  + (r.soldeDebutDebit  || 0),
+          soldeDebutCredit: acc.soldeDebutCredit + (r.soldeDebutCredit || 0),
+          mouvementDebit:   acc.mouvementDebit   + (r.mouvementDebit   || 0),
+          mouvementCredit:  acc.mouvementCredit  + (r.mouvementCredit  || 0),
+          soldeFinDebit:    acc.soldeFinDebit    + (r.soldeFinDebit    || 0),
+          soldeFinCredit:   acc.soldeFinCredit   + (r.soldeFinCredit   || 0),
+        }), { soldeDebutDebit: 0, soldeDebutCredit: 0, mouvementDebit: 0, mouvementCredit: 0, soldeFinDebit: 0, soldeFinCredit: 0 });
+
+        const ecartDebut = Math.abs(totals.soldeDebutDebit - totals.soldeDebutCredit);
+        const ecartMouv  = Math.abs(totals.mouvementDebit  - totals.mouvementCredit);
+        const ecartFin   = Math.abs(totals.soldeFinDebit   - totals.soldeFinCredit);
+        const balanceOk  = ecartDebut < 1 && ecartMouv < 1 && ecartFin < 1;
+
+        return createPortal(
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.7)', zIndex: 99999, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h3 style={{ color: '#1e40af', fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>Contrôle &amp; Prévisualisation — Balance {previewTarget}</h3>
               <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Cochez les lignes à ignorer lors du traitement comptable (ex: sous-totaux).</span>
             </div>
-            <button onClick={() => setPreviewTarget(null)} style={{ padding: '6px 16px', borderRadius: 8, cursor: 'pointer', background: '#2563eb', color: 'white', border: 'none', fontSize: '0.8rem', fontWeight: 700 }}>Fermer</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 800,
+                background: balanceOk ? '#dcfce7' : '#fee2e2', color: balanceOk ? '#166534' : '#991b1b',
+                border: `1px solid ${balanceOk ? '#86efac' : '#fca5a5'}`
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{balanceOk ? 'check_circle' : 'error'}</span>
+                {balanceOk ? 'Balance équilibrée' : `Déséquilibre détecté (${Math.round(Math.max(ecartDebut, ecartMouv, ecartFin)).toLocaleString('fr-FR')} DA)`}
+              </span>
+              <button onClick={() => setPreviewTarget(null)} style={{ padding: '6px 16px', borderRadius: 8, cursor: 'pointer', background: '#2563eb', color: 'white', border: 'none', fontSize: '0.8rem', fontWeight: 700 }}>Fermer</button>
+            </div>
           </div>
+          {!balanceOk && (
+            <div style={{ padding: '10px 24px', background: '#fef2f2', borderBottom: '1px solid #fecaca', fontSize: '0.74rem', color: '#991b1b', flexShrink: 0 }}>
+              ⚠ Les colonnes Débit/Crédit n'ont pas pu être détectées avec certitude dans ce fichier, ou la balance source contient une anomalie. Vérifiez les colonnes ci-dessous avant de poursuivre l'analyse.
+            </div>
+          )}
+          {duplicateComptes.length > 0 && (
+            <div style={{ padding: '10px 24px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: '0.74rem', color: '#92400e', flexShrink: 0 }}>
+              ⚠ Compte{duplicateComptes.length > 1 ? 's' : ''} apparaissant plusieurs fois dans le fichier : <strong>{duplicateComptes.join(', ')}</strong>.
+              {' '}Les montants seront additionnés automatiquement dans les totaux, mais vérifiez qu'il ne s'agit pas d'une erreur d'export (lignes surlignées ci-dessous).
+            </div>
+          )}
           <div style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead style={{ position: 'sticky', top: 0, background: '#ffffff', zIndex: 1 }}>
@@ -492,22 +561,47 @@ export function ImportData({ onDataImported }) {
                 </tr>
               </thead>
               <tbody>
-                {(previewTarget === 'N' ? parsedN : parsedN1).map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: row.ignore ? '#fff1f2' : '#ffffff' }}>
+                {previewRows.map((row, i) => {
+                  const isDuplicate = !row.ignore && duplicateComptes.includes(String(row.compte || '').trim());
+                  return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: row.ignore ? '#fff1f2' : (isDuplicate ? '#fffbeb' : '#ffffff') }}>
                     <td style={{ padding: '6px 12px', textAlign: 'center' }}><input type="checkbox" checked={row.ignore} onChange={() => toggleIgnoreRow(previewTarget, i)} /></td>
-                    <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}>{row.compte}</td>
+                    <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 700, color: isDuplicate ? '#b45309' : '#2563eb' }}>
+                      {row.compte}{isDuplicate && <span title="Ce numéro de compte apparaît plusieurs fois" style={{ marginLeft: 4 }}>⚠</span>}
+                    </td>
                     <td style={{ padding: '6px 12px' }}>{row.libelle}</td>
                     {[row.soldeDebutDebit, row.soldeDebutCredit, row.mouvementDebit, row.mouvementCredit, row.soldeFinDebit, row.soldeFinCredit].map((v, j) => (
                       <td key={j} style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{v ? Math.round(v).toLocaleString('fr-FR') : ''}</td>
                     ))}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
+              <tfoot style={{ position: 'sticky', bottom: 0 }}>
+                <tr style={{ borderTop: '2px solid #cbd5e1', background: balanceOk ? '#f0fdf4' : '#fef2f2' }}>
+                  <td colSpan={3} style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b', fontSize: '0.78rem' }}>
+                    TOTAUX ({activeRows.length} lignes actives{previewRows.length !== activeRows.length ? `, ${previewRows.length - activeRows.length} ignorée(s)` : ''})
+                  </td>
+                  {[
+                    { val: totals.soldeDebutDebit,  ok: ecartDebut < 1 },
+                    { val: totals.soldeDebutCredit, ok: ecartDebut < 1 },
+                    { val: totals.mouvementDebit,   ok: ecartMouv  < 1 },
+                    { val: totals.mouvementCredit,  ok: ecartMouv  < 1 },
+                    { val: totals.soldeFinDebit,    ok: ecartFin   < 1 },
+                    { val: totals.soldeFinCredit,   ok: ecartFin   < 1 },
+                  ].map((cell, j) => (
+                    <td key={j} style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, color: cell.ok ? '#166534' : '#dc2626' }}>
+                      {Math.round(cell.val).toLocaleString('fr-FR')}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>,
         document.body
-      )}
+        );
+      })()}
     </div>
   );
 }

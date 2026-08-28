@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { MODEL_TEMPLATES, createSimulationEntryFromLines, recalculateSimulatedDataset } from '../utils/simulationEngine';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEntries, isSimulationActive, setIsSimulationActive, formatCurrency }) {
   // Mode Modèles Repliable
@@ -14,7 +15,9 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
 
   // Éditeur Multiligne Avancé
   const [editingId, setEditingId]           = useState(null);
+  const [templateError, setTemplateError]   = useState(null);
   const [isEditorOpen, setIsEditorOpen]     = useState(false);
+  useEscapeKey(isEditorOpen, () => setIsEditorOpen(false));
   const [opLabel, setOpLabel]               = useState('Nouvelle opération');
 
   // Lignes Débit/Crédit de l'écriture en cours dans l'éditeur
@@ -136,6 +139,11 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       label: tpl.name,
       lines: tpl.lines,
     });
+    if (!newEntry.isBalanced) {
+      setTemplateError(`Le modèle "${tpl.name}" est déséquilibré (Débit ≠ Crédit) et n'a pas été appliqué. Merci de le corriger dans le code du modèle.`);
+      return;
+    }
+    setTemplateError(null);
     setSimulationEntries(prev => [...prev, newEntry]);
     if (setIsSimulationActive) setIsSimulationActive(true);
     setShowTemplates(false);
@@ -459,6 +467,16 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               ))}
             </div>
           </div>
+
+          {templateError && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', borderRadius: 8,
+              background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.72rem', marginBottom: 12
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0 }}>error</span>
+              <span style={{ flex: 1 }}>{templateError}</span>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
             {filteredTemplates.map(tpl => (

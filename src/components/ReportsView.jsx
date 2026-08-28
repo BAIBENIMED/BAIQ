@@ -657,12 +657,12 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             {currentReportEntry?.isGemini ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
-                  onClick={handleGenerateGeminiReport}
+                  disabled
                   className="btn"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.12)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    color: 'rgba(226,232,240,0.55)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                     borderRadius: 8,
                     padding: '8px 14px',
                     fontSize: '0.78rem',
@@ -670,12 +670,12 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    cursor: 'pointer'
+                    cursor: 'not-allowed'
                   }}
-                  title="Régénérer une nouvelle version avec Gemini"
+                  title="Quota consommé : ce dossier a déjà utilisé son unique appel IA. Importez un nouveau dossier pour relancer une analyse."
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#f59e0b' }}>refresh</span>
-                  Régénérer Gemini
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>lock</span>
+                  Rapport IA déjà généré (1/1)
                 </button>
               </div>
             ) : (
@@ -763,6 +763,14 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Chiffre d'Affaires :</span>
                     <strong className="mono">{fmt(data?.sig?.chiffreAffaires || 0)}</strong>
+                  </div>
+                </div>
+
+                <div style={{ padding: '10px 14px', background: 'rgba(217, 119, 6, 0.08)', border: '1px solid rgba(217, 119, 6, 0.3)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 18, marginTop: 1, flexShrink: 0 }}>privacy_tip</span>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Les données de ce dossier (comptes, montants, ratios) seront transmises à l'API Google Gemini pour générer ce rapport.
+                    Assurez-vous d'être autorisé à partager ces données avant de continuer.
                   </div>
                 </div>
               </div>

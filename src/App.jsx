@@ -1230,6 +1230,16 @@ export default function App() {
 function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSecteur }) {
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved]     = useState(false);
+  const [serverProxyConfigured, setServerProxyConfigured] = useState(null); // null = vérification en cours
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gemini/status')
+      .then(res => (res.ok ? res.json() : { configured: false }))
+      .then(json => { if (!cancelled) setServerProxyConfigured(Boolean(json?.configured)); })
+      .catch(() => { if (!cancelled) setServerProxyConfigured(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSaveKey = () => {
     setGeminiKey(geminiKey);
@@ -1249,17 +1259,23 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
         <div className="card-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb' }}>payments</span>
-            Devise d'affichage
+            Symbole monétaire affiché
           </h3>
         </div>
         <div className="card-body">
-          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Symbole monétaire</label>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Libellé affiché après les montants</label>
           <input
             value={cur}
             onChange={e => setCur(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 9, fontSize: '0.9rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
           />
-          <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 6 }}>Exemples : DZD, DA, EUR, USD</p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#d97706', flexShrink: 0 }}>info</span>
+            <p style={{ fontSize: '0.72rem', color: '#92400e', margin: 0 }}>
+              Ce champ ne fait que <strong>changer le libellé</strong> affiché après les montants (ex: "DZD" au lieu de "DA") — aucune conversion
+              de change n'est effectuée. Les montants restent exprimés dans la devise réelle de votre balance importée, quel que soit le texte saisi ici.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -1302,16 +1318,41 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           <span className="badge" style={{ background: '#ede9fe', color: '#7c3aed', borderColor: '#c4b5fd' }}>IA Avancée</span>
         </div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.6 }}>
-            <strong>🤖 Comment obtenir une clé Gemini gratuitement :</strong><br />
-            1. Allez sur <strong>aistudio.google.com</strong><br />
-            2. Connectez-vous avec votre compte Google<br />
-            3. Cliquez sur <strong>"Get API Key"</strong> → <strong>"Create API Key"</strong><br />
-            4. Copiez la clé et collez-la ci-dessous
+
+          {/* Statut du relais serveur sécurisé */}
+          {serverProxyConfigured === true ? (
+            <div style={{ padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac', fontSize: '0.78rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#059669' }}>verified_user</span>
+              <span><strong>Relais serveur sécurisé actif.</strong> L'IA Gemini fonctionne sans qu'aucune clé ne transite par votre navigateur — la clé ci-dessous n'est pas nécessaire.</span>
+            </div>
+          ) : serverProxyConfigured === false ? (
+            <div style={{ padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.6 }}>
+              <strong>🤖 Comment obtenir une clé Gemini gratuitement :</strong><br />
+              1. Allez sur <strong>aistudio.google.com</strong><br />
+              2. Connectez-vous avec votre compte Google<br />
+              3. Cliquez sur <strong>"Get API Key"</strong> → <strong>"Create API Key"</strong><br />
+              4. Copiez la clé et collez-la ci-dessous
+            </div>
+          ) : (
+            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
+              Vérification du relais serveur en cours…
+            </div>
+          )}
+
+          {/* Confidentialité : les données sont envoyées à Google, quel que soit le mode */}
+          <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: '0.74rem', color: '#92400e', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>privacy_tip</span>
+            <span>
+              <strong>Confidentialité :</strong> lorsque l'Assistant IA ou les rapports Gemini sont utilisés, les données financières du dossier actif
+              (chiffres du bilan, du compte de résultat, ratios) sont transmises à l'API Google Gemini pour générer l'analyse. N'activez pas cette
+              fonctionnalité sur des dossiers confidentiels sans l'accord de votre client. Le reste de l'application (calculs, ratios, PDF/Excel) fonctionne
+              entièrement en local, sans aucun envoi de données.
+            </span>
           </div>
 
+          <div style={{ opacity: serverProxyConfigured ? 0.5 : 1, pointerEvents: serverProxyConfigured ? 'none' : 'auto' }}>
           <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini</label>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini {serverProxyConfigured ? '(non nécessaire — relais serveur actif)' : '(mode local de repli)'}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1, position: 'relative' }}>
                 <input
@@ -1339,15 +1380,17 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           </div>
 
           {geminiKey && (
-            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.78rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.78rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#059669' }}>check_circle</span>
-              Clé configurée — L'Assistant IA utilisera Gemini pour des analyses avancées.
+              Clé configurée — utilisée uniquement si le relais serveur sécurisé n'est pas disponible.
             </div>
           )}
 
-          <p style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5 }}>
-            🔒 La clé est stockée uniquement dans votre navigateur (localStorage). Elle n'est jamais envoyée à nos serveurs.
+          <p style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5, marginTop: 10 }}>
+            🔒 Cette clé, si renseignée, est stockée uniquement dans votre navigateur (localStorage) et n'est envoyée qu'à Google, jamais à nos serveurs.
+            Sur un poste partagé, préférez le relais serveur (ci-dessus) qui évite de stocker une clé côté client.
           </p>
+          </div>
         </div>
       </div>
     </div>

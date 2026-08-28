@@ -24,7 +24,28 @@ export function AIView({ data, geminiKey }) {
   const [activeTab, setActiveTab]     = useState('diagnostic');
   const [inputText, setInputText]     = useState('');
   const [isLoading, setIsLoading]     = useState(false);
+  // 'checking' | 'proxy' | 'direct' | 'local' — reflète le mode Gemini réellement actif,
+  // pas seulement la présence d'une clé locale (le relais serveur peut fonctionner sans elle).
+  const [geminiMode, setGeminiMode]   = useState(geminiKey ? 'direct' : 'checking');
   const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gemini/status')
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => {
+        if (cancelled) return;
+        if (json?.configured) setGeminiMode('proxy');
+        else if (geminiKey) setGeminiMode('direct');
+        else setGeminiMode('local');
+      })
+      .catch(() => {
+        if (!cancelled) setGeminiMode(geminiKey ? 'direct' : 'local');
+      });
+    return () => { cancelled = true; };
+  }, [geminiKey]);
+
+  const isGeminiActive = geminiMode === 'proxy' || geminiMode === 'direct';
 
   const analysis = data ? runAIAnalysis(data) : null;
   const diag = analysis?.diagnosticAvance || {};
@@ -56,16 +77,41 @@ export function AIView({ data, geminiKey }) {
 
   /* ── Call Gemini API ── */
   const callGemini = async (userMessage) => {
-    if (!geminiKey) return null;
     const context = buildGeminiContext(data, analysis);
     const prompt  = context + `\n\n## QUESTION DE L'UTILISATEUR\n${userMessage}\n\nRéponds de manière structurée, hautement professionnelle et en français d'affaires. Utilise des titres, des calculs chiffrés en DZD, des listes à puces et cite les comptes SCF appropriés.`;
+    const requestBody = { contents: [{ parts: [{ text: prompt }] }] };
+    const modelName = 'gemini-2.0-flash';
+
+    // 1. Voie recommandée : relais serveur /api/gemini (clé Gemini gardée côté serveur, cf. server.js)
+    try {
+      const proxyRes = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelName, body: requestBody })
+      });
+      if (proxyRes.ok) {
+        const json = await proxyRes.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } else if (proxyRes.status !== 404) {
+        return null; // le relais existe mais a échoué (ex: clé serveur manquante) → pas la peine de tenter le mode direct
+      }
+    } catch {
+      // relais injoignable → on tente le mode direct ci-dessous si une clé locale existe
+    }
+
+    // 2. Repli : appel direct depuis le navigateur avec une clé saisie localement (moins sûr, cf. Paramètres)
+    if (!geminiKey) return null;
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey,
+          },
+          body: JSON.stringify(requestBody)
         }
       );
       const json = await res.json();
@@ -109,10 +155,7 @@ export function AIView({ data, geminiKey }) {
     const newMessages = [...chatMessages, { role: 'user', text: userMsg, time: new Date() }];
     setChatMessages(newMessages);
 
-    let response;
-    if (geminiKey) {
-      response = await callGemini(userMsg);
-    }
+    let response = await callGemini(userMsg);
     if (!response) {
       response = buildLocalResponse(userMsg);
     }
@@ -651,14 +694,14 @@ export function AIView({ data, geminiKey }) {
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontWeight: 900, fontSize: '0.95rem', color: '#fff' }}>Faites Parler Votre Balance 🇩🇿</div>
               <div style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
-                {geminiKey
+                {isGeminiActive
                   ? '🤖 Gemini IA connectée — Posez n\'importe quelle question en langage naturel sur vos données SCF'
                   : '⚡ Mode local actif — Moteur IA embarqué · Configurez Gemini dans Paramètres pour l\'IA avancée'}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
               <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>
-                {geminiKey ? '✅ IA Gemini' : '🔵 IA Locale'}
+                {isGeminiActive ? '✅ IA Gemini' : '🔵 IA Locale'}
               </div>
               <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#34d399' }}>
                 🔒 100% Local

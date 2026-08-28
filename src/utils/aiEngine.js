@@ -51,8 +51,12 @@ export function runAIAnalysis(data) {
   const couvertureFin   = cchfin > 0 ? safe(ebe, cchfin) : 99;
 
   // ── 3. Capacité d'Autofinancement (CAF) ──
-  // Méthode soustractive SCF : EBE - Charges financières décaissables - IBS
-  const caf = Math.max(0, ebe - cchfin - impots);
+  // Réutilise la CAF déjà calculée dans le moteur SIG (méthode soustractive SCF complète,
+  // incluant 75/65/76/66/69 et excluant les cessions d'immobilisations 752/652 non récurrentes).
+  // Ne PAS recalculer une version simplifiée ici : cela créait auparavant deux chiffres de CAF
+  // différents dans l'application, et masquait une CAF réellement négative (signal d'alerte
+  // important) derrière un plancher artificiel à 0.
+  const caf = (s.caf !== undefined && s.caf !== null) ? s.caf : (ebe - cchfin - impots);
   const tauxCAF = safe(caf, ca);
   
   // Dettes financières et capacité de remboursement
@@ -246,6 +250,9 @@ export function runAIAnalysis(data) {
     faiblesses.push({ titre: "EBE déficitaire — Activité opérationnelle non rentable", detail: `L'activité industrielle/commerciale consomme plus de cash opérationnel qu'elle n'en génère. Situation d'urgence vitale.`, cat: 'EBE', severite: 'critique' });
   else if (margeEBE < bm.margeEBE.faible)
     faiblesses.push({ titre: `Marge d'EBE comprimée (${pct(margeEBE)})`, detail: `Marge d'EBE insuffisante pour absorber les amortissements et les charges d'intérêts. La marge brute d'exploitation doit être relevée.`, cat: 'EBE', severite: 'eleve' });
+
+  if (caf < 0)
+    faiblesses.push({ titre: `Capacité d'Autofinancement négative (${fmtDZD(caf)})`, detail: `L'entreprise consomme du cash au lieu d'en générer sur son cycle courant : elle ne peut ni rembourser sa dette, ni financer son renouvellement d'investissements, ni distribuer de dividendes sans recourir à un financement externe additionnel. Situation à traiter en priorité.`, cat: 'Trésorerie', severite: 'critique' });
 
   if (frng < 0)
     faiblesses.push({ titre: `Déficit structurel de FRNG (${fmtDZD(frng)})`, detail: `Non-respect de la règle d'or financière : des emplois durables sont financés par de la dette à court terme. Vulnérabilité majeure.`, cat: 'Structure Financière', severite: 'critique' });
@@ -866,9 +873,9 @@ Effectue une analyse financière approfondie, critique, chiffrée et ultra-rigou
 
 /* ─── Générateur de Rapports Approfondis avec Gemini ─── */
 export async function generateGeminiReport(data, reportType = 'audit_diagnostic', geminiKey = '') {
-  if (!geminiKey) {
-    throw new Error("Clé API Google Gemini non configurée. Veuillez renseigner votre clé API dans les Paramètres ou l'en-tête.");
-  }
+  // Note : plus de blocage systématique sans geminiKey ici — le relais serveur sécurisé
+  // (/api/gemini, cf. server.js) ne nécessite aucune clé côté client. geminiKey ne sert
+  // désormais que de repli si ce relais n'est pas déployé (voir plus bas dans cette fonction).
   if (!data) {
     throw new Error("Aucune donnée financière disponible pour générer le rapport.");
   }
@@ -967,37 +974,80 @@ Structure impérative :
 
   const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
   let lastError = null;
+  let proxyUnavailable = false; // évite de re-tester le relais serveur à chaque modèle s'il est absent (déploiement statique)
 
   for (const modelName of models) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
-        {
+    const requestBody = {
+      contents: [{ parts: [{ text: fullPrompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 4000,
+      }
+    };
+
+    // ── 1. Voie recommandée : relais serveur /api/gemini (la clé reste côté serveur, cf. server.js) ──
+    if (!proxyUnavailable) {
+      try {
+        const proxyResponse = await fetch('/api/gemini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: fullPrompt }] }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 4000,
-            }
-          })
+          body: JSON.stringify({ modelName, body: requestBody })
+        });
+
+        if (proxyResponse.status === 404) {
+          // Le relais n'est pas déployé (ex: ancien mode "Static Site") → on bascule sur le mode direct ci-dessous
+          proxyUnavailable = true;
+        } else if (proxyResponse.ok) {
+          const json = await proxyResponse.json();
+          const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (generatedText && generatedText.trim().length > 50) {
+            return generatedText;
+          }
+        } else {
+          const errorData = await proxyResponse.json().catch(() => ({}));
+          lastError = new Error(errorData?.error || errorData?.error?.message || `Erreur relais HTTP ${proxyResponse.status}`);
         }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error?.message || `Erreur HTTP ${response.status}`);
+      } catch (err) {
+        // Relais injoignable (réseau, non déployé) → on tente le mode direct ci-dessous
+        proxyUnavailable = true;
       }
+    }
 
-      const json = await response.json();
-      const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (generatedText && generatedText.trim().length > 50) {
-        return generatedText;
+    // ── 2. Repli : appel direct depuis le navigateur avec une clé saisie localement ──
+    // Utilisé uniquement si le relais serveur (server.js) n'est pas déployé. Moins sûr :
+    // la clé est alors exposée côté client (cf. avertissement affiché dans Paramètres).
+    if (proxyUnavailable) {
+      if (!geminiKey) {
+        lastError = new Error("Le relais serveur sécurisé (/api/gemini) n'est pas disponible et aucune clé Gemini locale n'est configurée.");
+        continue;
       }
-    } catch (err) {
-      lastError = err;
-      console.warn(`Tentative Gemini avec ${modelName} a échoué :`, err.message);
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': geminiKey, // en-tête plutôt que ?key= dans l'URL : évite de journaliser la clé dans l'historique/les logs d'URL
+            },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.error?.message || `Erreur HTTP ${response.status}`);
+        }
+
+        const json = await response.json();
+        const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText && generatedText.trim().length > 50) {
+          return generatedText;
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Tentative Gemini (mode direct) avec ${modelName} a échoué :`, err.message);
+      }
     }
   }
 

@@ -400,7 +400,7 @@ export function CapitauxPropresView({ data, fmt }) {
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Mouvement de la période</div>
                       </div>
                       <div className="mono" style={{ fontSize: '0.88rem', fontWeight: 900, color: val === 0 ? 'var(--text-muted)' : isPos ? '#059669' : '#dc2626' }}>
-                        {val > 0 ? '+' : ''}{fmtN(val)} DA
+                        {val > 0 ? '+' : ''}{fmtCurrency(val)}
                       </div>
                     </div>
                   );

@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Variables d'environnement locales (clé API Gemini, etc.) — ne jamais committer
+.env
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

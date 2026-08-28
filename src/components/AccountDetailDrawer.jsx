@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = [], excludePrefixes = [], rows = [], formatCurrency }) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEscapeKey(isOpen, onClose);
 
   if (!isOpen) return null;
 
