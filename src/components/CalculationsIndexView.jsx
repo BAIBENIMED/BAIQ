@@ -314,7 +314,7 @@ export function CalculationsIndexView() {
     <div className="fade-in space-y-6">
       
       {/* ── BANDEAU EN-TÊTE : INDEX DES CALCULS ── */}
-      <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0b3446 0%, #124f66 100%)', color: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56,189,248,0.3)' }}>
@@ -387,7 +387,7 @@ export function CalculationsIndexView() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {filteredFormulas.length === 0 ? (
           <div className="card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#cbd5e1', display: 'block', marginBottom: 8 }}>search_off</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--border-mid)', display: 'block', marginBottom: 8 }}>search_off</span>
             <h4 style={{ fontWeight: 800, fontSize: '0.95rem' }}>Aucune formule ne correspond à votre recherche</h4>
             <p style={{ fontSize: '0.80rem' }}>Essayez un autre mot-clé ou sélectionnez « Toutes les sections ».</p>
           </div>
@@ -459,7 +459,7 @@ export function CalculationsIndexView() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10, marginTop: 6 }}>
                       <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>💡 Exemple Chiffré :</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>💡 Exemple Chiffré :</span>
                         <div style={{ fontSize: '0.74rem', color: 'var(--text)', marginTop: 2, fontWeight: 600 }}>{item.exemple}</div>
                       </div>
 

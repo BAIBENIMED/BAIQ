@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { auditBalanceAccounts, auditCrossAccountMovements, autoMatchAccounts, safeNum } from '../utils/financeCalculations';
+import { EmptyState } from './EmptyState';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -33,11 +34,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
 
   if (!rows || rows.length === 0) {
     return (
-      <div className="card fade-in" style={{ maxWidth: 450, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>fact_check</span>
-        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Audit non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable pour exécuter l'audit SCF.</p>
-      </div>
+      <EmptyState icon="fact_check" title="Audit non disponible" message="Veuillez d'abord importer une balance comptable pour exécuter l'audit SCF." />
     );
   }
 
@@ -283,7 +280,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
                   background: hideZeroAccounts ? '#f0f8fa' : 'var(--surface-alt)',
                   borderColor: hideZeroAccounts ? '#b7dce6' : 'var(--border)',
-                  color: hideZeroAccounts ? '#1d4ed8' : 'var(--text-sub)',
+                  color: hideZeroAccounts ? 'var(--primary-dk)' : 'var(--text-sub)',
                   transition: 'all 0.15s'
                 }}
               >
@@ -1071,6 +1068,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             </div>
             <button
               onClick={onClose}
+              aria-label="Fermer"
               style={{
                 border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer',
                 color: '#fff', padding: 6, borderRadius: 6, display: 'flex', transition: 'all 0.15s'

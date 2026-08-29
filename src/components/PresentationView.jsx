@@ -410,6 +410,11 @@ export function PresentationView({ data, onClose, formatCurrency }) {
                 La marge brute d'exploitation (EBE) s'établit à <strong>{fmt(sig.ebe)}</strong> ({fmtPct((sig.ebe || 0) / (sig.chiffreAffaires || 1))}), offrant un ratio de couverture des dettes de <strong>{solv.bancaire.ratioDetteSurEBE.toFixed(1)} an(s)</strong>.
                 L'entreprise est classée en statut <strong>{solv.bancaire.statutCredit}</strong> pour toute demande de concours financier ou d'investissement.
               </p>
+              {solv.estimationPartielle && (
+                <p style={{ margin: '10px 0 0', fontSize: '0.72rem', color: '#fbbf24', lineHeight: 1.5 }}>
+                  ⚠️ {solv.estimationPartielleMessage}
+                </p>
+              )}
             </div>
           </div>
         )}

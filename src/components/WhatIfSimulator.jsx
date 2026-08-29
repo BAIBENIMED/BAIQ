@@ -512,7 +512,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>edit_note</span>
               {editingId ? "Modification de l'Écriture Simulée" : "Saisie d'une Nouvelle Écriture Multiligne"}
             </h3>
-            <button onClick={() => setIsEditorOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+            <button onClick={() => setIsEditorOpen(false)} aria-label="Fermer l'éditeur d'écriture" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
             </button>
           </div>
@@ -584,7 +584,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                       <button
                         onClick={() => handleRemoveLine(idx)}
                         disabled={editorLines.length <= 2}
-                        style={{ border: 'none', background: 'none', cursor: editorLines.length <= 2 ? 'not-allowed' : 'pointer', color: editorLines.length <= 2 ? '#cbd5e1' : 'var(--red)' }}
+                        style={{ border: 'none', background: 'none', cursor: editorLines.length <= 2 ? 'not-allowed' : 'pointer', color: editorLines.length <= 2 ? 'var(--border-mid)' : 'var(--red)' }}
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                       </button>
@@ -835,7 +835,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                 formatter={(val) => [fmt(val)]}
               />
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
-              <Bar dataKey="Actuel" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={32} />
+              <Bar dataKey="Actuel" fill="var(--text-sub)" radius={[4, 4, 0, 0]} maxBarSize={32} />
               <Bar dataKey="Simulé" fill="#1b6e8c" radius={[4, 4, 0, 0]} maxBarSize={32} />
             </BarChart>
           </ResponsiveContainer>

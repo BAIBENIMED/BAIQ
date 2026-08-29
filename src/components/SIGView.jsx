@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { AccountDetailDrawer } from './AccountDetailDrawer';
+import { EmptyState } from './EmptyState';
 
 export function SIGView({ data, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
@@ -35,13 +36,7 @@ export function SIGView({ data, rows, formatCurrency }) {
   };
 
   if (!data) return (
-    <div className="card fade-in" style={{ maxWidth: 420, margin: '60px auto' }}>
-      <div style={{ padding: '48px 32px', textAlign: 'center' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>analytics</span>
-        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>TCR / SIG non disponibles</h3>
-        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez importer une balance comptable.</p>
-      </div>
-    </div>
+    <EmptyState icon="analytics" title="TCR / SIG non disponibles" message="Veuillez importer une balance comptable." maxWidth={420} />
   );
 
   /* ── KPIs principaux ── */
@@ -194,7 +189,7 @@ export function SIGView({ data, rows, formatCurrency }) {
     },
   ];
 
-  const statusColor = (ok) => ok === true ? '#059669' : ok === false ? '#dc2626' : '#94a3b8';
+  const statusColor = (ok) => ok === true ? '#059669' : ok === false ? '#dc2626' : 'var(--text-sub)';
   const statusIcon  = (ok) => ok === true ? 'check_circle' : ok === false ? 'cancel' : 'radio_button_unchecked';
   const statusBg    = (ok) => ok === true ? '#f0fdf4' : ok === false ? '#fff1f2' : 'var(--surface-alt)';
 
@@ -269,7 +264,7 @@ export function SIGView({ data, rows, formatCurrency }) {
                     style={{ background: rowBg, fontWeight, color, cursor: isCompte ? 'pointer' : 'default' }}
                   >
                     <td>
-                      <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: isCompte ? '#1b6e8c' : '#0f172a' }}>{r.code}</span>
+                      <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: isCompte ? '#1b6e8c' : 'var(--text)' }}>{r.code}</span>
                     </td>
                     <td style={{ paddingLeft: isCompte ? 24 : 12 }}>
                       {isTotal && <span style={{ color: '#1b6e8c', marginRight: 6 }}>►</span>}
@@ -280,7 +275,7 @@ export function SIGView({ data, rows, formatCurrency }) {
                         </span>
                       )}
                     </td>
-                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? '#dc2626' : (isGrandTotal ? '#124f66' : '#0f172a') }}>
+                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? '#dc2626' : (isGrandTotal ? '#124f66' : 'var(--text)') }}>
                       {fmt(displayVal)}
                     </td>
                   </tr>
@@ -309,14 +304,14 @@ export function SIGView({ data, rows, formatCurrency }) {
                     <stop offset="95%" stopColor="#1b6e8c" stopOpacity={0}    />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" angle={-25} textAnchor="end" height={60} fontSize={11} />
-                <YAxis tickFormatter={v => `${Math.round(v / 1000)}k`} stroke="#94a3b8" fontSize={11} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="name" stroke="var(--text-sub)" angle={-25} textAnchor="end" height={60} fontSize={11} />
+                <YAxis tickFormatter={v => `${Math.round(v / 1000)}k`} stroke="var(--text-sub)" fontSize={11} />
                 <Tooltip
                   formatter={v => [fmt(v), 'Montant']}
                   contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text)' }}
                 />
-                <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="4 4" />
+                <ReferenceLine y={0} stroke="var(--border-mid)" strokeDasharray="4 4" />
                 <Area type="monotone" dataKey="Valeur" stroke="#1b6e8c" strokeWidth={2.5} fill="url(#sigGrad)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -376,9 +371,9 @@ export function SIGView({ data, rows, formatCurrency }) {
               <div style={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={margesBarData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="name" fontSize={10} stroke="#94a3b8" />
-                    <YAxis tickFormatter={v => `${v}%`} fontSize={10} stroke="#94a3b8" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="name" fontSize={10} stroke="var(--text-sub)" />
+                    <YAxis tickFormatter={v => `${v}%`} fontSize={10} stroke="var(--text-sub)" />
                     <Tooltip formatter={v => [`${v} %`, 'Marge']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                     <Bar dataKey="val" radius={[4, 4, 0, 0]}>
                       {margesBarData.map((entry, i) => (
@@ -403,8 +398,8 @@ export function SIGView({ data, rows, formatCurrency }) {
               <div style={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart data={radarData}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="subject" fontSize={9} stroke="#94a3b8" />
+                    <PolarGrid stroke="var(--border)" />
+                    <PolarAngleAxis dataKey="subject" fontSize={9} stroke="var(--text-sub)" />
                     <Radar name="Score" dataKey="A" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.25} />
                   </RadarChart>
                 </ResponsiveContainer>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "finance-platform",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:client-only"],
+      "port": 5173
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { calculateVariationCapitauxPropres } from '../utils/financeCalculations';
-import { 
-  BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend 
+import {
+  BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
+import { EmptyState } from './EmptyState';
 
 const EMPTY_ROWS = [];
 
@@ -64,11 +65,7 @@ export function CapitauxPropresView({ data, fmt }) {
 
   if (!rows || rows.length === 0) {
     return (
-      <div className="card fade-in" style={{ maxWidth: 500, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_balance_wallet</span>
-        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Tableau des Capitaux Propres indisponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable pour afficher le TVCP.</p>
-      </div>
+      <EmptyState icon="account_balance_wallet" title="Tableau des Capitaux Propres indisponible" message="Veuillez d'abord importer une balance comptable pour afficher le TVCP." maxWidth={500} />
     );
   }
 
@@ -236,10 +233,10 @@ export function CapitauxPropresView({ data, fmt }) {
             </div>
           </div>
 
-          <div style={{ overflowX: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
               <thead>
-                <tr style={{ background: '#1e293b', color: '#ffffff' }}>
+                <tr style={{ background: '#0b3446', color: '#ffffff' }}>
                   <th style={{ width: '25%', padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.04em' }}>
                     RUBRIQUES &amp; NATURE DES VARIATIONS
                   </th>
@@ -250,7 +247,7 @@ export function CapitauxPropresView({ data, fmt }) {
                         width: col.isTotal ? '12%' : '10.5%',
                         padding: '8px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem',
                         letterSpacing: '0.02em', whiteSpace: 'normal', lineHeight: 1.2,
-                        background: col.isTotal ? '#0f172a' : 'transparent',
+                        background: col.isTotal ? '#124f66' : 'transparent',
                         color: col.isTotal ? '#4fb3cc' : '#ffffff',
                         borderLeft: '1px solid rgba(255,255,255,0.08)'
                       }}
@@ -477,8 +474,8 @@ export function CapitauxPropresView({ data, fmt }) {
                     <td className="mono" style={{ fontWeight: 800, color: '#124f66', padding: '6px 12px', borderRight: '1px solid var(--border)' }}>{a.compte}</td>
                     <td style={{ padding: '6px 12px', fontWeight: 600, color: 'var(--text)', borderRight: '1px solid var(--border)' }}>{a.libelle}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', borderRight: '1px solid var(--border)' }}>{fmtN(a.soldeDebut)}</td>
-                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: '#64748b', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementDebit)}</td>
-                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: '#64748b', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementCredit)}</td>
+                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementDebit)}</td>
+                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementCredit)}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, color: '#124f66', background: 'rgba(37,99,235,0.03)', borderRight: '1px solid var(--border)' }}>{fmtN(a.soldeFin)}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, color: a.variation >= 0 ? '#059669' : '#dc2626' }}>
                       {a.variation > 0 ? '+' : ''}{fmtN(a.variation)}

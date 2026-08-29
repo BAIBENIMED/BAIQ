@@ -58,7 +58,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
       <div style={{ position: 'absolute', inset: 0 }} onClick={onClose} />
 
       {/* Drawer Container */}
-      <div style={{
+      <div role="dialog" aria-modal="true" aria-label={title || 'Détail du poste'} style={{
         position: 'relative',
         width: '100%',
         maxWidth: 680,
@@ -78,7 +78,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
           borderBottom: '1px solid var(--border)',
           background: 'var(--surface-alt)',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center'
         }}>
           <div>
@@ -92,10 +92,11 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
 
           <button
             onClick={onClose}
+            aria-label="Fermer le détail du poste"
             style={{
               width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)',
               background: 'var(--surface)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              justify: 'center', color: 'var(--text-muted)', transition: 'background 0.15s'
+              justifyContent: 'center', color: 'var(--text-muted)', transition: 'background 0.15s'
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
@@ -139,7 +140,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
               }}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button onClick={() => setSearchQuery('')} aria-label="Effacer le filtre" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
               </button>
             )}
@@ -204,7 +205,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
           borderTop: '1px solid var(--border)',
           background: 'var(--surface-alt)',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '0.74rem',
           color: 'var(--text-muted)'

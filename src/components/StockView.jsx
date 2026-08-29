@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { calculateStockEvolution } from '../utils/financeCalculations';
+import { EmptyState } from './EmptyState';
 
 export function StockView({ rows, ratios, formatCurrency }) {
   const [activeTab, setActiveTab] = useState('synthese');
@@ -183,11 +184,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
   if (!data || data.categories.length === 0) {
     return (
-      <div className="card fade-in" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 42, color: '#cbd5e1', display: 'block', marginBottom: 12 }}>inventory_2</span>
-        <h4 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>Aucune donnée de stock (Classe 3)</h4>
-        <p style={{ fontSize: '0.80rem' }}>La balance ne contient aucun compte de stock actif.</p>
-      </div>
+      <EmptyState icon="inventory_2" title="Aucune donnée de stock (Classe 3)" message="La balance ne contient aucun compte de stock actif." />
     );
   }
 
@@ -248,7 +245,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
     <div className="fade-in space-y-6">
       
       {/* ── BANDEAU EN-TÊTE : KPI & ROTATION ── */}
-      <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0b3446 0%, #124f66 100%)', color: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -555,8 +552,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
             </div>
 
             {/* Tableau Récapitulatif Bilan */}
-            <div style={{ borderTop: '1px solid var(--border)' }}>
-              <table className="data-table compact-table" style={{ width: '100%' }}>
+            <div style={{ borderTop: '1px solid var(--border)', overflowX: 'auto' }}>
+              <table className="data-table compact-table" style={{ width: '100%', minWidth: 600 }}>
                 <thead>
                   <tr>
                     <th style={{ width: '60px' }}>CODE</th>
@@ -791,7 +788,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 </span>
               </div>
 
-              <table className="data-table compact-table" style={{ width: '100%', fontSize: '0.74rem' }}>
+              <div style={{ overflowX: 'auto' }}>
+              <table className="data-table compact-table" style={{ width: '100%', minWidth: 640, fontSize: '0.74rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface)' }}>
                     <th>COMPOSANTE DU COÛT</th>
@@ -838,6 +836,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   </tr>
                 </tfoot>
               </table>
+              </div>
             </div>
 
             {/* Note d'interprétation */}

@@ -50,7 +50,7 @@ const GaugeCard = ({ title, description, value, min, max, isPercentage, targetNo
               stroke="none"
             >
               <Cell fill={color} />
-              <Cell fill="#f1f5f9" />
+              <Cell fill="var(--border)" />
             </Pie>
           </PieChart>
         </ResponsiveContainer>
@@ -105,7 +105,7 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>{unit}</span>
               </div>
             ) : (
-              <span className="mono" style={{ fontSize: '1.4rem', fontWeight: 800, color: '#cbd5e1' }}>—</span>
+              <span className="mono" style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--border-mid)' }}>—</span>
             )}
             <span style={{ fontSize: '0.70rem', color: 'var(--text-sub)', display: 'block', marginTop: 4 }}>Délai moyen d'écoulement</span>
           </div>
@@ -128,7 +128,7 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
         )}
 
         <div>
-          <div style={{ height: 6, width: '100%', background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
+          <div style={{ height: 6, width: '100%', background: 'var(--border)', borderRadius: 6, overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 6, transition: 'width 0.6s ease', width: `${progress}%`, background: color }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.65rem', color: 'var(--text-sub)', fontWeight: 600 }}>
@@ -249,14 +249,14 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
 
       {/* ── 🛡️ NOUVELLE SECTION : SOLVABILITÉ, RATING BANCAIRE & ALTMAN Z''-SCORE ── */}
       <section style={{ background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #0b3446, #124f66)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span className="material-symbols-outlined" style={{ color: '#4fb3cc', fontSize: 20 }}>security</span>
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>Score de Solvabilité &amp; Rating Bancaire (Altman Z'')</h3>
-              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Modèle Altman Z'' adapté aux entreprises non cotées et pays émergents (EM-Score)</span>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Modèle Altman Z'' adapté aux entreprises non cotées et pays émergents (EM-Score)</span>
             </div>
           </div>
 
@@ -289,60 +289,60 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             <div className="mono" style={{ fontSize: '2.4rem', fontWeight: 900, color: solv.zoneColor, margin: '4px 0' }}>
               {solv.zScore.toFixed(2)}
             </div>
-            <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 }}>
               {solv.zScore >= 2.6 ? '🟢 Zone Saine (≥ 2.60)' : solv.zScore >= 1.1 ? '🟡 Zone Grise (1.10 - 2.60)' : '🔴 Zone Détresse (< 1.10)'}
             </span>
           </div>
 
           {/* Carte 2 : Probabilité de défaillance */}
           <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Risque de Défaillance</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Risque de Défaillance</span>
             <div style={{ fontSize: '1.3rem', fontWeight: 900, color: solv.zoneColor, margin: '6px 0 2px' }}>
               {solv.risqueDefaillance}
             </div>
-            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Niveau de risque indicatif (zone Altman Z'', non calibré statistiquement)</span>
-            <div style={{ marginTop: 8, height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Niveau de risque indicatif (zone Altman Z'', non calibré statistiquement)</span>
+            <div style={{ marginTop: 8, height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${solv.scoreSolvabilite}%`, background: solv.zoneColor, borderRadius: 4 }} />
             </div>
           </div>
 
           {/* Carte 3 : Désendettement Bancaire (Dettes/EBE) */}
           <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Dettes Nettes / EBE</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Dettes Nettes / EBE</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '6px 0 2px' }}>
               <span className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: solv.bancaire.ratioDetteSurEBE <= 3.5 ? '#059669' : '#dc2626' }}>
                 {solv.bancaire.ratioDetteSurEBE < 90 ? `${solv.bancaire.ratioDetteSurEBE.toFixed(1)} ans` : 'N/A'}
               </span>
             </div>
-            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Norme bancaire algérienne : ≤ 3.5 années d'EBE</span>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Norme bancaire algérienne : ≤ 3.5 années d'EBE</span>
           </div>
 
           {/* Carte 4 : Capacité d'endettement théorique */}
           <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Capacité d'Emprunt Max</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Capacité d'Emprunt Max</span>
             <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1b6e8c', margin: '6px 0 2px' }}>
               {fmt(solv.bancaire.capaciteEndettementMax)}
             </div>
-            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Potentiel de financement bancaire LT additionnel</span>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Potentiel de financement bancaire LT additionnel</span>
           </div>
 
         </div>
 
         {/* Détail des 4 Composantes de la Formule Altman */}
         <div style={{ background: 'var(--surface-alt)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#1b6e8c' }}>functions</span>
             Formule Altman Z'' = 6.56×X₁ + 3.26×X₂ + 6.72×X₃ + 1.05×X₄
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             {Object.entries(solv.ratios).map(([key, item], idx) => (
               <div key={key} style={{ background: 'var(--surface)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)' }}>
                   <span>X{idx + 1} (Poids : ×{item.poids})</span>
                   <span className="mono" style={{ color: 'var(--text)' }}>{item.val.toFixed(3)}</span>
                 </div>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{item.label}</div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{item.desc}</div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)' }}>{item.desc}</div>
               </div>
             ))}
           </div>
@@ -511,7 +511,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.1fr) minmax(280px, 1fr)', gap: 24, alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, alignItems: 'center' }}>
           <div style={{ height: 320, width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>

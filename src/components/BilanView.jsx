@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AccountDetailDrawer } from './AccountDetailDrawer';
+import { EmptyState } from './EmptyState';
 
 export function BilanView({ data, dataN1, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
@@ -17,13 +18,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
   const fmtPct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
 
   if (!data) return (
-    <div className="card fade-in" style={{ maxWidth: 420, margin: '60px auto' }}>
-      <div style={{ padding: '48px 32px', textAlign: 'center' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_tree</span>
-        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Bilan non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez importer une balance comptable.</p>
-      </div>
-    </div>
+    <EmptyState icon="account_tree" title="Bilan non disponible" message="Veuillez importer une balance comptable." maxWidth={420} />
   );
 
   const totalActifN  = (data.emploisStables || 0) + (data.actifCirculant || 0) + (data.tresorerieActive || 0);
@@ -226,7 +221,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                     N-1: <strong>{fmt(k.valN1)}</strong> ({fmtPct(k.valN1 ? ((k.value - k.valN1) / Math.abs(k.valN1)) * 100 : 0)})
                   </div>
                 )}
-                <div style={{ marginTop: 4, fontSize: '0.74rem', color: '#94a3b8' }}>{k.sub}</div>
+                <div style={{ marginTop: 4, fontSize: '0.74rem', color: 'var(--text-sub)' }}>{k.sub}</div>
               </div>
             ))}
           </div>

@@ -1007,7 +1007,7 @@ Structure impérative :
           const errorData = await proxyResponse.json().catch(() => ({}));
           lastError = new Error(errorData?.error || errorData?.error?.message || `Erreur relais HTTP ${proxyResponse.status}`);
         }
-      } catch (err) {
+      } catch {
         // Relais injoignable (réseau, non déployé) → on tente le mode direct ci-dessous
         proxyUnavailable = true;
       }

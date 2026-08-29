@@ -307,6 +307,7 @@ export function ImportData({ onDataImported }) {
                     </div>
                     <button
                       onClick={(e) => deleteDossierFromStorage(d.id, e)}
+                      aria-label={`Supprimer le dossier ${d.nom}`}
                       style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626', padding: 4 }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>

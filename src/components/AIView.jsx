@@ -62,6 +62,8 @@ export function AIView({ data, geminiKey }) {
 
   useEffect(() => {
     if (!dossierKey) return;
+    // Resynchronise le compteur de quota au changement de dossier (composant non remonté via key).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGeminiCallCount(parseInt(localStorage.getItem(dossierKey) || '0', 10));
   }, [dossierKey]);
 
@@ -214,7 +216,9 @@ export function AIView({ data, geminiKey }) {
     content += `Part du Personnel dans la VA: ${pct(diag.partPersonnel)}\n`;
     content += `Cash mobilisable sur BFR: ${fmt(diag.totalCashLibérable)}\n`;
     content += `Score Banque d'Algérie: ${solv.bancaire?.scoreBA || 14}/20 (${solv.bancaire?.ratingBA || 'Favorable'})\n`;
-    content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'})\n\n`;
+    content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'})\n`;
+    if (solv.estimationPartielle) content += `⚠️ ${solv.estimationPartielleMessage}\n`;
+    content += `\n`;
 
     content += `=== III. FORCES MAJEURES (${analysis?.forces?.length || 0}) ===\n`;
     (analysis?.forces || []).forEach((f, i) => {
@@ -583,6 +587,15 @@ export function AIView({ data, geminiKey }) {
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   💡 <strong>Avis Crédit :</strong> {solv.bancaire?.statutCredit || 'FAVORABLE'} pour l'obtention de lignes d'exploitation ou de crédits d'investissement.
                 </div>
+
+                {solv.estimationPartielle && (
+                  <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#d97706', flexShrink: 0 }}>info</span>
+                    <p style={{ fontSize: '0.72rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+                      {solv.estimationPartielleMessage}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

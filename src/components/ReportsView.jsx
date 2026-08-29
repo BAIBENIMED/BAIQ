@@ -942,6 +942,14 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             <span>Désendettement : <strong>{solv.bancaire.ratioDetteSurEBE < 90 ? `${solv.bancaire.ratioDetteSurEBE.toFixed(1)} ans d'EBE` : 'N/A'}</strong></span>
             <span>Capacité emprunt : <strong style={{ color: '#1b6e8c' }}>{fmt(solv.bancaire.capaciteEndettementMax)}</strong></span>
           </div>
+          {solv.estimationPartielle && (
+            <div style={{ display: 'flex', gap: 8, padding: '10px 20px', background: '#fffbeb', borderTop: '1px solid #fde68a' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#d97706', flexShrink: 0 }}>info</span>
+              <p style={{ fontSize: '0.72rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+                {solv.estimationPartielleMessage}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

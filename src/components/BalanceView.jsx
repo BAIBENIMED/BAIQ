@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { verifyAccountNature } from '../utils/financeCalculations';
+import { EmptyState } from './EmptyState';
 
 // Cellule adaptative intelligente avec échelle de division et arrondi
 const NumCell = ({ val, isBold, color, activeDivisor = 1, rounding = 2, style = {} }) => {
@@ -69,11 +70,7 @@ export function BalanceView({ rows }) {
 
   if (!rows || rows.length === 0) {
     return (
-      <div className="card fade-in" style={{ maxWidth: 450, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_balance</span>
-        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Balance non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable.</p>
-      </div>
+      <EmptyState icon="account_balance" title="Balance non disponible" message="Veuillez d'abord importer une balance comptable." />
     );
   }
 
@@ -227,7 +224,7 @@ export function BalanceView({ rows }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
 
             {/* 🧮 Sélecteur de Diviseur / Échelle d'affichage */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-alt)', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#1b6e8c' }}>tune</span>
                 Diviseur :
@@ -271,9 +268,9 @@ export function BalanceView({ rows }) {
             </div>
 
             {/* Sélecteur d'Arrondi (0, 1, 2 décimales) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-alt)', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>ARRONDI :</span>
-              <div style={{ display: 'flex', background: '#e2e8f0', padding: 2, borderRadius: 6, gap: 1 }}>
+              <div style={{ display: 'flex', background: 'var(--border)', padding: 2, borderRadius: 6, gap: 1 }}>
                 {[
                   { id: 0, label: '0 (Entier)' },
                   { id: 1, label: '1 (.0)' },
@@ -302,7 +299,7 @@ export function BalanceView({ rows }) {
             </div>
 
             {/* View Mode Toggle Button */}
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', background: 'var(--surface-alt)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
               <button
                 onClick={() => setViewMode('summary')}
                 style={{
@@ -350,7 +347,7 @@ export function BalanceView({ rows }) {
                   padding: '8px 32px 8px 34px',
                   borderRadius: 8,
                   border: '1px solid var(--border)',
-                  background: '#f8fafc',
+                  background: 'var(--surface-alt)',
                   fontSize: '0.85rem',
                   outline: 'none',
                   color: 'var(--text)',
@@ -358,7 +355,7 @@ export function BalanceView({ rows }) {
                 }}
               />
               {searchQuery && (
-                <button onClick={() => handleSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <button onClick={() => handleSearch('')} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
                 </button>
               )}
@@ -528,6 +525,7 @@ export function BalanceView({ rows }) {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 className="btn btn-ghost"
+                aria-label="Page précédente"
                 style={{ padding: '3px 6px', fontSize: '0.74rem', opacity: currentPage === 1 ? 0.4 : 1 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_left</span>
@@ -541,6 +539,7 @@ export function BalanceView({ rows }) {
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 className="btn btn-ghost"
+                aria-label="Page suivante"
                 style={{ padding: '3px 6px', fontSize: '0.74rem', opacity: currentPage === totalPages ? 0.4 : 1 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_right</span>
@@ -552,8 +551,8 @@ export function BalanceView({ rows }) {
 
       {/* Main Data Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ maxHeight: '680px', overflowY: 'auto' }}>
-          <table className="data-table compact-table grid-lines" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
+        <div style={{ maxHeight: '680px', overflowY: 'auto', overflowX: 'auto' }}>
+          <table className="data-table compact-table grid-lines" style={{ width: '100%', minWidth: 720, tableLayout: 'fixed', fontSize: '0.74rem' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface-alt)' }}>
               {isSummary ? (
                 <tr>

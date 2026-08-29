@@ -1713,12 +1713,17 @@ export const calculateRatios = (bilan, sig, rows) => {
       const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
       // Créances clients (Compte 41x hors 419)
+      // Note : un compte 41x au solde créditeur (client "à l'envers") est volontairement
+      // exclu ici plutôt que reclassé — il est déjà remonté comme ATYPIQUE par l'audit
+      // de balance (verifyAccountNature). Le garder hors ratio évite de fausser le BFR/DSO
+      // avec une position qui relève en réalité d'une dette (avance client).
       if (c.startsWith('41') && !c.startsWith('419')) {
         const soldeNet = solde > 0 ? solde : (deb - cred);
         if (soldeNet > 0) creancesClients += soldeNet;
       }
-      
-      // Stocks (Compte 3x hors 39)
+
+      // Stocks (Compte 3x hors 39) — même logique : un solde créditeur atypique est exclu
+      // du ratio plutôt que reclassé (cf. audit de balance pour son signalement).
       if (c.startsWith('3') && !c.startsWith('39')) {
         const init = (row.soldeDebutDebit || 0) - (row.soldeDebutCredit || 0);
         const fin  = (row.soldeFinDebit || 0) - (row.soldeFinCredit || 0);
@@ -1728,7 +1733,8 @@ export const calculateRatios = (bilan, sig, rows) => {
         if (soldeNet > 0) stocks += soldeNet;
       }
 
-      // Dettes Fournisseurs (Compte 40x hors 409 et 406)
+      // Dettes Fournisseurs (Compte 40x hors 409 et 406) — même logique : un solde débiteur
+      // atypique (avance fournisseur) est exclu du ratio plutôt que reclassé.
       if (c.startsWith('40') && !c.startsWith('409') && !c.startsWith('406')) {
         const soldeNet = solde < 0 ? -solde : (cred - deb);
         if (soldeNet > 0) dettesFournisseurs += soldeNet;

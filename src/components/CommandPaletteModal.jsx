@@ -111,7 +111,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
     }
 
     return results;
-  }, [query, rows, data, isSimulationActive]);
+  }, [query, rows, data, isSimulationActive, onNavigate, onClose, onExportExcel, onExportPDF, onTogglePresentation, setIsSimulationActive]);
 
   // Keyboard navigation inside the palette
   useEffect(() => {
@@ -152,6 +152,9 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Palette de commandes"
         style={{
           width: '100%', maxWidth: 640,
           background: 'var(--surface)',
@@ -173,19 +176,27 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
             placeholder="Rechercher compte (411, 512), agrégat (EBE, FRNG), écran ou action..."
+            aria-label="Rechercher un compte, un agrégat, un écran ou une action"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="command-palette-results"
             style={{
               flex: 1, border: 'none', background: 'transparent',
               fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)',
               outline: 'none'
             }}
           />
-          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-sub)', background: 'var(--surface)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+          <button
+            onClick={onClose}
+            aria-label="Fermer la palette de commandes"
+            style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-sub)', background: 'var(--surface)', padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}
+          >
             ESC
-          </span>
+          </button>
         </div>
 
         {/* Results List */}
-        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+        <div ref={listRef} id="command-palette-results" role="listbox" style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
           {searchResults.length === 0 ? (
             <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--text-sub)', marginBottom: 8 }}>search_off</span>
@@ -198,6 +209,8 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
               return (
                 <div
                   key={item.id || idx}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={item.action}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   style={{
