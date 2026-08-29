@@ -190,7 +190,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
             <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 36, color: 'var(--text-sub)', marginBottom: 8 }}>search_off</span>
               <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>Aucun résultat trouvé pour « {query} »</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-sub)', marginTop: 4 }}>Essayez un numéro de compte (ex: 700, 401), un ratio (ex: DSO, EBE) ou une action.</div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-sub)', marginTop: 4 }}>Essayez un numéro de compte (ex: 700, 401), un ratio (ex: DSO, EBE) ou une action.</div>
             </div>
           ) : (
             searchResults.map((item, idx) => {
@@ -221,7 +221,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
                       <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{item.icon}</span>
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {item.label}
                       </div>
                       {item.sub && (
@@ -232,7 +232,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
                     </div>
                   </div>
 
-                  <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-sub)', background: 'var(--surface-alt)', padding: '2px 7px', borderRadius: 6, flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-sub)', background: 'var(--surface-alt)', padding: '2px 7px', borderRadius: 6, flexShrink: 0 }}>
                     {item.category}
                   </span>
                 </div>
@@ -242,7 +242,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
         </div>
 
         {/* Footer shortcuts */}
-        <div style={{ padding: '8px 18px', background: 'var(--surface-alt)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+        <div style={{ padding: '8px 18px', background: 'var(--surface-alt)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: 'var(--text-muted)' }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <span><strong style={{ color: 'var(--text)' }}>↑↓</strong> Naviguer</span>
             <span><strong style={{ color: 'var(--text)' }}>↵</strong> Sélectionner</span>

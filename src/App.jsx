@@ -18,7 +18,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { PresentationView } from './components/PresentationView';
 import { exportFinancialWorkbook } from './utils/excelExporter';
 import { generateFullPDF } from './utils/pdfExporter';
-import { calculateStockEvolution } from './utils/financeCalculations';
+import { calculateStockEvolution, applyTvaRegimeToRatios } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
 
@@ -70,10 +70,22 @@ export default function App() {
 
   // Active dataset (Real vs Simulated)
   const activeData = useMemo(() => {
-    if (isSimulationActive && simulationEntries.length > 0 && data) {
-      return recalculateSimulatedDataset(data, simulationEntries);
-    }
-    return data;
+    const base = (isSimulationActive && simulationEntries.length > 0 && data)
+      ? recalculateSimulatedDataset(data, simulationEntries)
+      : data;
+    if (!base) return base;
+
+    // Applique le régime TVA (ventes/achats franchisés ou non, cf. Paramètres) aux
+    // délais clients/fournisseurs, de façon réactive et sans réimporter la balance.
+    const tvaRegime = base.profil?.tvaRegime || { ventesFranchisees: false, achatsFranchises: false, tauxTva: 19 };
+    return {
+      ...base,
+      ratios: base.ratios ? applyTvaRegimeToRatios(base.ratios, tvaRegime) : base.ratios,
+      dataN1: base.dataN1 ? {
+        ...base.dataN1,
+        ratios: base.dataN1.ratios ? applyTvaRegimeToRatios(base.dataN1.ratios, tvaRegime) : base.dataN1.ratios
+      } : base.dataN1
+    };
   }, [data, simulationEntries, isSimulationActive]);
 
   // Appliquer le thème sur document.documentElement
@@ -115,6 +127,26 @@ export default function App() {
     } : prev);
   };
 
+  // Régime TVA : par défaut, ventes ET achats sont NON franchisés (soumis à TVA).
+  // Une entreprise en franchise de TVA (exonération légale : export, régime de la franchise,
+  // secteur exonéré art. 9 Code des Taxes sur le CA...) doit le déclarer explicitement ici,
+  // car cela modifie le calcul des délais clients/fournisseurs (cf. updateTvaRegime).
+  const updateTvaRegime = (patch) => {
+    setData(prev => prev ? {
+      ...prev,
+      profil: {
+        ...(prev.profil || {}),
+        tvaRegime: {
+          ventesFranchisees: false,
+          achatsFranchises: false,
+          tauxTva: 19,
+          ...(prev.profil?.tvaRegime || {}),
+          ...patch
+        }
+      }
+    } : prev);
+  };
+
   /* ── Totaux Annuels Produits vs Charges (Sans détail) ── */
   const annualTotals = useMemo(() => {
     let totP = 0, totC = 0;
@@ -139,7 +171,7 @@ export default function App() {
       totC,
       net,
       bars: [
-        { name: 'Produits (Cl. 7)', Montant: totP, color: '#2563eb' },
+        { name: 'Produits (Cl. 7)', Montant: totP, color: '#1b6e8c' },
         { name: 'Charges (Cl. 6)',  Montant: totC, color: '#059669' },
         { name: 'Résultat Net',     Montant: net,  color: net >= 0 ? '#059669' : '#dc2626' },
       ]
@@ -169,7 +201,7 @@ export default function App() {
     const tot = a + s + p + i + o;
     if (tot > 0) {
       return [
-        { label: 'Achats consommés (60)',       val: a, color: '#2563eb' },
+        { label: 'Achats consommés (60)',       val: a, color: '#1b6e8c' },
         { label: 'Services extérieurs (61/62)', val: s, color: '#059669' },
         { label: 'Charges de personnel (63)',   val: p, color: '#d97706' },
         { label: 'Impôts & taxes (64)',          val: i, color: '#7c3aed' },
@@ -179,7 +211,7 @@ export default function App() {
 
     // Fallback démo équilibré si aucune balance chargée
     return [
-      { label: 'Achats consommés (60)',       val: 342000, color: '#2563eb', pct: 39.1 },
+      { label: 'Achats consommés (60)',       val: 342000, color: '#1b6e8c', pct: 39.1 },
       { label: 'Services extérieurs (61/62)', val: 156000, color: '#059669', pct: 17.8 },
       { label: 'Charges de personnel (63)',   val: 289000, color: '#d97706', pct: 33.1 },
       { label: 'Impôts & taxes (64)',          val: 42000,  color: '#7c3aed', pct: 4.8 },
@@ -485,7 +517,7 @@ export default function App() {
     if (tab === 'methodology') return <CalculationsIndexView />;
     if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
     if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
-    if (tab === 'settings')    return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} />;
+    if (tab === 'settings')    return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} onUpdateTvaRegime={updateTvaRegime} />;
 
     /* ── DASHBOARD ── */
     if (!data) return (
@@ -493,7 +525,7 @@ export default function App() {
         <div style={{ padding: '48px 32px', textAlign: 'center' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 52, color:'#cbd5e1', display:'block', marginBottom: 16 }}>pie_chart</span>
           <h3 style={{ fontWeight:800, fontSize:'1.15rem', marginBottom: 8 }}>Aucune donnée importée</h3>
-          <p style={{ color:'#64748b', fontSize:'0.875rem', marginBottom: 24 }}>
+          <p style={{ color:'#64748b', fontSize:'0.92rem', marginBottom: 24 }}>
             Importez votre balance comptable (CSV ou Excel) pour afficher l'analyse financière.
           </p>
           <button className="btn btn-primary" onClick={() => setTab('import')}>
@@ -530,17 +562,17 @@ export default function App() {
         {/* KPI Row 1 — Équilibre Financier */}
         <div className="kpi-grid">
           {[
-            { label:'FRNG', value: b.frng, color:'#2563eb', barColor:'#2563eb', pct: kpiPct(b.frng), trend: frngTrend.label, up: frngTrend.up },
-            { label:'BFR',  value: b.bfr,  color:'#0f172a', barColor:'#059669', pct: kpiPct(b.bfr),  trend: bfrTrend.label,  up: bfrTrend.up  },
-            { label:'Trésorerie Nette', value: b.tn, color:'#0f172a', barColor:'#d97706', pct: kpiPct(b.tn), trend: tnTrend.label, up: tnTrend.up },
-            { label:'Résultat Net', value: s.resultatNet, color:'#059669', barColor:'#2563eb', pct: kpiPct(s.resultatNet), trend: rnTrend.label, up: rnTrend.up },
+            { label:'FRNG', value: b.frng, color:'#1b6e8c', barColor:'#1b6e8c', pct: kpiPct(b.frng), trend: frngTrend.label, up: frngTrend.up },
+            { label:'BFR',  value: b.bfr,  color:'var(--text)', barColor:'#059669', pct: kpiPct(b.bfr),  trend: bfrTrend.label,  up: bfrTrend.up  },
+            { label:'Trésorerie Nette', value: b.tn, color:'var(--text)', barColor:'#d97706', pct: kpiPct(b.tn), trend: tnTrend.label, up: tnTrend.up },
+            { label:'Résultat Net', value: s.resultatNet, color:'#059669', barColor:'#1b6e8c', pct: kpiPct(s.resultatNet), trend: rnTrend.label, up: rnTrend.up },
           ].map((k,i) => {
             const numFormatted = Math.round(k.value || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
             const len = numFormatted.length;
             const adaptiveFontSize = len > 14 ? '1.05rem' : len > 11 ? '1.18rem' : len > 9 ? '1.3rem' : '1.45rem';
 
             return (
-              <div className="kpi-card" key={i} style={{ minWidth: 0, overflow: 'hidden' }}>
+              <div className={`kpi-card ${k.up ? 'kpi-good' : 'kpi-bad'}`} key={i} style={{ minWidth: 0, overflow: 'hidden' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 6 }}>
                   <span className="kpi-label">{k.label}</span>
                   <span className={`kpi-trend ${k.up?'up':'down'}`}>
@@ -550,7 +582,7 @@ export default function App() {
                 </div>
                 <div className="kpi-value" style={{ color: k.color, fontSize: adaptiveFontSize, display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>{numFormatted}</span>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0, opacity: 0.85 }}>{cur}</span>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0, opacity: 0.85 }}>{cur}</span>
                 </div>
                 <div className="kpi-bar-track">
                   <div className="kpi-bar-fill" style={{ width:`${k.pct}%`, background: k.barColor }}></div>
@@ -564,7 +596,7 @@ export default function App() {
         {/* KPI Row 2 — Rotation & Délais d'Exploitation */}
         <div className="kpi-grid" style={{ marginBottom: 20 }}>
           <div 
-            className="kpi-card" 
+            className={`kpi-card ${!r.rotationStocks ? '' : r.rotationStocks <= 45 ? 'kpi-good' : r.rotationStocks <= 75 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
             onClick={() => setTab('ratios')}
           >
@@ -577,10 +609,10 @@ export default function App() {
                 <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                   {r.rotationStocks ? Math.round(r.rotationStocks) : 0}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
+                <span style={{ fontSize: '0.80rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
               <span style={{ color: 'var(--text-muted)' }}>
                 Vitesse : <strong className="mono" style={{ color: 'var(--text)', fontWeight: 700 }}>{(r.tauxRotationStocks || 0).toFixed(1)}x / an</strong>
               </span>
@@ -589,7 +621,7 @@ export default function App() {
           </div>
 
           <div 
-            className="kpi-card" 
+            className={`kpi-card ${!r.delaiRecouvrement ? '' : r.delaiRecouvrement <= 45 ? 'kpi-good' : r.delaiRecouvrement <= 60 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
             onClick={() => setTab('ratios')}
           >
@@ -602,10 +634,10 @@ export default function App() {
                 <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                   {r.delaiRecouvrement ? Math.round(r.delaiRecouvrement) : 0}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
+                <span style={{ fontSize: '0.80rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
               <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                 Encours : <strong className="mono" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.creancesClients)}</strong>
               </span>
@@ -614,7 +646,7 @@ export default function App() {
           </div>
 
           <div 
-            className="kpi-card" 
+            className={`kpi-card ${!r.delaiFournisseurs ? '' : r.delaiFournisseurs >= 45 && r.delaiFournisseurs <= 90 ? 'kpi-good' : r.delaiFournisseurs > 90 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
             onClick={() => setTab('ratios')}
           >
@@ -627,10 +659,10 @@ export default function App() {
                 <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                   {r.delaiFournisseurs ? Math.round(r.delaiFournisseurs) : 0}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
+                <span style={{ fontSize: '0.80rem', fontWeight: 700, color: 'var(--text-muted)' }}>jours</span>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
               <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                 Encours : <strong className="mono" style={{ color: 'var(--text)', fontWeight: 700 }}>{fmt(r.dettesFournisseurs)}</strong>
               </span>
@@ -639,7 +671,7 @@ export default function App() {
           </div>
 
           <div 
-            className="kpi-card" 
+            className={`kpi-card ${!r.bfrJoursCA ? '' : r.bfrJoursCA <= 60 ? 'kpi-good' : r.bfrJoursCA <= 90 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
             onClick={() => setTab('ratios')}
           >
@@ -652,10 +684,10 @@ export default function App() {
                 <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
                   {r.bfrJoursCA ? Math.round(r.bfrJoursCA) : 0}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>j CA</span>
+                <span style={{ fontSize: '0.80rem', fontWeight: 700, color: 'var(--text-muted)' }}>j CA</span>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
               <span style={{ color: 'var(--text-muted)' }}>
                 Norme : <strong className="mono" style={{ color: 'var(--text)', fontWeight: 700 }}>&le; 60 j</strong>
               </span>
@@ -668,12 +700,12 @@ export default function App() {
         <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #f0f8fa, #dceef2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>bar_chart</span>
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Vue Annuelle : Produits vs Charges</h3>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Totaux cumulés des classes 7 et 6, et résultat net qui en découle</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Totaux cumulés des classes 7 et 6, et résultat net qui en découle</span>
               </div>
             </div>
           </div>
@@ -694,8 +726,8 @@ export default function App() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, fontSize: '0.78rem' }}>
-              <span>Produits : <strong className="mono" style={{ color: '#2563eb' }}>{fmt(annualTotals.totP)}</strong></span>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, fontSize: '0.80rem' }}>
+              <span>Produits : <strong className="mono" style={{ color: '#1b6e8c' }}>{fmt(annualTotals.totP)}</strong></span>
               <span>Charges : <strong className="mono" style={{ color: '#059669' }}>{fmt(annualTotals.totC)}</strong></span>
               <span>Résultat Net : <strong className="mono" style={{ color: annualTotals.net >= 0 ? '#059669' : '#dc2626' }}>{fmt(annualTotals.net)}</strong></span>
             </div>
@@ -706,15 +738,15 @@ export default function App() {
         <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, #f0f8fa, #dceef2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>donut_small</span>
               </div>
               <div>
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Structure &amp; Répartition des Charges (Classe 6 — SCF)</h3>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Décomposition des flux de charges par nature selon la nomenclature officielle</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Décomposition des flux de charges par nature selon la nomenclature officielle</span>
               </div>
             </div>
-            <button className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setTab('balance')}>
+            <button className="btn btn-ghost" style={{ fontSize: '0.74rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setTab('balance')}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>account_balance</span>
               Grand Livre des Charges
             </button>
@@ -726,7 +758,7 @@ export default function App() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip
-                    contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                     formatter={(val, name, entry) => [`${fmt(val)} (${entry.payload.pct}%)`, name]}
                   />
                   <Pie
@@ -741,7 +773,7 @@ export default function App() {
                     cornerRadius={5}
                   >
                     {expenses.map((entry, index) => (
-                      <Cell key={`cell-expense-${index}`} fill={entry.color} stroke="#fff" strokeWidth={2} />
+                      <Cell key={`cell-expense-${index}`} fill={entry.color} stroke="var(--surface)" strokeWidth={2} />
                     ))}
                   </Pie>
                 </PieChart>
@@ -749,11 +781,11 @@ export default function App() {
               
               {/* Centre du Donut avec Total des Charges */}
               <div style={{ position: 'absolute', textAlign: 'center', pointerEvents: 'none' }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'block' }}>Total Charges</span>
-                <span className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text)', display: 'block', marginTop: 2 }}>
+                <span style={{ fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'block' }}>Total Charges</span>
+                <span className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text)', display: 'block', marginTop: 2 }}>
                   {fmt(expenses.reduce((s, e) => s + e.val, 0))}
                 </span>
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary)', background: '#eff6ff', padding: '1px 6px', borderRadius: 10, display: 'inline-block', marginTop: 4 }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary)', background: '#f0f8fa', padding: '1px 6px', borderRadius: 10, display: 'inline-block', marginTop: 4 }}>
                   Classe 6
                 </span>
               </div>
@@ -766,11 +798,11 @@ export default function App() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, flexShrink: 0 }} />
-                      <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)' }}>{e.label}</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text)' }}>{e.label}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="mono" style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)' }}>{fmt(e.val)}</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: e.color, background: `${e.color}15`, padding: '2px 8px', borderRadius: 6, minWidth: 42, textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: e.color, background: `${e.color}15`, padding: '2px 8px', borderRadius: 6, minWidth: 42, textAlign: 'center' }}>
                         {e.pct}%
                       </span>
                     </div>
@@ -792,7 +824,7 @@ export default function App() {
               <span className="material-symbols-outlined" style={{ fontSize:22, color:'var(--primary)' }}>warehouse</span>
               <div>
                 <h3 style={{ margin:0, fontSize:'0.92rem', fontWeight:800 }}>Évolution des Stocks par Catégorie</h3>
-                <span style={{ fontSize:'0.73rem', color:'var(--text-muted)' }}>Comparaison des stocks initiaux (N-1) et finaux (N) selon la nomenclature SCF</span>
+                <span style={{ fontSize:'0.74rem', color:'var(--text-muted)' }}>Comparaison des stocks initiaux (N-1) et finaux (N) selon la nomenclature SCF</span>
               </div>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
@@ -802,7 +834,7 @@ export default function App() {
                 </span>
                 {stockData.globalMouvement} ({stockData.totalVariation > 0 ? `+${fmt(stockData.totalVariation)}` : fmt(stockData.totalVariation)} | {fmtPct(stockData.totalPctVariation)})
               </span>
-              <button className="btn btn-ghost" style={{ fontSize:'0.75rem', padding:'5px 12px' }} onClick={() => setTab('stocks')}>
+              <button className="btn btn-ghost" style={{ fontSize:'0.74rem', padding:'5px 12px' }} onClick={() => setTab('stocks')}>
                 Analyse Détaillée
               </button>
             </div>
@@ -824,11 +856,11 @@ export default function App() {
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={v => `${Math.round(v/1000)}k`} />
                   <Tooltip 
-                    contentStyle={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:10, fontSize:12, boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }}
+                    contentStyle={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, fontSize:12, color:'var(--text)', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }}
                     formatter={(v, n) => [fmt(v), n]}
                   />
                   <Bar dataKey="Stock Initial" fill="#94a3b8" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="Stock Final" fill="#2563eb" radius={[5, 5, 0, 0]} maxBarSize={28} />
+                  <Bar dataKey="Stock Final" fill="#1b6e8c" radius={[5, 5, 0, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -836,23 +868,23 @@ export default function App() {
             {/* Cartes par catégorie de stock */}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12 }}>
               {stockData.categories.map((cat, i) => (
-                <div key={i} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:10, padding:14 }}>
+                <div key={i} style={{ background:'var(--surface-alt)', border:'1px solid var(--border)', borderRadius:10, padding:14 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, gap:6 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
                       <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--primary)', flexShrink:0 }}>{cat.icon || 'inventory_2'}</span>
-                      <span style={{ fontWeight:700, fontSize:'0.8rem', color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cat.label}</span>
+                      <span style={{ fontWeight:700, fontSize:'0.80rem', color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cat.label}</span>
                     </div>
-                    <span className={`badge ${cat.badgeCls}`} style={{ fontSize:'0.6rem', flexShrink:0 }}>{cat.mouvement}</span>
+                    <span className={`badge ${cat.badgeCls}`} style={{ fontSize:'0.58rem', flexShrink:0 }}>{cat.mouvement}</span>
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', marginBottom:4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.74rem', marginBottom:4 }}>
                     <span style={{ color:'var(--text-muted)' }}>Début: <strong style={{ color:'var(--text)' }}>{fmt(cat.stockInitial)}</strong></span>
                     <span style={{ color:'var(--text-muted)' }}>Fin: <strong style={{ color:'var(--text)' }}>{fmt(cat.stockFinal)}</strong></span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:6, borderTop:'1px dashed #cbd5e1', marginTop:4 }}>
                     <span style={{ fontSize:'0.7rem', color:'var(--text-muted)', fontWeight:600 }}>Variation Net:</span>
-                    <span className="mono" style={{ fontWeight:800, fontSize:'0.82rem', color: cat.variation > 0 ? 'var(--green)' : cat.variation < 0 ? 'var(--red)' : 'var(--text)' }}>
+                    <span className="mono" style={{ fontWeight:800, fontSize:'0.85rem', color: cat.variation > 0 ? 'var(--green)' : cat.variation < 0 ? 'var(--red)' : 'var(--text)' }}>
                       {cat.variation > 0 ? `+${fmt(cat.variation)}` : fmt(cat.variation)}
-                      <span style={{ fontSize:'0.72rem', marginLeft:4, opacity:0.9 }}>
+                      <span style={{ fontSize:'0.74rem', marginLeft:4, opacity:0.9 }}>
                         ({fmtPct(cat.pctVariation)})
                       </span>
                     </span>
@@ -870,15 +902,15 @@ export default function App() {
               <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--red)' }}>warning</span>
               <h3>Alertes — Soldes Anormaux</h3>
             </div>
-            <button className="btn btn-ghost" style={{ fontSize:'0.75rem', padding:'5px 12px' }} onClick={() => setTab('balance')}>
+            <button className="btn btn-ghost" style={{ fontSize:'0.74rem', padding:'5px 12px' }} onClick={() => setTab('balance')}>
               Balance complète
             </button>
           </div>
           {notableRows.filter(r => r.anomalie !== false).length === 0 ? (
             <div style={{ padding:'28px', textAlign:'center', color:'var(--green)', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
               <span className="material-symbols-outlined" style={{ fontSize:36 }}>check_circle</span>
-              <span style={{ fontWeight:700, fontSize:'0.875rem' }}>Aucun solde anormal détecté</span>
-              <span style={{ color:'var(--text-muted)', fontSize:'0.78rem' }}>Tous les comptes ont un solde conforme aux règles du PCG.</span>
+              <span style={{ fontWeight:700, fontSize:'0.92rem' }}>Aucun solde anormal détecté</span>
+              <span style={{ color:'var(--text-muted)', fontSize:'0.80rem' }}>Tous les comptes ont un solde conforme aux règles du PCG.</span>
             </div>
           ) : (
             <div style={{ overflowX:'auto' }}>
@@ -908,7 +940,7 @@ export default function App() {
                           {r.sens}
                         </span>
                       </td>
-                      <td style={{ fontSize:'0.75rem', color:'var(--text-muted)', maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.motif}</td>
+                      <td style={{ fontSize:'0.74rem', color:'var(--text-muted)', maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.motif}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -930,31 +962,31 @@ export default function App() {
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div style={{
                 width: 34, height: 34, borderRadius: 10,
-                background: '#000000',
+                background: 'linear-gradient(135deg, var(--ink), var(--primary-dk))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                border: '1px solid #27272a'
+                boxShadow: '0 2px 8px rgba(11,52,70,0.35)',
+                border: '1px solid var(--ink)'
               }}>
-                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 900, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1 }}>BQ</span>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1 }}>BQ</span>
               </div>
-              {/* Blue dot — top-right */}
+              {/* Gold dot — top-right, signature accent */}
               <span style={{
                 position: 'absolute', top: -3, right: -3,
                 width: 9, height: 9, borderRadius: '50%',
-                background: '#2563eb',
+                background: 'var(--accent)',
                 border: '2px solid var(--surface)',
-                boxShadow: '0 0 6px rgba(37,99,235,0.7)',
+                boxShadow: '0 0 6px rgba(192,138,46,0.7)',
                 display: 'block'
               }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.06em', lineHeight: 1 }}>BAIQ</span>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1 }}>BAIQ</span>
               </div>
-              <div style={{ fontSize: '0.52rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)', marginTop: 2, lineHeight: 1 }}>Balance and Financial Analytics</div>
+              <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)', marginTop: 2, lineHeight: 1 }}>Balance and Financial Analytics</div>
             </div>
           </div>
-          <div style={{ marginTop: 6, fontSize: '0.55rem', fontWeight: 600, color: 'var(--text-sub)', letterSpacing: '0.06em', opacity: 0.7 }}>Comptabilité · Finance · IA — SCF Algérie</div>
+          <div style={{ marginTop: 6, fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-sub)', letterSpacing: '0.06em', opacity: 0.7 }}>Comptabilité · Finance · IA — SCF Algérie</div>
         </div>
         <nav className="sidebar-nav">
           {NAV.map(n => {
@@ -967,34 +999,34 @@ export default function App() {
                 className={`nav-item ${isActive ? 'active' : ''}`}
                 style={isAI ? {
                   background: isActive
-                    ? 'linear-gradient(135deg, #2563eb, #7c3aed)'
-                    : 'linear-gradient(135deg, #eff6ff, #f5f3ff)',
-                  color: isActive ? '#fff' : '#7c3aed',
-                  border: '1px solid #c4b5fd',
+                    ? 'linear-gradient(135deg, var(--ink), var(--accent-dk))'
+                    : 'linear-gradient(135deg, var(--primary-lt2), var(--accent-lt))',
+                  color: isActive ? '#fff' : 'var(--accent-dk)',
+                  border: '1px solid var(--accent)',
                   marginTop: 8,
                   fontWeight: 800,
                 } : {}}
               >
-                <span className="material-symbols-outlined" style={isAI && !isActive ? { color: '#7c3aed' } : {}}>{n.icon}</span>
+                <span className="material-symbols-outlined" style={isAI && !isActive ? { color: 'var(--accent-dk)' } : {}}>{n.icon}</span>
                 {n.label}
                 {isAI && !isActive && (
-                  <span style={{ marginLeft: 'auto', fontSize: '0.55rem', fontWeight: 900, background: 'linear-gradient(135deg,#2563eb,#7c3aed)', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>IA</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.58rem', fontWeight: 900, background: 'linear-gradient(135deg,var(--ink),var(--accent-dk))', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>IA</span>
                 )}
               </button>
             );
           })}
         </nav>
-        {/* COMPTEUR D'ANALYSES EXÉCUTÉES (100% Confidentiel - Simple entier local) */}
-        <div style={{ padding: '8px 12px', margin: '4px 10px 8px 10px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--primary)' }}>analytics</span>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)' }}>Analyses exécutées</span>
-          </div>
-          <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--primary)', background: 'rgba(37,99,235,0.1)', padding: '2px 8px', borderRadius: 6 }}>
-            {analysisCount}
-          </span>
-        </div>
         <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+          {/* COMPTEUR D'ANALYSES EXÉCUTÉES (100% Confidentiel - Simple entier local) — repositionné en pied de menu, format compact */}
+          <div style={{ padding: '4px 6px', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.75 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 12, color: 'var(--text-muted)' }}>analytics</span>
+              <span style={{ fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-muted)' }}>Analyses exécutées</span>
+            </div>
+            <span className="mono" style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)' }}>
+              {analysisCount}
+            </span>
+          </div>
           <button className={`nav-item ${tab==='settings'?'active':''}`} onClick={() => setTab('settings')}>
             <span className="material-symbols-outlined">settings</span>
             Paramètres
@@ -1034,7 +1066,7 @@ export default function App() {
                 background: isSimulationActive ? 'linear-gradient(135deg, #059669, #047857)' : 'var(--surface-alt)',
                 color: isSimulationActive ? '#fff' : 'var(--text-muted)',
                 border: `1px solid ${isSimulationActive ? '#059669' : 'var(--border)'}`,
-                fontSize: '0.78rem', fontWeight: 800, transition: 'all 0.2s',
+                fontSize: '0.80rem', fontWeight: 800, transition: 'all 0.2s',
                 boxShadow: isSimulationActive ? '0 2px 8px rgba(5,150,105,0.25)' : 'none'
               }}
             >
@@ -1046,12 +1078,12 @@ export default function App() {
 
             {data && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20, padding: '4px 12px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>domain</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Secteur :</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#1b6e8c' }}>domain</span>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Secteur :</span>
                 <select
                   value={data?.profil?.secteurId || 'commerce_gros'}
                   onChange={e => updateSecteur(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', fontSize: '0.78rem', fontWeight: 800, color: '#1e40af', outline: 'none', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', fontSize: '0.80rem', fontWeight: 800, color: '#124f66', outline: 'none', cursor: 'pointer' }}
                 >
                   {SECTEURS.map(sec => (
                     <option key={sec.id} value={sec.id}>{sec.label}</option>
@@ -1072,8 +1104,8 @@ export default function App() {
                 {theme === 'light' ? 'dark_mode' : 'light_mode'}
               </span>
             </button>
-            <div className="avatar" style={{ background: 'linear-gradient(135deg, #1e40af, #2563eb)', border: '2px solid #93c5fd' }}>
-              <span className="avatar-initials" style={{ color: '#fff', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '-0.02em' }}>IB</span>
+            <div className="avatar" style={{ background: 'linear-gradient(135deg, #124f66, #1b6e8c)', border: '2px solid #8fc6d6' }}>
+              <span className="avatar-initials" style={{ color: '#fff', fontWeight: 900, fontSize: '0.80rem', letterSpacing: '-0.02em' }}>IB</span>
             </div>
           </div>
         </header>
@@ -1088,10 +1120,10 @@ export default function App() {
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button onClick={() => setTab('whatif')} style={{ background: '#fff', color: '#047857', border: 'none', padding: '4px 12px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}>
+                <button onClick={() => setTab('whatif')} style={{ background: '#fff', color: '#047857', border: 'none', padding: '4px 12px', borderRadius: 8, fontSize: '0.80rem', fontWeight: 800, cursor: 'pointer' }}>
                   Gérer la Simulation ⚙️
                 </button>
-                <button onClick={() => setIsSimulationActive(false)} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setIsSimulationActive(false)} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 8, fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}>
                   Désactiver ✕
                 </button>
               </div>
@@ -1128,11 +1160,11 @@ export default function App() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#60a5fa' }}>support_agent</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#4fb3cc' }}>support_agent</span>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Contact &amp; Assistance</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>BAIQ — Balance and Financial Analytics</p>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Contact &amp; Assistance</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#94a3b8' }}>BAIQ — Balance and Financial Analytics</p>
                 </div>
               </div>
               <button
@@ -1146,9 +1178,9 @@ export default function App() {
             {/* Body */}
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: 'var(--surface-alt)', padding: 14, borderRadius: 10, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Plateforme &amp; Support Technique</div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text)' }}>Assistance Comptable &amp; Financière SCF</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>Besoin d'une démonstration, d'une règle d'audit spécifique ou d'un support technique ?</div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Plateforme &amp; Support Technique</div>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text)' }}>Assistance Comptable &amp; Financière SCF</div>
+                <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)', marginTop: 4 }}>Besoin d'une démonstration, d'une règle d'audit spécifique ou d'un support technique ?</div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1162,7 +1194,7 @@ export default function App() {
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                 >
-                  <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 22 }}>mail</span>
+                  <span className="material-symbols-outlined" style={{ color: '#1b6e8c', fontSize: 22 }}>mail</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>EMAIL CONTACT</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>contact@baiq.ai</div>
@@ -1227,7 +1259,8 @@ export default function App() {
 
 /* ── ReportsView est dans ./components/ReportsView.jsx ── */
 
-function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSecteur }) {
+function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSecteur, onUpdateTvaRegime }) {
+  const tvaRegime = data?.profil?.tvaRegime || { ventesFranchisees: false, achatsFranchises: false, tauxTva: 19 };
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved]     = useState(false);
   const [serverProxyConfigured, setServerProxyConfigured] = useState(null); // null = vérification en cours
@@ -1258,20 +1291,20 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
       <div className="card" style={{ maxWidth: 500 }}>
         <div className="card-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb' }}>payments</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#1b6e8c' }}>payments</span>
             Symbole monétaire affiché
           </h3>
         </div>
         <div className="card-body">
-          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Libellé affiché après les montants</label>
+          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Libellé affiché après les montants</label>
           <input
             value={cur}
             onChange={e => setCur(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 9, fontSize: '0.9rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
+            style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 10, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#d97706', flexShrink: 0 }}>info</span>
-            <p style={{ fontSize: '0.72rem', color: '#92400e', margin: 0 }}>
+            <p style={{ fontSize: '0.74rem', color: '#92400e', margin: 0 }}>
               Ce champ ne fait que <strong>changer le libellé</strong> affiché après les montants (ex: "DZD" au lieu de "DA") — aucune conversion
               de change n'est effectuée. Les montants restent exprimés dans la devise réelle de votre balance importée, quel que soit le texte saisi ici.
             </p>
@@ -1284,24 +1317,72 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
         <div className="card" style={{ maxWidth: 500 }}>
           <div className="card-header">
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb' }}>domain</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#1b6e8c' }}>domain</span>
               Secteur d'activité (Benchmarks)
             </h3>
           </div>
           <div className="card-body">
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Référentiel sectoriel actif</label>
+            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Référentiel sectoriel actif</label>
             <select
               value={data?.profil?.secteurId || 'commerce_gros'}
               onChange={e => onUpdateSecteur(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 9, fontSize: '0.88rem', fontWeight: 700, outline: 'none', background: '#fff' }}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: '#fff' }}
             >
               {SECTEURS.map(sec => (
                 <option key={sec.id} value={sec.id}>{sec.label}</option>
               ))}
             </select>
-            <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 6 }}>
+            <p style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 6 }}>
               Changer le secteur recalibre immédiatement toutes les normes sectorielles et scores IA sans réimporter la balance.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Régime TVA — ventes / achats franchisés ou non */}
+      {data && (
+        <div className="card" style={{ maxWidth: 500 }}>
+          <div className="card-header">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#1b6e8c' }}>receipt_long</span>
+              Régime TVA (ventes / achats)
+            </h3>
+          </div>
+          <div className="card-body">
+            <p style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 0, marginBottom: 12 }}>
+              Détermine si les délais de recouvrement clients et de règlement fournisseurs doivent être corrigés
+              de l'effet TVA (les soldes de balance sont en TTC, le CA et les achats du TCR sont en HT). Par défaut,
+              ventes et achats sont considérés <strong>non franchisés</strong> (soumis à TVA) — cochez uniquement si
+              une exonération légale s'applique réellement (export, régime de la franchise, activité exonérée, etc.).
+            </p>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!!tvaRegime.ventesFranchisees}
+                onChange={e => onUpdateTvaRegime({ ventesFranchisees: e.target.checked })}
+              />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Ventes en franchise de TVA (exonérées)</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!!tvaRegime.achatsFranchises}
+                onChange={e => onUpdateTvaRegime({ achatsFranchises: e.target.checked })}
+              />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Achats en franchise de TVA (exonérés)</span>
+            </label>
+
+            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Taux de TVA applicable (si non franchisé)</label>
+            <select
+              value={tvaRegime.tauxTva}
+              onChange={e => onUpdateTvaRegime({ tauxTva: Number(e.target.value) })}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: '#fff' }}
+            >
+              <option value={19}>19 % — Taux normal</option>
+              <option value={9}>9 % — Taux réduit</option>
+            </select>
           </div>
         </div>
       )}
@@ -1310,7 +1391,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
       <div className="card" style={{ maxWidth: 500, border: '1px solid #c4b5fd' }}>
         <div className="card-header" style={{ background: '#f5f3ff', borderBottom: '1px solid #ddd6fe' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 24, height: 24, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ width: 24, height: 24, background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#fff' }}>smart_toy</span>
             </span>
             Clé API Google Gemini
@@ -1321,12 +1402,12 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
 
           {/* Statut du relais serveur sécurisé */}
           {serverProxyConfigured === true ? (
-            <div style={{ padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac', fontSize: '0.78rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: 12, background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac', fontSize: '0.80rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#059669' }}>verified_user</span>
               <span><strong>Relais serveur sécurisé actif.</strong> L'IA Gemini fonctionne sans qu'aucune clé ne transite par votre navigateur — la clé ci-dessous n'est pas nécessaire.</span>
             </div>
           ) : serverProxyConfigured === false ? (
-            <div style={{ padding: 12, background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.6 }}>
+            <div style={{ padding: 12, background: '#f0f8fa', borderRadius: 8, border: '1px solid #b7dce6', fontSize: '0.80rem', color: '#124f66', lineHeight: 1.6 }}>
               <strong>🤖 Comment obtenir une clé Gemini gratuitement :</strong><br />
               1. Allez sur <strong>aistudio.google.com</strong><br />
               2. Connectez-vous avec votre compte Google<br />
@@ -1334,7 +1415,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
               4. Copiez la clé et collez-la ci-dessous
             </div>
           ) : (
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
+            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.80rem', color: '#64748b' }}>
               Vérification du relais serveur en cours…
             </div>
           )}
@@ -1352,7 +1433,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
 
           <div style={{ opacity: serverProxyConfigured ? 0.5 : 1, pointerEvents: serverProxyConfigured ? 'none' : 'auto' }}>
           <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini {serverProxyConfigured ? '(non nécessaire — relais serveur actif)' : '(mode local de repli)'}</label>
+            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini {serverProxyConfigured ? '(non nécessaire — relais serveur actif)' : '(mode local de repli)'}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1, position: 'relative' }}>
                 <input
@@ -1360,7 +1441,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
                   value={geminiKey}
                   onChange={e => setGeminiKey(e.target.value)}
                   placeholder="AIza..."
-                  style={{ width: '100%', padding: '10px 40px 10px 14px', border: '1px solid #c4b5fd', borderRadius: 9, fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: '#faf5ff' }}
+                  style={{ width: '100%', padding: '10px 40px 10px 14px', border: '1px solid #c4b5fd', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: '#faf5ff' }}
                 />
                 <button
                   onClick={() => setShowKey(!showKey)}
@@ -1371,7 +1452,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
               </div>
               <button
                 onClick={handleSaveKey}
-                style={{ padding: '10px 18px', background: saved ? '#059669' : 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.3s', whiteSpace: 'nowrap' }}
+                style={{ padding: '10px 18px', background: saved ? '#059669' : 'linear-gradient(135deg, #1b6e8c, #7c3aed)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.3s', whiteSpace: 'nowrap' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{saved ? 'check_circle' : 'save'}</span>
                 {saved ? 'Sauvegardé !' : 'Sauvegarder'}
@@ -1380,7 +1461,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           </div>
 
           {geminiKey && (
-            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.78rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+            <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.80rem', color: '#166534', display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#059669' }}>check_circle</span>
               Clé configurée — utilisée uniquement si le relais serveur sécurisé n'est pas disponible.
             </div>

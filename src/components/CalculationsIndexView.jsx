@@ -283,7 +283,7 @@ export function CalculationsIndexView() {
 
   const categories = [
     { id: 'all',       label: 'Toutes les sections', icon: 'apps',               color: 'var(--primary)' },
-    { id: 'bilan',     label: 'Bilan & Équilibre',   icon: 'account_tree',       color: '#2563eb' },
+    { id: 'bilan',     label: 'Bilan & Équilibre',   icon: 'account_tree',       color: '#1b6e8c' },
     { id: 'bfr',       label: 'FRNG, BFR & Trésorerie', icon: 'payments',        color: '#059669' },
     { id: 'sig',       label: 'SIG & TCR par Nature', icon: 'analytics',         color: '#7c3aed' },
     { id: 'caf',       label: 'CAF & Autofinancement', icon: 'savings',          color: '#0891b2' },
@@ -318,20 +318,20 @@ export function CalculationsIndexView() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56,189,248,0.3)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#38bdf8' }}>menu_book</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#4fb3cc' }}>menu_book</span>
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#fff' }}>
+              <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#fff' }}>
                 Index &amp; Dictionnaire des Règles de Calculs
               </h2>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+              <span style={{ fontSize: '0.80rem', color: '#94a3b8' }}>
                 Méthodologie formelle SCF (Loi 07-11 / Décret 08-156) • Formules, Définitions &amp; Comptes Associés
               </span>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)', padding: '5px 14px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)', padding: '5px 14px', borderRadius: 20, fontSize: '0.74rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 5 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 15 }}>verified</span>
               {FORMULAS_DATABASE.length} Règles Normalisées
             </span>
@@ -369,7 +369,7 @@ export function CalculationsIndexView() {
                 border: isSel ? `1px solid ${cat.color}` : '1px solid var(--border)',
                 background: isSel ? 'var(--primary)' : 'var(--surface)',
                 color: isSel ? '#ffffff' : 'var(--text)',
-                fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer',
+                fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: isSel ? '0 4px 12px rgba(37,99,235,0.25)' : '0 1px 3px rgba(0,0,0,0.04)',
                 transition: 'all 0.15s ease',
@@ -389,7 +389,7 @@ export function CalculationsIndexView() {
           <div className="card" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#cbd5e1', display: 'block', marginBottom: 8 }}>search_off</span>
             <h4 style={{ fontWeight: 800, fontSize: '0.95rem' }}>Aucune formule ne correspond à votre recherche</h4>
-            <p style={{ fontSize: '0.78rem' }}>Essayez un autre mot-clé ou sélectionnez « Toutes les sections ».</p>
+            <p style={{ fontSize: '0.80rem' }}>Essayez un autre mot-clé ou sélectionnez « Toutes les sections ».</p>
           </div>
         ) : (
           filteredFormulas.map(item => {
@@ -415,11 +415,11 @@ export function CalculationsIndexView() {
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#f0f8fa', color: '#124f66', border: '1px solid #b7dce6', textTransform: 'uppercase' }}>
                         {item.refSCF}
                       </span>
                     </div>
-                    <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: 'var(--text)' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: 'var(--text)' }}>
                       {item.titre}
                     </h3>
                   </div>
@@ -442,30 +442,30 @@ export function CalculationsIndexView() {
 
                 {/* Détails étendus */}
                 {isExpanded && (
-                  <div className="fade-in space-y-3" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, fontSize: '0.76rem', color: 'var(--text)' }}>
+                  <div className="fade-in space-y-3" style={{ borderTop: '1px solid var(--border)', paddingTop: 12, fontSize: '0.74rem', color: 'var(--text)' }}>
                     <div>
-                      <strong style={{ color: 'var(--text-sub)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em' }}>Comptes SCF Associés :</strong>
-                      <div style={{ color: '#1e40af', fontWeight: 700, marginTop: 2, background: '#eff6ff', padding: '4px 8px', borderRadius: 6, border: '1px solid #bfdbfe' }}>
+                      <strong style={{ color: 'var(--text-sub)', textTransform: 'uppercase', fontSize: '0.70rem', letterSpacing: '0.04em' }}>Comptes SCF Associés :</strong>
+                      <div style={{ color: '#124f66', fontWeight: 700, marginTop: 2, background: '#f0f8fa', padding: '4px 8px', borderRadius: 6, border: '1px solid #b7dce6' }}>
                         {item.comptes}
                       </div>
                     </div>
 
                     <div>
-                      <strong style={{ color: 'var(--text-sub)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em' }}>Signification &amp; Objectif Financier :</strong>
+                      <strong style={{ color: 'var(--text-sub)', textTransform: 'uppercase', fontSize: '0.70rem', letterSpacing: '0.04em' }}>Signification &amp; Objectif Financier :</strong>
                       <p style={{ margin: '3px 0 0', color: 'var(--text)', lineHeight: 1.45 }}>
                         {item.explication}
                       </p>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10, marginTop: 6 }}>
-                      <div style={{ padding: '8px 10px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>💡 Exemple Chiffré :</span>
-                        <div style={{ fontSize: '0.72rem', color: '#1e293b', marginTop: 2, fontWeight: 600 }}>{item.exemple}</div>
+                      <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>💡 Exemple Chiffré :</span>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text)', marginTop: 2, fontWeight: 600 }}>{item.exemple}</div>
                       </div>
 
                       <div style={{ padding: '8px 10px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>🎯 Règle Normative :</span>
-                        <div style={{ fontSize: '0.72rem', color: '#15803d', marginTop: 2, fontWeight: 700 }}>{item.norme}</div>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>🎯 Règle Normative :</span>
+                        <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: 2, fontWeight: 700 }}>{item.norme}</div>
                       </div>
                     </div>
                   </div>

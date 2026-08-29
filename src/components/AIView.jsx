@@ -47,6 +47,26 @@ export function AIView({ data, geminiKey }) {
 
   const isGeminiActive = geminiMode === 'proxy' || geminiMode === 'direct';
 
+  // ── Quota d'appels IA (Gemini) dans le chat, par dossier importé ──
+  // Le chat reste utilisable sans limite, mais au-delà de MAX_GEMINI_CHAT_CALLS,
+  // les échanges basculent automatiquement sur le moteur local (gratuit, sans appel
+  // réseau) pour éviter une consommation d'API illimitée et non maîtrisée.
+  const MAX_GEMINI_CHAT_CALLS = 10;
+  const dossierKey = data?.profil?.nomEntreprise
+    ? `baiq_ai_quota_${data.profil.nomEntreprise}_${data?.sig?.chiffreAffaires || 0}`
+    : null;
+  const [geminiCallCount, setGeminiCallCount] = useState(() => {
+    if (!dossierKey) return 0;
+    return parseInt(localStorage.getItem(dossierKey) || '0', 10);
+  });
+
+  useEffect(() => {
+    if (!dossierKey) return;
+    setGeminiCallCount(parseInt(localStorage.getItem(dossierKey) || '0', 10));
+  }, [dossierKey]);
+
+  const geminiQuotaExceeded = geminiCallCount >= MAX_GEMINI_CHAT_CALLS;
+
   const analysis = data ? runAIAnalysis(data) : null;
   const diag = analysis?.diagnosticAvance || {};
   const solv = analysis?.solvabilite || {};
@@ -155,9 +175,20 @@ export function AIView({ data, geminiKey }) {
     const newMessages = [...chatMessages, { role: 'user', text: userMsg, time: new Date() }];
     setChatMessages(newMessages);
 
-    let response = await callGemini(userMsg);
+    let response = null;
+    if (!geminiQuotaExceeded) {
+      response = await callGemini(userMsg);
+      if (response && dossierKey) {
+        const next = geminiCallCount + 1;
+        setGeminiCallCount(next);
+        localStorage.setItem(dossierKey, String(next));
+      }
+    }
     if (!response) {
       response = buildLocalResponse(userMsg);
+      if (geminiQuotaExceeded) {
+        response += `\\n\\n*— Quota d'appels IA (${MAX_GEMINI_CHAT_CALLS}/${MAX_GEMINI_CHAT_CALLS}) atteint pour ce dossier : réponse générée par le moteur local (hors ligne), sans appel à Gemini.*`;
+      }
     }
 
     setChatMessages([...newMessages, { role: 'assistant', text: response, time: new Date() }]);
@@ -215,14 +246,14 @@ export function AIView({ data, geminiKey }) {
   const formatText = (text) => {
     const lines = text.split('\n');
     return lines.map((line, i) => {
-      if (line.startsWith('## '))   return <h4 key={i} style={{ fontWeight: 800, fontSize: '0.95rem', margin: '12px 0 4px', color: '#0f172a' }}>{line.slice(3)}</h4>;
-      if (line.startsWith('### '))  return <h5 key={i} style={{ fontWeight: 700, fontSize: '0.85rem', margin: '8px 0 4px', color: '#2563eb' }}>{line.slice(4)}</h5>;
-      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontWeight: 800, margin: '4px 0', fontSize: '0.84rem' }}>{line.slice(2, -2)}</p>;
-      if (line.startsWith('- ') || line.startsWith('• ')) return <li key={i} style={{ marginLeft: 16, fontSize: '0.83rem', lineHeight: 1.6, color: '#334155' }}>{renderBold(line.slice(2))}</li>;
+      if (line.startsWith('## '))   return <h4 key={i} style={{ fontWeight: 800, fontSize: '0.95rem', margin: '12px 0 4px', color: 'var(--text)' }}>{line.slice(3)}</h4>;
+      if (line.startsWith('### '))  return <h5 key={i} style={{ fontWeight: 700, fontSize: '0.85rem', margin: '8px 0 4px', color: '#1b6e8c' }}>{line.slice(4)}</h5>;
+      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontWeight: 800, margin: '4px 0', fontSize: '0.85rem' }}>{line.slice(2, -2)}</p>;
+      if (line.startsWith('- ') || line.startsWith('• ')) return <li key={i} style={{ marginLeft: 16, fontSize: '0.85rem', lineHeight: 1.6, color: '#334155' }}>{renderBold(line.slice(2))}</li>;
       if (line.startsWith('|') && line.includes('---')) return null;
-      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.78rem', fontFamily: 'monospace', borderBottom: '1px solid #e2e8f0', padding: '3px 0' }}>{line}</div>;
+      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.80rem', fontFamily: 'monospace', borderBottom: '1px solid #e2e8f0', padding: '3px 0' }}>{line}</div>;
       if (line === '')              return <br key={i} />;
-      return <p key={i} style={{ margin: '3px 0', fontSize: '0.83rem', lineHeight: 1.6 }}>{renderBold(line)}</p>;
+      return <p key={i} style={{ margin: '3px 0', fontSize: '0.85rem', lineHeight: 1.6 }}>{renderBold(line)}</p>;
     });
   };
 
@@ -235,17 +266,17 @@ export function AIView({ data, geminiKey }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 40 }}>
       <div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>IA</span>
+          <span style={{ background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.74rem', color: '#fff', fontWeight: 700 }}>IA</span>
           Diagnostic Financier Approfondi
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Analyse multicritères de haute précision selon les normes SCF Algérie.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse multicritères de haute précision selon les normes SCF Algérie.</p>
       </div>
       <div className="card" style={{ maxWidth: 480, margin: '20px auto', textAlign: 'center', padding: '48px 32px' }}>
-        <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#fff' }}>smart_toy</span>
         </div>
-        <h3 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 8 }}>Importez votre balance d'abord</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>L'IA exécutera un audit complet dès le chargement de votre balance comptable.</p>
+        <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Importez votre balance d'abord</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>L'IA exécutera un audit complet dès le chargement de votre balance comptable.</p>
       </div>
     </div>
   );
@@ -257,10 +288,10 @@ export function AIView({ data, geminiKey }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ background: 'linear-gradient(135deg, #0f172a, #2563eb)', borderRadius: 10, padding: '4px 12px', fontSize: '0.72rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>DIAGNOSTIC IA</span>
+            <span style={{ background: 'linear-gradient(135deg, #0f172a, #1b6e8c)', borderRadius: 10, padding: '4px 12px', fontSize: '0.74rem', color: '#fff', fontWeight: 800, letterSpacing: '0.05em' }}>DIAGNOSTIC IA</span>
             Audit & Diagnostic Financier Approfondi
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>
             Évaluation complète : Équilibre structurel, Partage de la Valeur Ajoutée, CAF, Rating Banque d'Algérie & Potentiel Cash
           </p>
         </div>
@@ -270,7 +301,7 @@ export function AIView({ data, geminiKey }) {
             style={{
               padding: '9px 18px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
-              fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex',
+              fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex',
               alignItems: 'center', gap: 8, boxShadow: 'var(--shadow-sm)'
             }}
           >
@@ -278,9 +309,9 @@ export function AIView({ data, geminiKey }) {
             Exporter la Synthèse (.txt)
           </button>
           {analysis && (
-            <div style={{ background: `${analysis.niveau.color}15`, border: `2px solid ${analysis.niveau.color}`, borderRadius: 14, padding: '8px 18px', textAlign: 'center', minWidth: 120 }}>
-              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: analysis.niveau.color, lineHeight: 1 }} className="mono">{analysis.scoreGlobal}</div>
-              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: analysis.niveau.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>/ 100 — {analysis.niveau.label}</div>
+            <div style={{ background: `${analysis.niveau.color}15`, border: `2px solid ${analysis.niveau.color}`, borderRadius: 16, padding: '8px 18px', textAlign: 'center', minWidth: 120 }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 900, color: analysis.niveau.color, lineHeight: 1 }} className="mono">{analysis.scoreGlobal}</div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: analysis.niveau.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>/ 100 — {analysis.niveau.label}</div>
             </div>
           )}
         </div>
@@ -296,8 +327,8 @@ export function AIView({ data, geminiKey }) {
           { id: 'chat',            label: 'Parlez à votre Balance', icon: 'record_voice_over' },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800,
-            background: activeTab === t.id ? '#2563eb' : 'transparent',
+            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.80rem', fontWeight: 800,
+            background: activeTab === t.id ? '#1b6e8c' : 'transparent',
             color: activeTab === t.id ? '#fff' : 'var(--text-muted)',
             transition: 'all 0.15s',
           }}>
@@ -318,11 +349,11 @@ export function AIView({ data, geminiKey }) {
             <div style={{ padding: '18px 24px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                 <div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '0.08em' }}>SANTÉ FINANCIÈRE GLOBALE</span>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', color: '#8fc6d6', letterSpacing: '0.08em' }}>SANTÉ FINANCIÈRE GLOBALE</span>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 4 }}>
-                    <span className="mono" style={{ fontSize: '2.8rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{analysis.scoreGlobal}</span>
-                    <span style={{ fontSize: '1.2rem', color: '#94a3b8', fontWeight: 700 }}>/ 100</span>
-                    <span style={{ background: `${analysis.niveau.color}30`, color: '#fff', border: `1px solid ${analysis.niveau.color}`, padding: '4px 12px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 800 }}>
+                    <span className="mono" style={{ fontSize: '2.4rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{analysis.scoreGlobal}</span>
+                    <span style={{ fontSize: '1.15rem', color: '#94a3b8', fontWeight: 700 }}>/ 100</span>
+                    <span style={{ background: `${analysis.niveau.color}30`, color: '#fff', border: `1px solid ${analysis.niveau.color}`, padding: '4px 12px', borderRadius: 20, fontSize: '0.80rem', fontWeight: 800 }}>
                       {analysis.niveau.emoji} {analysis.niveau.label}
                     </span>
                   </div>
@@ -340,8 +371,8 @@ export function AIView({ data, geminiKey }) {
                     const c = p.v >= 70 ? '#10b981' : p.v >= 45 ? '#f59e0b' : '#ef4444';
                     return (
                       <div key={p.k} style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '8px 12px', minWidth: 80 }}>
-                        <div className="mono" style={{ fontSize: '1.2rem', fontWeight: 900, color: c }}>{Math.round(p.v)}%</div>
-                        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 2 }}>{p.l}</div>
+                        <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: c }}>{Math.round(p.v)}%</div>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginTop: 2 }}>{p.l}</div>
                       </div>
                     );
                   })}
@@ -351,13 +382,13 @@ export function AIView({ data, geminiKey }) {
 
             {/* Résumé exécutif */}
             <div style={{ padding: '16px 24px', background: 'var(--surface-alt)' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#2563eb', letterSpacing: '0.06em', marginBottom: 6 }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#1b6e8c', letterSpacing: '0.06em', marginBottom: 6 }}>
                 📋 Synthèse Exécutive du Diagnostic
               </div>
               <div style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--text)' }}>
                 {analysis.resume.split('\n').map((para, pIdx) => (
                   <p key={pIdx} style={{ margin: '4px 0' }}>
-                    {para.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: '#0f172a' }}>{part}</strong> : part)}
+                    {para.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: 'var(--text)' }}>{part}</strong> : part)}
                   </p>
                 ))}
               </div>
@@ -369,52 +400,52 @@ export function AIView({ data, geminiKey }) {
 
             {/* Carte 1 : Rentabilité & Partage de la Valeur Ajoutée */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '12px 18px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>pie_chart</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase' }}>Rentabilité & Partage de la Valeur Ajoutée</span>
+              <div style={{ padding: '12px 18px', background: '#f0f8fa', borderBottom: '1px solid #b7dce6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ color: '#1b6e8c', fontSize: 20 }}>pie_chart</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#124f66', textTransform: 'uppercase' }}>Rentabilité & Partage de la Valeur Ajoutée</span>
               </div>
               <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Valeur Ajoutée (VA)</div>
-                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(analysis.metriques.va)}</div>
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>{pct(analysis.metriques.tauxVA)} du CA</div>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>Valeur Ajoutée (VA)</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text)', marginTop: 2 }}>{fmt(analysis.metriques.va)}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)' }}>{pct(analysis.metriques.tauxVA)} du CA</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>EBE (% du CA)</div>
-                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: analysis.metriques.margeEBE >= 0.10 ? '#059669' : '#dc2626', marginTop: 2 }}>
-                      {fmt(analysis.metriques.ebe)} <span style={{ fontSize: '0.75rem' }}>({pct(analysis.metriques.margeEBE)})</span>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>EBE (% du CA)</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: analysis.metriques.margeEBE >= 0.10 ? '#059669' : '#dc2626', marginTop: 2 }}>
+                      {fmt(analysis.metriques.ebe)} <span style={{ fontSize: '0.74rem' }}>({pct(analysis.metriques.margeEBE)})</span>
                     </div>
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>Norme: {sec.benchmarks?.margeEBE?.norme || '≥10%'}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)' }}>Norme: {sec.benchmarks?.margeEBE?.norme || '≥10%'}</div>
                   </div>
                 </div>
 
                 {/* Décomposition du Partage de la Valeur Ajoutée */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
                   <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 8 }}>
                     Répartition de la Richesse Créée (100% de la VA) :
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.72rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.74rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#475569' }}>• Rémunération du Personnel (63) :</span>
                       <strong className="mono" style={{ color: diag.partPersonnel <= 0.65 ? '#059669' : '#dc2626' }}>{pct(diag.partPersonnel)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#475569' }}>• Contribution État & Impôts (64 + 695) :</span>
-                      <strong className="mono" style={{ color: '#0f172a' }}>{pct(diag.partEtat)}</strong>
+                      <strong className="mono" style={{ color: 'var(--text)' }}>{pct(diag.partEtat)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#475569' }}>• Rémunération des Prêteurs (66) :</span>
-                      <strong className="mono" style={{ color: '#0f172a' }}>{pct(diag.partPreteurs)}</strong>
+                      <strong className="mono" style={{ color: 'var(--text)' }}>{pct(diag.partPreteurs)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#475569' }}>• Autofinancement & Maintien de l'Outil (CAF) :</span>
-                      <strong className="mono" style={{ color: '#2563eb' }}>{pct(diag.partEntreprise)}</strong>
+                      <strong className="mono" style={{ color: '#1b6e8c' }}>{pct(diag.partEntreprise)}</strong>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   💡 <strong>Rentabilité des Capitaux :</strong> ROE (Rentabilité financière) : <strong>{pct(diag.roe)}</strong> · ROA (Rentabilité économique) : <strong>{pct(diag.roa)}</strong>.
                 </div>
               </div>
@@ -425,10 +456,10 @@ export function AIView({ data, geminiKey }) {
               <div style={{ padding: '12px 18px', background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 20 }}>payments</span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#065f46', textTransform: 'uppercase' }}>BFR & Potentiel de Cash</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#065f46', textTransform: 'uppercase' }}>BFR & Potentiel de Cash</span>
                 </div>
                 {diag.totalCashLibérable > 0 && (
-                  <span style={{ background: '#059669', color: '#fff', fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
+                  <span style={{ background: '#059669', color: '#fff', fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
                     +{fmt(diag.totalCashLibérable)} mobilisables
                   </span>
                 )}
@@ -437,26 +468,26 @@ export function AIView({ data, geminiKey }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>DSO Clients</div>
-                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.dso <= 60 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.dso)}j</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: ≤60j</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: analysis.metriques.dso <= 60 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.dso)}j</div>
+                    <div style={{ fontSize: '0.58rem', color: 'var(--text-sub)' }}>Cible: ≤60j</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>DPO Fourn.</div>
-                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.dpo >= 30 ? '#059669' : '#d97706' }}>{Math.round(analysis.metriques.dpo)}j</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: 45-75j</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: analysis.metriques.dpo >= 30 ? '#059669' : '#d97706' }}>{Math.round(analysis.metriques.dpo)}j</div>
+                    <div style={{ fontSize: '0.58rem', color: 'var(--text-sub)' }}>Cible: 45-75j</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Rotation Stock</div>
-                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: analysis.metriques.rotS <= 90 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.rotS)}j</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Cible: ≤90j</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: analysis.metriques.rotS <= 90 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.rotS)}j</div>
+                    <div style={{ fontSize: '0.58rem', color: 'var(--text-sub)' }}>Cible: ≤90j</div>
                   </div>
                 </div>
 
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', marginBottom: 4 }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', marginBottom: 4 }}>
                     💵 Décomposition du Cash Bloqué dans l'Exploitation :
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.72rem', color: '#14532d' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.74rem', color: '#14532d' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>• Retard de recouvrement clients :</span>
                       <strong className="mono">{fmt(diag.gainDSO)}</strong>
@@ -468,7 +499,7 @@ export function AIView({ data, geminiKey }) {
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   💡 <strong>BFR Total :</strong> {fmt(analysis.metriques.bfr)} ({Math.round(analysis.metriques.bfrJCA)} jours de CA). L'ajustement du DSO et du stock libérera du cash immédiatement.
                 </div>
               </div>
@@ -478,35 +509,35 @@ export function AIView({ data, geminiKey }) {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '12px 18px', background: '#faf5ff', borderBottom: '1px solid #e9d5ff', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: 20 }}>account_balance</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#6b21a8', textTransform: 'uppercase' }}>CAF & Désendettement</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#6b21a8', textTransform: 'uppercase' }}>CAF & Désendettement</span>
               </div>
               <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>CAF Brute Générée</div>
-                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(diag.caf)}</div>
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>{pct(diag.tauxCAF)} du CA</div>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>CAF Brute Générée</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text)', marginTop: 2 }}>{fmt(diag.caf)}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)' }}>{pct(diag.tauxCAF)} du CA</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Dettes Financières LT</div>
-                    <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmt(solv.bancaire?.dettesFinancieresLT || 0)}</div>
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-sub)' }}>Compte 16x</div>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>Dettes Financières LT</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text)', marginTop: 2 }}>{fmt(solv.bancaire?.dettesFinancieresLT || 0)}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)' }}>Compte 16x</div>
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Capacité d'Extinction de la Dette</span>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155' }}>Capacité d'Extinction de la Dette</span>
                     <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: diag.ratioDetteSurCAF <= 3.5 ? '#059669' : '#dc2626' }}>
                       {diag.ratioDetteSurCAF ? `${diag.ratioDetteSurCAF.toFixed(1)} an(s)` : '0 an'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                     Norme bancaire : <strong>≤ 3.5 ans</strong> · Statut : <strong>{diag.capaciteRemboursementLabel}</strong>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   💡 <strong>Capacité d'emprunt résiduelle :</strong> {fmt(solv.bancaire?.capaciteEndettementMax || 0)} selon la règle prudentielle de 3.5 × EBE.
                 </div>
               </div>
@@ -517,9 +548,9 @@ export function AIView({ data, geminiKey }) {
               <div style={{ padding: '12px 18px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 20 }}>verified_user</span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#92400e', textTransform: 'uppercase' }}>Score Banque d'Algérie & Risque</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#92400e', textTransform: 'uppercase' }}>Score Banque d'Algérie & Risque</span>
                 </div>
-                <span style={{ background: solv.bancaire?.ratingBAColor || '#059669', color: '#fff', fontSize: '0.68rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
+                <span style={{ background: solv.bancaire?.ratingBAColor || '#059669', color: '#fff', fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
                   {solv.bancaire?.scoreBA || 14} / 20 ({solv.bancaire?.ratingBA || 'Favorable'})
                 </span>
               </div>
@@ -527,18 +558,18 @@ export function AIView({ data, geminiKey }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Altman Z''-Score</div>
-                    <div className="mono" style={{ fontSize: '1.0rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}</div>
-                    <div style={{ fontSize: '0.6rem', color: solv.zoneColor || '#059669' }}>{solv.zoneLabel || 'Zone Sûre'}</div>
+                    <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}</div>
+                    <div style={{ fontSize: '0.58rem', color: solv.zoneColor || '#059669' }}>{solv.zoneLabel || 'Zone Sûre'}</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Risque de Défaillance</div>
                     <div className="mono" style={{ fontSize: '0.95rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.risqueDefaillance || 'Faible'}</div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--text-sub)' }}>Modèle EM-Score</div>
+                    <div style={{ fontSize: '0.58rem', color: 'var(--text-sub)' }}>Modèle EM-Score</div>
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', marginBottom: 4 }}>
+                <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 4 }}>
                     Détail des 4 Piliers Banque d'Algérie :
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
@@ -549,7 +580,7 @@ export function AIView({ data, geminiKey }) {
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   💡 <strong>Avis Crédit :</strong> {solv.bancaire?.statutCredit || 'FAVORABLE'} pour l'obtention de lignes d'exploitation ou de crédits d'investissement.
                 </div>
               </div>
@@ -564,7 +595,7 @@ export function AIView({ data, geminiKey }) {
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'forces' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ padding: '12px 18px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, fontSize: '0.82rem', color: '#065f46', fontWeight: 700 }}>
+          <div style={{ padding: '12px 18px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, fontSize: '0.85rem', color: '#065f46', fontWeight: 700 }}>
             🌟 <strong>{analysis.forces.length} Atouts & Forces Identifiés</strong> selon les normes sectorielles SCF de {sec.label}.
           </div>
           {analysis.forces.map((f, i) => (
@@ -572,13 +603,13 @@ export function AIView({ data, geminiKey }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 20 }}>check_circle</span>
-                  <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{f.titre}</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text)' }}>{f.titre}</span>
                 </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#d1fae5', color: '#065f46', padding: '3px 10px', borderRadius: 20 }}>
+                <span style={{ fontSize: '0.70rem', fontWeight: 800, background: '#d1fae5', color: '#065f46', padding: '3px 10px', borderRadius: 20 }}>
                   {f.cat}
                 </span>
               </div>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
             </div>
           ))}
         </div>
@@ -589,7 +620,7 @@ export function AIView({ data, geminiKey }) {
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'faiblesses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ padding: '12px 18px', background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 10, fontSize: '0.82rem', color: '#9f1239', fontWeight: 700 }}>
+          <div style={{ padding: '12px 18px', background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 10, fontSize: '0.85rem', color: '#9f1239', fontWeight: 700 }}>
             ⚠️ <strong>{analysis.faiblesses.length} Risques & Vulnérabilités Détectés</strong> nécessitant une attention immédiate.
           </div>
           {analysis.faiblesses.map((f, i) => {
@@ -599,13 +630,13 @@ export function AIView({ data, geminiKey }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="material-symbols-outlined" style={{ color: st.color, fontSize: 20 }}>{st.icon}</span>
-                    <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{f.titre}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text)' }}>{f.titre}</span>
                   </div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, background: st.bg, color: st.color, padding: '3px 10px', borderRadius: 20, border: `1px solid ${st.border}` }}>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 800, background: st.bg, color: st.color, padding: '3px 10px', borderRadius: 20, border: `1px solid ${st.border}` }}>
                     {st.label}
                   </span>
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-sub)', margin: 0, lineHeight: 1.6 }}>{f.detail}</p>
               </div>
             );
           })}
@@ -617,13 +648,13 @@ export function AIView({ data, geminiKey }) {
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === 'recommandations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: '14px 20px', background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ padding: '14px 20px', background: 'linear-gradient(135deg, #0b3446, #1b6e8c)', color: '#fff', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <div style={{ fontWeight: 900, fontSize: '0.95rem' }}>Feuille de Route DAF & Plan d'Action Stratégique</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: 2 }}>{analysis.recommandations.length} chantiers prioritaires échelonnés dans le temps</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.85, marginTop: 2 }}>{analysis.recommandations.length} chantiers prioritaires échelonnés dans le temps</div>
             </div>
             {diag.totalCashLibérable > 0 && (
-              <div style={{ background: 'rgba(255,255,255,0.15)', padding: '6px 14px', borderRadius: 10, fontWeight: 900, fontSize: '0.82rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.15)', padding: '6px 14px', borderRadius: 10, fontWeight: 900, fontSize: '0.85rem' }}>
                 Gain de Trésorerie Cible : {fmt(diag.totalCashLibérable)}
               </div>
             )}
@@ -635,34 +666,34 @@ export function AIView({ data, geminiKey }) {
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `5px solid ${u.color}`, borderRadius: 12, padding: '18px 22px', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 900, color: u.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 900, color: u.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {rec.horizon || 'Action Prioritaire'} · {rec.categorie}
                     </span>
-                    <h4 style={{ margin: '3px 0 0', fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>{rec.action}</h4>
+                    <h4 style={{ margin: '3px 0 0', fontSize: '0.95rem', fontWeight: 900, color: 'var(--text)' }}>{rec.action}</h4>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {rec.gainEstime && (
-                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 900 }}>
+                      <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 10px', borderRadius: 8, fontSize: '0.74rem', fontWeight: 900 }}>
                         Gain : {rec.gainEstime}
                       </span>
                     )}
-                    <span style={{ background: u.bg, color: u.color, padding: '3px 10px', borderRadius: 8, fontSize: '0.72rem', fontWeight: 800 }}>
+                    <span style={{ background: u.bg, color: u.color, padding: '3px 10px', borderRadius: 8, fontSize: '0.74rem', fontWeight: 800 }}>
                       {u.label}
                     </span>
                   </div>
                 </div>
 
-                <p style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.6, margin: '0 0 14px' }}>{rec.detail}</p>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.6, margin: '0 0 14px' }}>{rec.detail}</p>
 
                 {rec.etapes && rec.etapes.length > 0 && (
                   <div style={{ background: 'var(--surface-alt)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>checklist</span>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#1b6e8c' }}>checklist</span>
                       Étapes Opérationnelles d'Exécution :
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {rec.etapes.map((etape, eIdx) => (
-                        <div key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8rem', color: 'var(--text)' }}>
+                        <div key={eIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.80rem', color: 'var(--text)' }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#059669', flexShrink: 0, marginTop: 1 }}>check_circle</span>
                           <span>{etape}</span>
                         </div>
@@ -684,8 +715,8 @@ export function AIView({ data, geminiKey }) {
 
           {/* ── Bannière "Faites Parler Votre Balance" ── */}
           <div style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #7c3aed 100%)',
-            borderRadius: 14, padding: '16px 20px',
+            background: 'linear-gradient(135deg, #0f172a 0%, #0b3446 60%, #7c3aed 100%)',
+            borderRadius: 16, padding: '16px 20px',
             display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap'
           }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -693,45 +724,45 @@ export function AIView({ data, geminiKey }) {
             </div>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontWeight: 900, fontSize: '0.95rem', color: '#fff' }}>Faites Parler Votre Balance 🇩🇿</div>
-              <div style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+              <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
                 {isGeminiActive
                   ? '🤖 Gemini IA connectée — Posez n\'importe quelle question en langage naturel sur vos données SCF'
                   : '⚡ Mode local actif — Moteur IA embarqué · Configurez Gemini dans Paramètres pour l\'IA avancée'}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#fff' }}>
+              <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: '0.70rem', fontWeight: 800, color: '#fff' }}>
                 {isGeminiActive ? '✅ IA Gemini' : '🔵 IA Locale'}
               </div>
-              <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#34d399' }}>
+              <div style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 8, padding: '4px 10px', fontSize: '0.70rem', fontWeight: 800, color: '#34d399' }}>
                 🔒 100% Local
               </div>
             </div>
           </div>
 
           {/* Zone de chat */}
-          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 480 }}>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 480 }}>
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {chatMessages.map((msg, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
                   {msg.role === 'assistant' && (
-                    <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#fff' }}>smart_toy</span>
                     </div>
                   )}
                   <div style={{
                     maxWidth: '80%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                    background: msg.role === 'user' ? '#2563eb' : '#fff',
+                    background: msg.role === 'user' ? '#1b6e8c' : '#fff',
                     color: msg.role === 'user' ? '#fff' : 'var(--text)',
                     boxShadow: 'var(--shadow-sm)',
                     border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
                   }}>
                     {msg.role === 'user'
-                      ? <p style={{ fontSize: '0.83rem', lineHeight: 1.5 }}>{msg.text}</p>
-                      : <div style={{ fontSize: '0.83rem', lineHeight: 1.6 }}>{formatText(msg.text)}</div>
+                      ? <p style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>{msg.text}</p>
+                      : <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>{formatText(msg.text)}</div>
                     }
-                    <div style={{ fontSize: '0.62rem', color: msg.role === 'user' ? 'rgba(255,255,255,0.6)' : 'var(--text-sub)', marginTop: 4, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
+                    <div style={{ fontSize: '0.65rem', color: msg.role === 'user' ? 'rgba(255,255,255,0.6)' : 'var(--text-sub)', marginTop: 4, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
                       {msg.time?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
@@ -744,12 +775,12 @@ export function AIView({ data, geminiKey }) {
               ))}
               {isLoading && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #2563eb, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#fff' }}>smart_toy</span>
                   </div>
-                  <div style={{ padding: '10px 16px', background: '#fff', border: '1px solid var(--border)', borderRadius: '14px 14px 14px 4px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <div style={{ padding: '10px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '14px 14px 14px 4px', display: 'flex', gap: 4, alignItems: 'center' }}>
                     {[0, 1, 2].map(j => (
-                      <div key={j} style={{ width: 7, height: 7, borderRadius: '50%', background: '#2563eb', animation: `bounce 1.2s ease-in-out ${j * 0.2}s infinite` }} />
+                      <div key={j} style={{ width: 7, height: 7, borderRadius: '50%', background: '#1b6e8c', animation: `bounce 1.2s ease-in-out ${j * 0.2}s infinite` }} />
                     ))}
                   </div>
                 </div>
@@ -758,13 +789,13 @@ export function AIView({ data, geminiKey }) {
             </div>
 
             {/* ── Questions suggérées groupées par thème ── */}
-            <div style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '10px 14px', maxHeight: 210, overflowY: 'auto' }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-alt)', padding: '10px 14px', maxHeight: 210, overflowY: 'auto' }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                 💬 Interroger la balance en 1 clic :
               </div>
               {[
                 {
-                  theme: '📊 Équilibre & Trésorerie', color: '#2563eb',
+                  theme: '📊 Équilibre & Trésorerie', color: '#1b6e8c',
                   questions: ['Pourquoi mon BFR est-il élevé ?', 'Mon FRNG couvre-t-il mon BFR ?', 'État de ma trésorerie nette ?', 'Quel est le cash mobilisable sur mon BFR ?']
                 },
                 {
@@ -781,14 +812,14 @@ export function AIView({ data, geminiKey }) {
                 },
               ].map(group => (
                 <div key={group.theme} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: '0.63rem', fontWeight: 900, color: group.color, marginBottom: 4 }}>{group.theme}</div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 900, color: group.color, marginBottom: 4 }}>{group.theme}</div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                     {group.questions.map(q => (
                       <button
                         key={q}
                         onClick={() => sendCustomMessage(q)}
                         style={{
-                          fontSize: '0.69rem', padding: '3px 10px', borderRadius: 20,
+                          fontSize: '0.70rem', padding: '3px 10px', borderRadius: 20,
                           border: `1px solid ${group.color}35`,
                           background: `${group.color}09`,
                           color: group.color,
@@ -807,6 +838,18 @@ export function AIView({ data, geminiKey }) {
             </div>
 
             {/* Input */}
+            {isGeminiActive && dossierKey && (
+              <div style={{ padding: '4px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
+                <span style={{
+                  fontSize: '0.70rem', fontWeight: 700,
+                  color: geminiQuotaExceeded ? '#dc2626' : '#64748b'
+                }}>
+                  {geminiQuotaExceeded
+                    ? `Quota IA atteint (${MAX_GEMINI_CHAT_CALLS}/${MAX_GEMINI_CHAT_CALLS}) — réponses en mode local`
+                    : `Réponses IA (Gemini) : ${geminiCallCount}/${MAX_GEMINI_CHAT_CALLS}`}
+                </span>
+              </div>
+            )}
             <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
               <input
                 value={inputText}
@@ -819,7 +862,7 @@ export function AIView({ data, geminiKey }) {
               <button
                 onClick={sendMessage}
                 disabled={!data || isLoading || !inputText.trim()}
-                style={{ width: 42, height: 42, borderRadius: 10, border: 'none', cursor: (!data || isLoading || !inputText.trim()) ? 'not-allowed' : 'pointer', background: (!data || !inputText.trim()) ? '#e2e8f0' : 'linear-gradient(135deg, #2563eb, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                style={{ width: 42, height: 42, borderRadius: 10, border: 'none', cursor: (!data || isLoading || !inputText.trim()) ? 'not-allowed' : 'pointer', background: (!data || !inputText.trim()) ? '#e2e8f0' : 'linear-gradient(135deg, #1b6e8c, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: (!data || !inputText.trim()) ? '#94a3b8' : '#fff' }}>send</span>
               </button>

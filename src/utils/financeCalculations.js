@@ -1,11 +1,60 @@
 import * as XLSX from 'xlsx';
 
-const safeNum = (v) => {
+/**
+ * Parseur de nombre robuste pour les exports comptables (SCF Algérie & au-delà).
+ *
+ * Gère correctement les formats suivants, y compris lorsqu'ils sont MÉLANGÉS
+ * dans un même fichier (cas fréquent des exports Sage/Ciel/EBP/ERP locaux) :
+ *   - Français à espace milliers   : "1 234 567,89"
+ *   - Français à point milliers    : "1.234.567,89"   ⚠️ auparavant mal géré
+ *   - Anglo-saxon                  : "1,234,567.89"    ⚠️ auparavant mal géré
+ *   - Entier simple                : "1234567" / "1.234.567"
+ *   - Négatif entre parenthèses    : "(1 234,56)" → -1234.56
+ *
+ * Règle de désambiguïsation quand virgule ET point sont tous deux présents :
+ * le séparateur qui apparaît EN DERNIER dans la chaîne est le séparateur décimal,
+ * l'autre est un séparateur de milliers à supprimer.
+ */
+export const safeNum = (v) => {
   if (v === undefined || v === null || v === '') return 0;
   if (typeof v === 'number') return isNaN(v) ? 0 : v;
-  const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+
+  let s = String(v).trim();
+  if (!s) return 0;
+
+  // Supprimer tous types d'espaces (normaux, insécables, fins...) utilisés comme séparateurs de milliers
+  s = s.replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '');
+
+  // Notation comptable négative entre parenthèses : (1234,56) → -1234,56
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) {
+    negative = true;
+    s = s.slice(1, -1);
+  }
+
+  const hasComma = s.includes(',');
+  const hasDot = s.includes('.');
+
+  if (hasComma && hasDot) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else if (hasComma) {
+    const commaCount = (s.match(/,/g) || []).length;
+    s = commaCount > 1 ? s.replace(/,/g, '') : s.replace(',', '.');
+  } else if (hasDot) {
+    const dotCount = (s.match(/\./g) || []).length;
+    if (dotCount > 1) s = s.replace(/\./g, '');
+  }
+
+  // Nettoyage final de tout caractère résiduel non numérique (hors point/tiret)
+  s = s.replace(/[^0-9.-]/g, '');
+
   const n = parseFloat(s);
-  return isNaN(n) ? 0 : n;
+  if (isNaN(n)) return 0;
+  return negative ? -n : n;
 };
 
 /**
@@ -16,14 +65,8 @@ const safeNum = (v) => {
  */
 export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 0) {
   if (!compte) return { classe: 0, classeLabel: 'Inconnu', nature: 'Inconnue', sensAttendu: 'MIXTE', statut: 'CONFORME', diagnostic: 'Compte non défini' };
-  
-  const parseNum = (v) => {
-    if (v === undefined || v === null || v === '') return 0;
-    if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
+
+  const parseNum = safeNum;
 
   const c = String(compte).trim();
   const deb = parseNum(soldeFinDebit);
@@ -444,14 +487,6 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
 export function auditBalanceAccounts(rows = []) {
   if (!rows || !Array.isArray(rows)) return { total: 0, conformes: 0, atypiques: 0, anomalies: 0, scoreCoherence: 100, comptesAudit: [] };
 
-  const safeNum = (v) => {
-    if (v === undefined || v === null || v === '') return 0;
-    if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
-
   const comptesAudit = rows.filter(r => r.compte && !r.ignore).map(r => {
     let deb = safeNum(r.soldeFinDebit);
     let cred = safeNum(r.soldeFinCredit);
@@ -521,14 +556,6 @@ export function auditBalanceAccounts(rows = []) {
  */
 export function auditCrossAccountMovements(rows = []) {
   if (!rows || !Array.isArray(rows)) return { regles: [], scoreFlux: 100, totalAnomaliesFlux: 0, totalAtypiquesFlux: 0, totalConformesFlux: 0 };
-
-  const safeNum = (v) => {
-    if (v === undefined || v === null || v === '') return 0;
-    if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
 
   const fmtDA = (v) => {
     const num = safeNum(v);
@@ -1224,8 +1251,8 @@ export const parseFile = async (file) => {
               for (let r = dataStart; r < Math.min(data.length, dataStart + 15); r++) {
                 const v = data[r]?.[col];
                 if (v !== undefined && v !== null && v !== '') {
-                  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(',', '.'));
-                  if (!isNaN(n)) { numCols.push(col); break; }
+                  const isNumericLike = typeof v === 'number' || /^[+-]?[()\d.,\s\u00a0\u202f]+$/.test(String(v).trim());
+                  if (isNumericLike) { numCols.push(col); break; }
                 }
               }
             }
@@ -1271,13 +1298,48 @@ export const parseFile = async (file) => {
           const parseNumber = (val) => {
             if (typeof val === 'number') return isNaN(val) ? 0 : val;
             if (!val && val !== 0) return 0;
-            // Supprimer espaces normaux, insécables (\u00a0), fins (\u202f), et autres unicode
-            const s = String(val)
-              .replace(/[\u00a0\u202f\u2009\u2007\u2008\u0020\t]/g, '')  // tous types d'espaces
-              .replace(/\s/g, '')       // fallback regex \s
-              .replace(',', '.');       // virgule décimale française → point
+
+            let s = String(val).trim();
+            if (!s) return 0;
+
+            // Supprimer tous types d'espaces (normaux, insécables, fins...) utilisés comme séparateurs de milliers
+            s = s.replace(/[\u00a0\u202f\u2009\u2007\u2008\u0020\t]/g, '').replace(/\s/g, '');
+
+            // Notation comptable négative entre parenthèses : (1234,56) → -1234,56
+            let negative = false;
+            if (/^\(.*\)$/.test(s)) {
+              negative = true;
+              s = s.slice(1, -1);
+            }
+
+            const hasComma = s.includes(',');
+            const hasDot = s.includes('.');
+
+            if (hasComma && hasDot) {
+              // Les deux séparateurs sont présents : celui qui apparaît EN DERNIER est le séparateur
+              // décimal, l'autre est un séparateur de milliers à supprimer.
+              // Ex FR : "1.234.567,89" (point = milliers, virgule = décimale)
+              // Ex EN : "1,234,567.89" (virgule = milliers, point = décimale)
+              if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+                s = s.replace(/\./g, '').replace(',', '.');
+              } else {
+                s = s.replace(/,/g, '');
+              }
+            } else if (hasComma) {
+              // Une seule virgule → décimale française ("1234,56").
+              // Plusieurs virgules → séparateurs de milliers anglo-saxons ("1,234,567").
+              const commaCount = (s.match(/,/g) || []).length;
+              s = commaCount > 1 ? s.replace(/,/g, '') : s.replace(',', '.');
+            } else if (hasDot) {
+              // Plusieurs points → séparateurs de milliers français/belges ("1.234.567").
+              // Un seul point → décimale ("1234.56").
+              const dotCount = (s.match(/\./g) || []).length;
+              if (dotCount > 1) s = s.replace(/\./g, '');
+            }
+
             const n = parseFloat(s);
-            return isNaN(n) ? 0 : n;
+            if (isNaN(n)) return 0;
+            return negative ? -n : n;
           };
 
           const getCol = (idx) => (idx !== undefined && idx !== null && idx !== -1) ? parseNumber(row[idx]) : 0;
@@ -1583,6 +1645,51 @@ export const calculateSIG = (data) => {
     resultatNetOrdinaire: 0, resultatExtraordinaire: 0, resultatNet: 0, caf: 0, achats: 0
   };
 };
+
+/**
+ * Corrige le biais TVA (TTC/HT) sur les délais clients & fournisseurs.
+ *
+ * Les soldes de balance "Créances clients" (compte 41) et "Dettes fournisseurs"
+ * (compte 40) sont enregistrés TTC (TVA incluse), alors que le Chiffre d'Affaires
+ * et les Achats/Consommation du TCR sont HT. Diviser un TTC par un HT surestime
+ * mécaniquement le délai d'environ [taux de TVA] % si l'activité est soumise à TVA.
+ *
+ * Par défaut (non franchisé), on reconstitue un CA/Achats "TTC" pour neutraliser
+ * ce biais. Si l'activité est déclarée en franchise de TVA (exonérée), la créance/
+ * dette ne porte pas de TVA : la formule HT/HT d'origine est alors la bonne et n'est
+ * pas modifiée.
+ *
+ * @param {object} ratios   Objet retourné par calculateRatios (non muté)
+ * @param {object} tvaRegime { ventesFranchisees, achatsFranchises, tauxTva }
+ */
+export function applyTvaRegimeToRatios(ratios = {}, tvaRegime = {}) {
+  const {
+    ventesFranchisees = false,
+    achatsFranchises = false,
+    tauxTva = 19
+  } = tvaRegime || {};
+
+  const coef = 1 + (Number(tauxTva) || 0) / 100;
+  const ca = ratios.chiffreAffaires || 0;
+  const achats = ratios.achats || 0;
+
+  const caTTC = ventesFranchisees ? ca : ca * coef;
+  const achatsTTC = achatsFranchises ? achats : achats * coef;
+
+  const delaiRecouvrement = caTTC === 0 ? 0 : ((ratios.creancesClients || 0) / caTTC) * 360;
+  const delaiFournisseurs = achatsTTC === 0 ? 0 : ((ratios.dettesFournisseurs || 0) / achatsTTC) * 360;
+
+  return {
+    ...ratios,
+    delaiRecouvrement,
+    delaiFournisseurs,
+    tvaCorrectionAppliquee: {
+      ventesFranchisees: !!ventesFranchisees,
+      achatsFranchises: !!achatsFranchises,
+      tauxTva: Number(tauxTva) || 0
+    }
+  };
+}
 
 export const calculateRatios = (bilan, sig, rows) => {
   const totalBilan = (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0);
@@ -1945,14 +2052,6 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
       comptesClasse1: []
     };
   }
-
-  const safeNum = (v) => {
-    if (v === undefined || v === null || v === '') return 0;
-    if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
 
   // Filtrer les comptes de la classe 1 (Capitaux Propres & Dettes LT)
   const c1Rows = rows.filter(r => r.compte && !r.ignore && String(r.compte).trim().startsWith('1'));

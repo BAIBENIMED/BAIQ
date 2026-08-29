@@ -38,10 +38,72 @@ if (fs.existsSync(envPath)) {
 
 const app = express();
 
+// Nécessaire derrière un proxy inverse (Render, Heroku, etc.) pour que req.ip
+// reflète la vraie IP du visiteur — sans cela, le rate limiting par IP ci-dessous
+// verrait toutes les requêtes provenir de l'IP du proxy et deviendrait inefficace.
+app.set('trust proxy', true);
+
 app.use(express.json({ limit: '2mb' }));
 
 const PORT = process.env.PORT || 8787;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+// ── Whitelist des modèles autorisés à traverser le relais ──────────────────
+// Empêche un appel direct à /api/gemini (hors navigateur, ex. curl/script) de
+// demander un modèle arbitraire plus coûteux que ceux réellement utilisés par
+// l'application.
+const ALLOWED_GEMINI_MODELS = new Set([
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-exp',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+]);
+
+// ── Garde-fou anti-abus côté serveur (rate limiting en mémoire) ────────────
+// Les quotas affichés côté interface (1 rapport/dossier, 10 messages/dossier)
+// sont uniquement déclaratifs : n'importe qui connaissant l'URL du relais
+// pourrait sinon appeler /api/gemini sans limite et consommer le budget de la
+// clé API. Ces deux fenêtres glissantes protègent la clé indépendamment de ce
+// que fait le front-end.
+//   - MAX_PAR_IP_PAR_HEURE : plafond par visiteur (anti-script isolé).
+//   - MAX_GLOBAL_PAR_HEURE : plafond toutes IP confondues (anti-abus distribué,
+//     protège le budget total même si l'IP source varie).
+// Ajuster ces valeurs selon l'usage réel attendu de l'application.
+const MAX_PAR_IP_PAR_HEURE = 15;
+const MAX_GLOBAL_PAR_HEURE = 60;
+const FENETRE_MS = 60 * 60 * 1000;
+
+const appelsParIp = new Map();   // ip -> [timestamps]
+let appelsGlobaux = [];          // [timestamps]
+
+function purgerAnciens(liste, maintenant) {
+  return liste.filter(t => maintenant - t < FENETRE_MS);
+}
+
+function rateLimitGemini(req, res, next) {
+  const maintenant = Date.now();
+  const ip = req.ip || req.connection?.remoteAddress || 'inconnu';
+
+  appelsGlobaux = purgerAnciens(appelsGlobaux, maintenant);
+  if (appelsGlobaux.length >= MAX_GLOBAL_PAR_HEURE) {
+    return res.status(429).json({
+      error: "Limite globale d'appels IA atteinte pour cette heure. Réessayez plus tard."
+    });
+  }
+
+  const historiqueIp = purgerAnciens(appelsParIp.get(ip) || [], maintenant);
+  if (historiqueIp.length >= MAX_PAR_IP_PAR_HEURE) {
+    return res.status(429).json({
+      error: "Trop d'appels IA depuis cette adresse pour cette heure. Réessayez plus tard."
+    });
+  }
+
+  historiqueIp.push(maintenant);
+  appelsParIp.set(ip, historiqueIp);
+  appelsGlobaux.push(maintenant);
+  next();
+}
 
 // ── Statut du relais (pour l'interface : savoir si Gemini est disponible sans exposer la clé) ──
 app.get('/api/gemini/status', (req, res) => {
@@ -49,7 +111,7 @@ app.get('/api/gemini/status', (req, res) => {
 });
 
 // ── Relais sécurisé vers l'API Gemini ──────────────────────────────────────
-app.post('/api/gemini', async (req, res) => {
+app.post('/api/gemini', rateLimitGemini, async (req, res) => {
   if (!GEMINI_API_KEY) {
     return res.status(503).json({
       error: "Clé API Gemini non configurée côté serveur. Définissez la variable d'environnement GEMINI_API_KEY sur votre hébergeur."
@@ -59,6 +121,9 @@ app.post('/api/gemini', async (req, res) => {
   const { modelName, body } = req.body || {};
   if (!modelName || !body) {
     return res.status(400).json({ error: 'Requête invalide : modelName et body sont requis.' });
+  }
+  if (!ALLOWED_GEMINI_MODELS.has(modelName)) {
+    return res.status(400).json({ error: `Modèle non autorisé : ${modelName}.` });
   }
 
   try {

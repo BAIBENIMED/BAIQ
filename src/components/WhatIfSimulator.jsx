@@ -34,7 +34,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       <div className="card fade-in" style={{ maxWidth: 480, margin: '40px auto', textAlign: 'center', padding: 40 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--text-sub)', marginBottom: 12 }}>tune</span>
         <h3 style={{ fontWeight: 800 }}>Simulateur non disponible</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Veuillez importer une balance comptable pour lancer des simulations en partie double.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Veuillez importer une balance comptable pour lancer des simulations en partie double.</p>
       </div>
     );
   }
@@ -257,7 +257,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ background: 'linear-gradient(135deg, #059669, #047857)', borderRadius: 8, padding: '3px 9px', color: '#fff', fontSize: '0.68rem', fontWeight: 800 }}>
+            <span style={{ background: 'linear-gradient(135deg, #059669, #047857)', borderRadius: 8, padding: '3px 9px', color: '#fff', fontSize: '0.70rem', fontWeight: 800 }}>
               MOTEUR EN PARTIE DOUBLE
             </span>
             Simulateur Comptable Multilignes (SCF Algérie)
@@ -273,7 +273,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             style={{
               padding: '8px 14px', background: showTemplates ? '#f3e8ff' : 'var(--surface-alt)',
               color: showTemplates ? '#6b21a8' : 'var(--text)', border: `1px solid ${showTemplates ? '#c084fc' : 'var(--border)'}`,
-              borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem',
+              borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.80rem',
               display: 'flex', alignItems: 'center', gap: 6
             }}
           >
@@ -285,7 +285,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             onClick={handleOpenNewEditor}
             style={{
               padding: '8px 16px', background: 'var(--surface-alt)', color: 'var(--text)',
-              border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.82rem',
+              border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
               display: 'flex', alignItems: 'center', gap: 6
             }}
           >
@@ -319,7 +319,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#059669' }}>flash_on</span>
             Créateur Rapide d'Opération Simulée (Partie Double SCF)
           </h3>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: 20 }}>
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: 20 }}>
             Application immédiate sur toute la plateforme 🚀
           </span>
         </div>
@@ -327,7 +327,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, alignItems: 'end' }}>
           {/* 1. Type d'opération */}
           <div>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
+            <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
               1. Type d'Opération Simulée
             </label>
             <select
@@ -340,7 +340,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                 else if (type === 'salaires') setQuickCounterpart('421');
                 else if (type === 'immo') setQuickCounterpart('512');
               }}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: '#ffffff', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: 'var(--surface)', outline: 'none' }}
             >
               <option value="vente">🛒 Vente / Chiffre d'Affaires (+CA / Compte 700)</option>
               <option value="achat">📦 Achat de Marchandises (+Charges / Compte 600)</option>
@@ -354,13 +354,13 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
 
           {/* 2. Contrepartie */}
           <div>
-            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
+            <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
               2. Compte de Contrepartie (Partie Double)
             </label>
             <select
               value={quickCounterpart}
               onChange={e => setQuickCounterpart(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: '#ffffff', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: 'var(--surface)', outline: 'none' }}
             >
               {quickOpType === 'vente' && (
                 <>
@@ -398,7 +398,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
           {/* 3. Montant */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
+              <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
                 3. Montant (DA)
               </label>
               {/* Raccourcis de montants */}
@@ -407,7 +407,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                   <button
                     key={m}
                     onClick={() => setQuickAmount(m)}
-                    style={{ fontSize: '0.62rem', padding: '2px 6px', borderRadius: 4, border: '1px solid #86efac', background: '#dcfce7', color: '#166534', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: 4, border: '1px solid #86efac', background: '#dcfce7', color: '#166534', fontWeight: 800, cursor: 'pointer' }}
                   >
                     +{m / 1000000}M
                   </button>
@@ -419,7 +419,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               value={quickAmount}
               onChange={e => setQuickAmount(Number(e.target.value))}
               placeholder="Ex: 5000000"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.95rem', fontWeight: 900, color: '#166534', outline: 'none', background: '#ffffff' }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.95rem', fontWeight: 900, color: '#166534', outline: 'none', background: 'var(--surface)' }}
             />
           </div>
 
@@ -429,7 +429,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               onClick={handleQuickAdd}
               style={{
                 width: '100%', padding: '12px 18px', background: 'linear-gradient(135deg, #059669, #047857)',
-                color: '#ffffff', border: 'none', borderRadius: 9, cursor: 'pointer', fontWeight: 900, fontSize: '0.88rem',
+                color: '#ffffff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(5,150,105,0.3)'
               }}
             >
@@ -444,7 +444,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       {showTemplates && (
         <div className="card fade-in" style={{ padding: 16, border: '1px solid #c084fc', background: '#faf5ff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-            <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#581c87', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#581c87', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>auto_fix_high</span>
               Choisissez un Modèle d'Écriture Prédéfini
             </h4>
@@ -455,7 +455,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
                   style={{
-                    fontSize: '0.68rem', padding: '3px 8px', borderRadius: 16,
+                    fontSize: '0.70rem', padding: '3px 8px', borderRadius: 16,
                     border: `1px solid ${selectedCategory === cat ? '#7c3aed' : '#e9d5ff'}`,
                     background: selectedCategory === cat ? '#7c3aed' : '#fff',
                     color: selectedCategory === cat ? '#fff' : '#6b21a8',
@@ -471,7 +471,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
           {templateError && (
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', borderRadius: 8,
-              background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.72rem', marginBottom: 12
+              background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.74rem', marginBottom: 12
             }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0 }}>error</span>
               <span style={{ flex: 1 }}>{templateError}</span>
@@ -484,13 +484,13 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                 key={tpl.id}
                 onClick={() => handleApplyTemplate(tpl)}
                 style={{
-                  background: '#fff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
+                  background: 'var(--surface)', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
                   cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
                 }}
                 className="card-hover-effect"
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4c1d95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#4c1d95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {tpl.name}
                   </div>
                   <div style={{ fontSize: '0.65rem', color: '#7c3aed', opacity: 0.8 }}>
@@ -508,7 +508,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       {isEditorOpen && (
         <div className="card fade-in" style={{ padding: 20, border: '2px solid var(--primary)', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>edit_note</span>
               {editingId ? "Modification de l'Écriture Simulée" : "Saisie d'une Nouvelle Écriture Multiligne"}
             </h3>
@@ -550,7 +550,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                         value={line.compte}
                         onChange={e => handleLineChange(idx, 'compte', e.target.value)}
                         placeholder="700"
-                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.8rem', fontWeight: 800, outline: 'none' }}
+                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, outline: 'none' }}
                       />
                     </td>
                     <td>
@@ -559,7 +559,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                         value={line.libelle}
                         onChange={e => handleLineChange(idx, 'libelle', e.target.value)}
                         placeholder="Intitulé"
-                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.78rem', outline: 'none' }}
+                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.80rem', outline: 'none' }}
                       />
                     </td>
                     <td className="right">
@@ -568,7 +568,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                         value={line.debit || ''}
                         onChange={e => handleLineChange(idx, 'debit', Number(e.target.value))}
                         placeholder="0"
-                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--green)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.8rem', fontWeight: 800, color: 'var(--green)', outline: 'none' }}
+                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--green)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--green)', outline: 'none' }}
                       />
                     </td>
                     <td className="right">
@@ -577,7 +577,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                         value={line.credit || ''}
                         onChange={e => handleLineChange(idx, 'credit', Number(e.target.value))}
                         placeholder="0"
-                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--primary)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-dk)', outline: 'none' }}
+                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--primary)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--primary-dk)', outline: 'none' }}
                       />
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -594,7 +594,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="2" style={{ fontWeight: 800, fontSize: '0.75rem' }}>TOTAL ÉCRITURE SIMULÉE</td>
+                  <td colSpan="2" style={{ fontWeight: 800, fontSize: '0.74rem' }}>TOTAL ÉCRITURE SIMULÉE</td>
                   <td className="right mono" style={{ fontWeight: 900, color: 'var(--green)', fontSize: '0.85rem' }}>{fmt(sumDebit)}</td>
                   <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem' }}>{fmt(sumCredit)}</td>
                   <td></td>
@@ -607,13 +607,13 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 onClick={() => handleAddLine('debit')}
-                style={{ padding: '5px 10px', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ padding: '5px 10px', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 + Ligne Débit
               </button>
               <button
                 onClick={() => handleAddLine('credit')}
-                style={{ padding: '5px 10px', background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ padding: '5px 10px', background: '#f0f8fa', color: '#124f66', border: '1px solid #b7dce6', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 + Ligne Crédit
               </button>
@@ -621,11 +621,11 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {isBalanced ? (
-                <span className="badge badge-green" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
+                <span className="badge badge-green" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
                   ✓ Équilibrée (D = C)
                 </span>
               ) : (
-                <span className="badge badge-red" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
+                <span className="badge badge-red" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
                   ⚠ Écart: {fmt(diffDC)}
                 </span>
               )}
@@ -636,7 +636,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                 style={{
                   padding: '8px 18px', background: isBalanced ? 'linear-gradient(135deg, #059669, #047857)' : '#cbd5e1',
                   color: '#fff', border: 'none', borderRadius: 8, cursor: isBalanced ? 'pointer' : 'not-allowed',
-                  fontWeight: 800, fontSize: '0.82rem'
+                  fontWeight: 800, fontSize: '0.85rem'
                 }}
               >
                 {editingId ? 'Enregistrer' : 'Valider'}
@@ -658,7 +658,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             <button
               onClick={handleOpenNewEditor}
               className="btn btn-primary"
-              style={{ fontSize: '0.75rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
+              style={{ fontSize: '0.74rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
               + Saisie Avancée
@@ -667,7 +667,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             {simulationEntries.length > 0 && (
               <button
                 onClick={() => setSimulationEntries([])}
-                style={{ border: 'none', background: 'none', color: 'var(--red)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ border: 'none', background: 'none', color: 'var(--red)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 × Vider Tout
               </button>
@@ -696,12 +696,12 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               ) : (
                 simulationEntries.map((e) => (
                   <tr key={e.id}>
-                    <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)', verticalAlign: 'top', padding: '8px 8px' }}>
+                    <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)', verticalAlign: 'top', padding: '8px 8px' }}>
                       {e.date}
                     </td>
 
                     <td style={{ verticalAlign: 'top', padding: '8px 8px', wordBreak: 'break-word' }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--text)', marginBottom: 4 }}>{e.label}</div>
+                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', marginBottom: 4 }}>{e.label}</div>
                       
                       {e.lines && e.lines.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.7rem' }}>
@@ -717,7 +717,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                           ))}
                         </div>
                       ) : (
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                           D: {e.debitCompte} | C: {e.creditCompte}
                         </div>
                       )}
@@ -727,13 +727,13 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                       {e.lines && e.lines.length > 0 ? (
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                           {e.lines.map((l, li) => (
-                            <span key={li} className="mono" style={{ fontSize: '0.65rem', background: l.debit > 0 ? '#dcfce7' : '#eff6ff', color: l.debit > 0 ? '#166534' : '#1e40af', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
+                            <span key={li} className="mono" style={{ fontSize: '0.65rem', background: l.debit > 0 ? '#dcfce7' : '#f0f8fa', color: l.debit > 0 ? '#166534' : '#124f66', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
                               {l.compte}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 800 }}>{e.debitCompte} / {e.creditCompte}</span>
+                        <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 800 }}>{e.debitCompte} / {e.creditCompte}</span>
                       )}
                     </td>
 
@@ -746,7 +746,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                         <button
                           onClick={() => handleOpenEditEditor(e)}
                           title="Modifier cette écriture"
-                          style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1e40af', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
+                          style={{ border: '1px solid #b7dce6', background: '#f0f8fa', color: '#124f66', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
                           Éditer
@@ -768,10 +768,10 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
             {simulationEntries.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan="3" style={{ fontWeight: 800, fontSize: '0.75rem', padding: '8px 8px' }}>TOTAL GENERAL DU JOURNAL SIMULÉ</td>
+                  <td colSpan="3" style={{ fontWeight: 800, fontSize: '0.74rem', padding: '8px 8px' }}>TOTAL GENERAL DU JOURNAL SIMULÉ</td>
                   <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem', padding: '8px 8px' }}>{fmt(totalSimulatedDebit)}</td>
                   <td style={{ textAlign: 'center', padding: '8px 8px' }}>
-                    <span className="badge badge-green" style={{ fontSize: '0.62rem' }}>✓ D = C</span>
+                    <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>✓ D = C</span>
                   </td>
                 </tr>
               </tfoot>
@@ -784,31 +784,31 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
         
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>CHIFFRE D'AFFAIRES (CA)</div>
+          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>CHIFFRE D'AFFAIRES (CA)</div>
           <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simCA >= baseCA ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simCA)}</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseCA)} ({fmtPct(baseCA ? ((simCA - baseCA)/baseCA)*100 : 0)})</div>
         </div>
 
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXCÉDENT BRUT (EBE)</div>
+          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXCÉDENT BRUT (EBE)</div>
           <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simEBE >= baseEBE ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simEBE)}</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseEBE)}</div>
         </div>
 
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>RÉSULTAT NET</div>
+          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>RÉSULTAT NET</div>
           <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simNet >= baseNet ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simNet)}</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseNet)}</div>
         </div>
 
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>BFR (BESOIN EN FONDS)</div>
+          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>BFR (BESOIN EN FONDS)</div>
           <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simBFR <= baseBFR ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simBFR)}</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseBFR)}</div>
         </div>
 
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>TRÉSORERIE NETTE (TN)</div>
+          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>TRÉSORERIE NETTE (TN)</div>
           <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simTN >= baseTN ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simTN)}</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseTN)}</div>
         </div>
@@ -818,7 +818,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       {/* Comparison Chart */}
       <div className="card" style={{ padding: 18 }}>
         <div className="card-header" style={{ marginBottom: 14 }}>
-          <h3 style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <h3 style={{ fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
             <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 18 }}>bar_chart</span>
             Comparatif Visuel : Situation Actuelle vs Scénario Simulé
           </h3>
@@ -836,7 +836,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
               />
               <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
               <Bar dataKey="Actuel" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={32} />
-              <Bar dataKey="Simulé" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={32} />
+              <Bar dataKey="Simulé" fill="#1b6e8c" radius={[4, 4, 0, 0]} maxBarSize={32} />
             </BarChart>
           </ResponsiveContainer>
         </div>

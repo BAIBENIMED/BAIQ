@@ -25,10 +25,10 @@ const GaugeCard = ({ title, description, value, min, max, isPercentage, targetNo
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: color }} />
 
       <div style={{ marginBottom: 12, textAlign: 'center' }}>
-        <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 4 }}>{title}</p>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', lineHeight: 1.4, minHeight: '32px' }}>{description}</p>
+        <p style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 4 }}>{title}</p>
+        <p style={{ fontSize: '0.74rem', color: 'var(--text-sub)', lineHeight: 1.4, minHeight: '32px' }}>{description}</p>
         {targetNorm && (
-          <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: 10, border: '1px solid #bfdbfe' }}>
+          <span style={{ fontSize: '0.70rem', fontWeight: 700, background: '#f0f8fa', color: '#1b6e8c', padding: '2px 8px', borderRadius: 10, border: '1px solid #b7dce6' }}>
             Norme secteur : {targetNorm}
           </span>
         )}
@@ -82,8 +82,8 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
-          <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', lineHeight: 1.3 }}>{title}</span>
-          <span className="badge" style={{ background: `${color}15`, color, borderColor: `${color}40`, fontSize: '0.62rem', flexShrink: 0 }}>
+          <span style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', lineHeight: 1.3 }}>{title}</span>
+          <span className="badge" style={{ background: `${color}15`, color, borderColor: `${color}40`, fontSize: '0.65rem', flexShrink: 0 }}>
             {rating}
           </span>
         </div>
@@ -91,7 +91,7 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
 
         {normLabel && (
           <div style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#f5f3ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 10, border: '1px solid #ddd6fe' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 700, background: '#f5f3ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 10, border: '1px solid #ddd6fe' }}>
               🎯 Benchmark secteur ({sectorLabel || ''}) : {normLabel}
             </span>
           </div>
@@ -101,19 +101,19 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
           <div>
             {display !== null ? (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <span className="mono" style={{ fontSize: '1.9rem', fontWeight: 800, color, lineHeight: 1 }}>{display}</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>{unit}</span>
+                <span className="mono" style={{ fontSize: '2rem', fontWeight: 800, color, lineHeight: 1 }}>{display}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>{unit}</span>
               </div>
             ) : (
-              <span className="mono" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#cbd5e1' }}>—</span>
+              <span className="mono" style={{ fontSize: '1.4rem', fontWeight: 800, color: '#cbd5e1' }}>—</span>
             )}
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-sub)', display: 'block', marginTop: 4 }}>Délai moyen d'écoulement</span>
+            <span style={{ fontSize: '0.70rem', color: 'var(--text-sub)', display: 'block', marginTop: 4 }}>Délai moyen d'écoulement</span>
           </div>
 
           {extraRate !== undefined && extraRate !== null && (
             <div style={{ textAlign: 'right', paddingLeft: 12, borderLeft: '1px solid var(--border)' }}>
-              <span className="mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' }}>{Number(extraRate).toFixed(1)}x</span>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-sub)', display: 'block' }}>{extraLabel || 'Rotations / an'}</span>
+              <span className="mono" style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>{Number(extraRate).toFixed(1)}x</span>
+              <span style={{ fontSize: '0.70rem', color: 'var(--text-sub)', display: 'block' }}>{extraLabel || 'Rotations / an'}</span>
             </div>
           )}
         </div>
@@ -131,7 +131,7 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
           <div style={{ height: 6, width: '100%', background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 6, transition: 'width 0.6s ease', width: `${progress}%`, background: color }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.67rem', color: 'var(--text-sub)', fontWeight: 600 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.65rem', color: 'var(--text-sub)', fontWeight: 600 }}>
             <span>0 j</span>
             <span>Objectif ≤ {thresholdGood} j</span>
             <span>Seuil max {thresholdMed} j</span>
@@ -147,7 +147,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
     <div className="card" style={{ maxWidth: 480, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
       <span className="material-symbols-outlined" style={{ fontSize: 52, color: 'var(--text-sub)', display: 'block', marginBottom: 16 }}>query_stats</span>
       <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Ratios non disponibles</h3>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Veuillez importer une balance comptable.</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Veuillez importer une balance comptable.</p>
     </div>
   );
 
@@ -219,17 +219,17 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Ratios Financiers, Solvabilité &amp; Benchmarks</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Analyse comparative recalibrée sur les normes du secteur d'activité (SCF Algérie).</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse comparative recalibrée sur les normes du secteur d'activité (SCF Algérie).</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 14, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 16, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: secteur.couleur, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: 16 }}>{secteur.icon}</span>
             </div>
             <div>
-              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase' }}>Secteur Actif</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{secteur.label}</div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase' }}>Secteur Actif</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}>{secteur.label}</div>
             </div>
           </div>
 
@@ -237,7 +237,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             onClick={handleExportExcel}
             style={{
               padding: '9px 16px', background: '#059669', color: '#fff', border: 'none', borderRadius: 12,
-              fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 2px 8px rgba(5,150,105,0.2)'
             }}
           >
@@ -248,14 +248,14 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
       </div>
 
       {/* ── 🛡️ NOUVELLE SECTION : SOLVABILITÉ, RATING BANCAIRE & ALTMAN Z''-SCORE ── */}
-      <section style={{ background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+      <section style={{ background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ color: '#38bdf8', fontSize: 20 }}>security</span>
+              <span className="material-symbols-outlined" style={{ color: '#4fb3cc', fontSize: 20 }}>security</span>
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Score de Solvabilité &amp; Rating Bancaire (Altman Z'')</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>Score de Solvabilité &amp; Rating Bancaire (Altman Z'')</h3>
               <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Modèle Altman Z'' adapté aux entreprises non cotées et pays émergents (EM-Score)</span>
             </div>
           </div>
@@ -263,13 +263,22 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{
               background: solv.zoneBg, color: solv.zoneColor, border: `1px solid ${solv.zoneBorder}`,
-              padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6
+              padding: '6px 14px', borderRadius: 20, fontSize: '0.80rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 6
             }}>
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>verified_user</span>
               Rating : {solv.rating} ({solv.zoneLabel.split('—')[0]})
             </span>
           </div>
         </div>
+
+        {solv.estimationPartielle && (
+          <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, marginBottom: 16 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#d97706', flexShrink: 0 }}>info</span>
+            <p style={{ fontSize: '0.74rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+              {solv.estimationPartielleMessage}
+            </p>
+          </div>
+        )}
 
         {/* Grille principale Solvabilité */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -280,60 +289,60 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             <div className="mono" style={{ fontSize: '2.4rem', fontWeight: 900, color: solv.zoneColor, margin: '4px 0' }}>
               {solv.zScore.toFixed(2)}
             </div>
-            <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>
               {solv.zScore >= 2.6 ? '🟢 Zone Saine (≥ 2.60)' : solv.zScore >= 1.1 ? '🟡 Zone Grise (1.10 - 2.60)' : '🔴 Zone Détresse (< 1.10)'}
             </span>
           </div>
 
           {/* Carte 2 : Probabilité de défaillance */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Risque de Défaillance</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: solv.zoneColor, margin: '6px 0 2px' }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: solv.zoneColor, margin: '6px 0 2px' }}>
               {solv.risqueDefaillance}
             </div>
-            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Probabilité d'insolvabilité à 2 ans</span>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Niveau de risque indicatif (zone Altman Z'', non calibré statistiquement)</span>
             <div style={{ marginTop: 8, height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${solv.scoreSolvabilite}%`, background: solv.zoneColor, borderRadius: 4 }} />
             </div>
           </div>
 
           {/* Carte 3 : Désendettement Bancaire (Dettes/EBE) */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Dettes Nettes / EBE</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '6px 0 2px' }}>
               <span className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: solv.bancaire.ratioDetteSurEBE <= 3.5 ? '#059669' : '#dc2626' }}>
                 {solv.bancaire.ratioDetteSurEBE < 90 ? `${solv.bancaire.ratioDetteSurEBE.toFixed(1)} ans` : 'N/A'}
               </span>
             </div>
-            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Norme bancaire algérienne : ≤ 3.5 années d'EBE</span>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Norme bancaire algérienne : ≤ 3.5 années d'EBE</span>
           </div>
 
           {/* Carte 4 : Capacité d'endettement théorique */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>Capacité d'Emprunt Max</span>
-            <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: '#2563eb', margin: '6px 0 2px' }}>
+            <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1b6e8c', margin: '6px 0 2px' }}>
               {fmt(solv.bancaire.capaciteEndettementMax)}
             </div>
-            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Potentiel de financement bancaire LT additionnel</span>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Potentiel de financement bancaire LT additionnel</span>
           </div>
 
         </div>
 
         {/* Détail des 4 Composantes de la Formule Altman */}
-        <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16, border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#2563eb' }}>functions</span>
+        <div style={{ background: 'var(--surface-alt)', borderRadius: 12, padding: 16, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#1b6e8c' }}>functions</span>
             Formule Altman Z'' = 6.56×X₁ + 3.26×X₂ + 6.72×X₃ + 1.05×X₄
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             {Object.entries(solv.ratios).map(([key, item], idx) => (
-              <div key={key} style={{ background: '#fff', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div key={key} style={{ background: 'var(--surface)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: 800, color: '#64748b' }}>
                   <span>X{idx + 1} (Poids : ×{item.poids})</span>
-                  <span className="mono" style={{ color: '#0f172a' }}>{item.val.toFixed(3)}</span>
+                  <span className="mono" style={{ color: 'var(--text)' }}>{item.val.toFixed(3)}</span>
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{item.label}</div>
-                <div style={{ fontSize: '0.67rem', color: '#94a3b8' }}>{item.desc}</div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>{item.label}</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{item.desc}</div>
               </div>
             ))}
           </div>
@@ -345,13 +354,13 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 22, color: solv.bancaire.ratingBAColor }}>assured_workload</span>
               <div>
-                <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)' }}>Score Centrale des Risques (Banque d'Algérie)</h4>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>Grille d'évaluation standard pour l'accès aux financements bancaires locaux (Éligibilité)</span>
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)' }}>Score Centrale des Risques (Banque d'Algérie)</h4>
+                <span style={{ fontSize: '0.70rem', color: 'var(--text-sub)' }}>Grille d'évaluation standard pour l'accès aux financements bancaires locaux (Éligibilité)</span>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-sub)' }}>Score :</span>
-              <span className="mono" style={{ fontSize: '1.25rem', fontWeight: 900, color: solv.bancaire.ratingBAColor }}>
+              <span className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: solv.bancaire.ratingBAColor }}>
                 {solv.bancaire.scoreBA} / 20
               </span>
               <span className="badge" style={{ background: `${solv.bancaire.ratingBAColor}15`, color: solv.bancaire.ratingBAColor, fontWeight: 800 }}>
@@ -365,11 +374,11 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
               <div key={key} style={{ background: 'var(--surface)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>
                   <span>{item.label}</span>
-                  <span className="badge" style={{ background: item.score >= 4 ? '#d1fae5' : item.score >= 2.5 ? '#fef3c7' : '#fee2e2', color: item.score >= 4 ? '#065f46' : item.score >= 2.5 ? '#92400e' : '#991b1b', fontSize: '0.62rem' }}>
+                  <span className="badge" style={{ background: item.score >= 4 ? '#d1fae5' : item.score >= 2.5 ? '#fef3c7' : '#fee2e2', color: item.score >= 4 ? '#065f46' : item.score >= 2.5 ? '#92400e' : '#991b1b', fontSize: '0.65rem' }}>
                     {item.score} / 5 pts
                   </span>
                 </div>
-                <div className="mono" style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>
+                <div className="mono" style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)', marginTop: 4 }}>
                   {item.displayVal || (key === 'rentabilite' ? `${item.val.toFixed(1)} %` : item.val >= 90 ? 'Sans dette LT (100%)' : item.val.toFixed(2))}
                 </div>
               </div>
@@ -382,7 +391,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <span className="material-symbols-outlined" style={{ color: 'var(--green)', fontSize: 20 }}>update</span>
-          <h3 style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Ratios de Rotation &amp; Délais d'Exploitation</h3>
+          <h3 style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Ratios de Rotation &amp; Délais d'Exploitation</h3>
         </div>
         <div className="kpi-grid">
           <DaysCard
@@ -445,7 +454,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>speed</span>
-          <h3 style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Structure Financière &amp; Rentabilité</h3>
+          <h3 style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Structure Financière &amp; Rentabilité</h3>
         </div>
         <div className="grid-3">
           <GaugeCard
@@ -483,20 +492,20 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(37, 99, 235, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>radar</span>
+              <span className="material-symbols-outlined" style={{ color: '#1b6e8c', fontSize: 20 }}>radar</span>
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)' }}>Radar d'Alignement Sectoriel (6 Piliers)</h3>
               <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Superposition de l'empreinte financière sur la médiane du secteur {secteur.label}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.72rem', fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.74rem', fontWeight: 700 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#2563eb' }}></span>
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: '#1b6e8c' }}></span>
               Votre Entreprise
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#a855f7' }}></span>
+              <span style={{ width: 12, height: 12, borderRadius: 4, background: '#a855f7' }}></span>
               Médiane Secteur {secteur.label}
             </span>
           </div>
@@ -509,9 +518,9 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
                 <PolarGrid stroke="var(--border)" />
                 <PolarAngleAxis dataKey="subject" stroke="var(--text-muted)" fontSize={11} fontWeight={700} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--border)" fontSize={9} />
-                <Radar name="Votre Entreprise" dataKey="Entreprise" stroke="#2563eb" fill="#2563eb" fillOpacity={0.4} />
+                <Radar name="Votre Entreprise" dataKey="Entreprise" stroke="#1b6e8c" fill="#1b6e8c" fillOpacity={0.4} />
                 <Radar name="Moyenne Secteur" dataKey="Secteur" stroke="#a855f7" fill="#a855f7" fillOpacity={0.2} />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.75rem' }} />
+                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.74rem' }} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -519,9 +528,9 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {radarData.map((item, idx) => (
               <div key={idx} style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.subject}</div>
+                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{item.subject}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
-                  <span className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: '#2563eb' }}>{item.valEntreprise}</span>
+                  <span className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1b6e8c' }}>{item.valEntreprise}</span>
                   <span className="mono" style={{ fontSize: '0.70rem', color: '#a855f7', fontWeight: 700 }}>Norme : {item.valSecteur}</span>
                 </div>
               </div>
@@ -537,7 +546,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
             <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>summarize</span>
             <h3 style={{ fontWeight: 800, fontSize: '0.95rem' }}>Synthèse des Ratios vs Benchmarks {secteur.label}</h3>
           </div>
-          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '4px 12px', borderRadius: 20, border: '1px solid #ddd6fe' }}>Référentiel Sectoriel SCF</span>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '4px 12px', borderRadius: 20, border: '1px solid #ddd6fe' }}>Référentiel Sectoriel SCF</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ width: '100%' }}>
@@ -605,8 +614,8 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
                 <tr key={i}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>{row.label}</td>
                   <td className="right mono" style={{ fontWeight: 700 }}>{row.value}</td>
-                  <td className="right mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{row.extra}</td>
-                  <td className="mono" style={{ paddingLeft: 24, fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed' }}>{row.norme}</td>
+                  <td className="right mono" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{row.extra}</td>
+                  <td className="mono" style={{ paddingLeft: 24, fontSize: '0.74rem', fontWeight: 700, color: '#7c3aed' }}>{row.norme}</td>
                   <td style={{ textAlign: 'center' }}>
                     <span className="badge" style={{
                       background: row.ok ? '#d1fae5' : '#fee2e2',

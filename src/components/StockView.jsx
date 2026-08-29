@@ -85,9 +85,9 @@ export function StockView({ rows, ratios, formatCurrency }) {
     securiteStatut = {
       titre: 'Gestion Optimisée / Flux Tendu Maîtrisé',
       badgeCls: 'badge-blue',
-      color: '#2563eb',
-      bg: '#eff6ff',
-      bdr: '#bfdbfe',
+      color: '#1b6e8c',
+      bg: '#f0f8fa',
+      bdr: '#b7dce6',
       icon: 'speed',
       description: 'Rotation rapide et efficace. Le BFR est très allégé avec un bon réassortiment.'
     };
@@ -186,7 +186,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
       <div className="card fade-in" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 42, color: '#cbd5e1', display: 'block', marginBottom: 12 }}>inventory_2</span>
         <h4 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>Aucune donnée de stock (Classe 3)</h4>
-        <p style={{ fontSize: '0.8rem' }}>La balance ne contient aucun compte de stock actif.</p>
+        <p style={{ fontSize: '0.80rem' }}>La balance ne contient aucun compte de stock actif.</p>
       </div>
     );
   }
@@ -197,8 +197,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
       label: '1. Coût Financier / Opportunité du Capital',
       desc: 'Intérêts bancaires (crédits court terme / découverts) ou rendement d\'un placement alternatif',
       icon: 'account_balance',
-      color: '#2563eb',
-      bg: '#eff6ff',
+      color: '#1b6e8c',
+      bg: '#f0f8fa',
       max: 15,
       step: 0.25
     },
@@ -252,20 +252,20 @@ export function StockView({ rows, ratios, formatCurrency }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#38bdf8' }}>warehouse</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#4fb3cc' }}>warehouse</span>
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>
                 Évolution, Diagnostic Financier &amp; Sécurité des Stocks
               </h3>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+              <span style={{ fontSize: '0.80rem', color: '#94a3b8' }}>
                 Analyse SCF (IAS 2) • Impact BFR &amp; Trésorerie • Contrôle de Surconsommation
               </span>
             </div>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ background: isCashPositive ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: isCashPositive ? '#34d399' : '#f87171', border: `1px solid ${isCashPositive ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`, padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ background: isCashPositive ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: isCashPositive ? '#34d399' : '#f87171', border: `1px solid ${isCashPositive ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`, padding: '4px 12px', borderRadius: 20, fontSize: '0.74rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{isCashPositive ? 'savings' : 'outbox'}</span>
               Impact Trésorerie : {isCashPositive ? '+' : ''}{fmt(cashImpact)}
             </span>
@@ -278,12 +278,12 @@ export function StockView({ rows, ratios, formatCurrency }) {
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Délai d'Écoulement</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-              <span className="mono" style={{ fontSize: '1.75rem', fontWeight: 900, color: rotationJours <= 90 ? '#34d399' : '#fbbf24' }}>
+              <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 900, color: rotationJours <= 90 ? '#34d399' : '#fbbf24' }}>
                 {Math.round(rotationJours)}
               </span>
               <span style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 700 }}>jours</span>
             </div>
-            <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
+            <span style={{ fontSize: '0.70rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
               Norme conseillée : 30 à 90 jours
             </span>
           </div>
@@ -292,12 +292,12 @@ export function StockView({ rows, ratios, formatCurrency }) {
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Vitesse de Rotation</span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-              <span className="mono" style={{ fontSize: '1.75rem', fontWeight: 900, color: '#38bdf8' }}>
+              <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 900, color: '#4fb3cc' }}>
                 {tauxRotation.toFixed(1)}x
               </span>
               <span style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 700 }}>/ an</span>
             </div>
-            <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
+            <span style={{ fontSize: '0.70rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
               Renouvellements du stock par an
             </span>
           </div>
@@ -305,13 +305,13 @@ export function StockView({ rows, ratios, formatCurrency }) {
           {/* 3. Stock Moyen & Variation */}
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 14, border: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Stock Final au 31 Déc.</span>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#f8fafc', marginTop: 4 }} className="mono">
+            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#f8fafc', marginTop: 4 }} className="mono">
               {fmt(data.totalFinal)}
             </div>
-            <span style={{ fontSize: '0.68rem', color: data.totalVariation <= 0 ? '#34d399' : '#fbbf24', display: 'block', marginTop: 2, fontWeight: 700 }}>
+            <span style={{ fontSize: '0.70rem', color: data.totalVariation <= 0 ? '#34d399' : '#fbbf24', display: 'block', marginTop: 2, fontWeight: 700 }}>
               Var : {data.totalVariation > 0 ? '+' : ''}{fmt(data.totalVariation)} ({fmtPct(data.totalPctVariation)})
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
+            <span style={{ fontSize: '0.70rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
               Poids du stock / CA : {((data.totalFinal / chiffreAffaires) * 100).toFixed(1)} %
             </span>
           </div>
@@ -325,7 +325,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 {securiteStatut.titre}
               </span>
             </div>
-            <span style={{ fontSize: '0.68rem', color: '#cbd5e1', display: 'block', marginTop: 4, lineHeight: 1.2 }}>
+            <span style={{ fontSize: '0.70rem', color: '#cbd5e1', display: 'block', marginTop: 4, lineHeight: 1.2 }}>
               Stock d'alerte sous contrôle
             </span>
           </div>
@@ -339,12 +339,12 @@ export function StockView({ rows, ratios, formatCurrency }) {
             id: 'synthese',
             num: '01',
             badge: 'Bilan SCF',
-            badgeColor: '#2563eb',
-            badgeBg: '#eff6ff',
+            badgeColor: '#1b6e8c',
+            badgeBg: '#f0f8fa',
             title: '1. Synthèse par Catégorie',
             subtitle: '5 rubriques & mouvements SCF',
             icon: 'grid_view',
-            accent: '#2563eb'
+            accent: '#1b6e8c'
           },
           {
             id: 'tresorerie',
@@ -436,7 +436,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
               {/* Titre & Sous-titre */}
               <div style={{ marginTop: 2 }}>
                 <div style={{
-                  fontSize: '0.82rem', fontWeight: 900,
+                  fontSize: '0.85rem', fontWeight: 900,
                   color: isActive ? t.accent : 'var(--text)',
                   lineHeight: 1.25,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
@@ -444,7 +444,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   {t.title}
                 </div>
                 <div style={{
-                  fontSize: '0.68rem', fontWeight: 600,
+                  fontSize: '0.70rem', fontWeight: 600,
                   color: isActive ? 'var(--text)' : 'var(--text-muted)',
                   marginTop: 2,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -477,13 +477,13 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--primary)' }}>category</span>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Détail des 5 Rubriques de Stock (Classe 3)</h3>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mouvement de stockage vs déstockage compte par compte</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Mouvement de stockage vs déstockage compte par compte</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Mouvement Global :</span>
-                <span className={`badge ${data.globalMouvement === 'STOCKAGE' ? 'badge-green' : data.globalMouvement === 'DÉSTOCKAGE' ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: '0.72rem', padding: '5px 12px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>Mouvement Global :</span>
+                <span className={`badge ${data.globalMouvement === 'STOCKAGE' ? 'badge-green' : data.globalMouvement === 'DÉSTOCKAGE' ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: '0.74rem', padding: '5px 12px' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 13, marginRight: 4 }}>
                     {data.globalMouvement === 'STOCKAGE' ? 'trending_up' : data.globalMouvement === 'DÉSTOCKAGE' ? 'trending_down' : 'remove'}
                   </span>
@@ -513,7 +513,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 0 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)', marginTop: 2, flexShrink: 0 }}>{cat.icon}</span>
-                          <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--text)', lineHeight: 1.3 }}>{cat.label}</span>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.3 }}>{cat.label}</span>
                         </div>
                         <span className={`badge ${isStockage ? 'badge-green' : isDestockage ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: '0.65rem', flexShrink: 0 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 11, marginRight: 2 }}>
@@ -524,20 +524,20 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       </div>
 
                       <div style={{ padding: '10px 12px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>DÉBUT (1er Janv.) :</span>
                           <span className="mono" style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(cat.stockInitial)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>FIN (31 Déc.) :</span>
                           <span className="mono" style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(cat.stockFinal)}</span>
                         </div>
                         <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.80rem' }}>
                           <span style={{ fontWeight: 700, color: 'var(--text)' }}>VARIATION NETTE :</span>
-                          <span className="mono" style={{ fontWeight: 800, fontSize: '0.86rem', color: isStockage ? 'var(--green)' : isDestockage ? '#d97706' : 'var(--text)' }}>
+                          <span className="mono" style={{ fontWeight: 800, fontSize: '0.85rem', color: isStockage ? 'var(--green)' : isDestockage ? '#d97706' : 'var(--text)' }}>
                             {cat.variation > 0 ? `+${fmt(cat.variation)}` : fmt(cat.variation)}
-                            <span style={{ fontSize: '0.72rem', marginLeft: 5, opacity: 0.9 }}>
+                            <span style={{ fontSize: '0.74rem', marginLeft: 5, opacity: 0.9 }}>
                               ({fmtPct(cat.pctVariation)})
                             </span>
                           </span>
@@ -545,7 +545,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', border: '1px solid var(--border)', padding: '6px 8px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', border: '1px solid var(--border)', padding: '6px 8px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 14, color: isStockage ? 'var(--green)' : isDestockage ? '#d97706' : 'var(--text-sub)', flexShrink: 0 }}>info</span>
                       <span style={{ lineHeight: 1.25 }}>{cat.impactSCF}</span>
                     </div>
@@ -587,7 +587,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                           {cat.mouvement}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{cat.impactSCF}</td>
+                      <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{cat.impactSCF}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -607,7 +607,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                         {data.globalMouvement}
                       </span>
                     </td>
-                    <td style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-dk)' }}>
+                    <td style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary-dk)' }}>
                       {data.globalMouvement === 'STOCKAGE' ? 'Augmentation globale des réserves' : 'Consommation globale des stocks'}
                     </td>
                   </tr>
@@ -626,11 +626,11 @@ export function StockView({ rows, ratios, formatCurrency }) {
           <div className="card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#2563eb' }}>payments</span>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0f8fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#1b6e8c' }}>payments</span>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>
                     Diagnostic Trésorerie, BFR &amp; Coût de Possession du Stock
                   </h3>
                   <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -652,7 +652,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                     onClick={() => applyPreset(p.id)}
                     style={{
                       padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
-                      background: 'var(--surface-alt)', fontSize: '0.71rem', fontWeight: 700,
+                      background: 'var(--surface-alt)', fontSize: '0.70rem', fontWeight: 700,
                       color: 'var(--text)', cursor: 'pointer', transition: 'all 0.15s'
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.color = '#fff'; }}
@@ -668,13 +668,13 @@ export function StockView({ rows, ratios, formatCurrency }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 20 }}>
               {/* Carte 1 : Cash Généré / Consommé */}
               <div style={{ padding: '14px 16px', borderRadius: 12, background: isCashPositive ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isCashPositive ? '#bbf7d0' : '#fecaca'}` }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: isCashPositive ? '#166534' : '#991b1b', textTransform: 'uppercase', marginBottom: 3 }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: isCashPositive ? '#166534' : '#991b1b', textTransform: 'uppercase', marginBottom: 3 }}>
                   {isCashPositive ? '💰 Trésorerie Libérée (Cash-In)' : '📉 Trésorerie Mobilisée (Cash-Out)'}
                 </div>
                 <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: isCashPositive ? '#15803d' : '#b91c1c' }}>
                   {isCashPositive ? '+' : ''}{fmt(cashImpact)}
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text)', lineHeight: 1.35 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: 'var(--text)', lineHeight: 1.35 }}>
                   {isCashPositive 
                     ? `Désengagement direct du BFR réinjecté dans les disponibilités bancaires.`
                     : `Trésorerie nette gelée sous forme de stocks supplémentaires.`
@@ -684,26 +684,26 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
               {/* Carte 2 : Coût de Possession Global */}
               <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', marginBottom: 3 }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#124f66', textTransform: 'uppercase', marginBottom: 3 }}>
                   Coût Global de Possession ({totalTauxPossession}%)
                 </div>
-                <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e40af' }}>
+                <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: '#124f66' }}>
                   {fmt(coutPossessionEstime)} / an
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                   Charges annuelles totales engagées pour détenir le stock moyen ({fmt(stockMoyen)}).
                 </p>
               </div>
 
               {/* Carte 3 : Économies de Portage */}
               <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: gainPortageEstime > 0 ? '#15803d' : 'var(--text-sub)', textTransform: 'uppercase', marginBottom: 3 }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: gainPortageEstime > 0 ? '#15803d' : 'var(--text-sub)', textTransform: 'uppercase', marginBottom: 3 }}>
                   Économie Annuelle de Portage Réalisée
                 </div>
                 <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: gainPortageEstime > 0 ? '#059669' : 'var(--text)' }}>
                   {gainPortageEstime > 0 ? `+${fmt(gainPortageEstime)}` : '0 DZD'} / an
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.71rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                   {gainPortageEstime > 0
                     ? `Gain récurrent sur le compte de résultat généré par la baisse de volume.`
                     : `Aucune baisse de coûts constatée (maintien ou augmentation des stocks).`
@@ -715,11 +715,11 @@ export function StockView({ rows, ratios, formatCurrency }) {
             {/* ── GRILLE DES 5 TAUX PERSONNALISABLES (SLIDERS + INPUTS) ── */}
             <div style={{ marginTop: 10, marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)' }}>tune</span>
                   Paramétrage Personnalisé des 5 Composantes du Taux de Possession
                 </h4>
-                <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 900, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 6 }}>
+                <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#124f66', background: '#f0f8fa', border: '1px solid #b7dce6', padding: '3px 10px', borderRadius: 6 }}>
                   Taux Global : {totalTauxPossession}% par an
                 </span>
               </div>
@@ -737,7 +737,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span className="material-symbols-outlined" style={{ fontSize: 18, color: rate.color }}>{rate.icon}</span>
-                          <span style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text)' }}>{rate.label}</span>
+                          <span style={{ fontWeight: 800, fontSize: '0.80rem', color: 'var(--text)' }}>{rate.label}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <input
@@ -749,11 +749,11 @@ export function StockView({ rows, ratios, formatCurrency }) {
                             onChange={e => handleRateChange(rate.key, e.target.value)}
                             style={{
                               width: 58, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)',
-                              fontSize: '0.82rem', fontWeight: 800, textAlign: 'right', outline: 'none',
+                              fontSize: '0.85rem', fontWeight: 800, textAlign: 'right', outline: 'none',
                               color: rate.color, background: 'var(--surface-alt)'
                             }}
                           />
-                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: rate.color }}>%</span>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: rate.color }}>%</span>
                         </div>
                       </div>
 
@@ -815,7 +815,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                             {rate.label}
                           </div>
                         </td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{rate.desc}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>{rate.desc}</td>
                         <td className="right mono" style={{ fontWeight: 800, color: rate.color }}>{val.toFixed(2)}%</td>
                         <td className="right mono" style={{ fontWeight: 800 }}>{fmt(coutPoste)}</td>
                         <td className="right mono" style={{ color: 'var(--text-sub)' }}>{partTotal}%</td>
@@ -828,22 +828,22 @@ export function StockView({ rows, ratios, formatCurrency }) {
                     <td colSpan="2" style={{ fontWeight: 900, color: 'var(--text)' }}>
                       TOTAL COÛT DE POSSESSION GLOBAL DU STOCK
                     </td>
-                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af', fontSize: '0.80rem' }}>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#124f66', fontSize: '0.80rem' }}>
                       {totalTauxPossession.toFixed(2)}%
                     </td>
-                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af', fontSize: '0.84rem' }}>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#124f66', fontSize: '0.85rem' }}>
                       {fmt(coutPossessionEstime)} DZD
                     </td>
-                    <td className="right mono" style={{ fontWeight: 900, color: '#1e40af' }}>100.0%</td>
+                    <td className="right mono" style={{ fontWeight: 900, color: '#124f66' }}>100.0%</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
 
             {/* Note d'interprétation */}
-            <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb', flexShrink: 0 }}>tips_and_updates</span>
-              <span style={{ fontSize: '0.72rem', color: '#1e40af', lineHeight: 1.4 }}>
+            <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: '#f0f8fa', border: '1px solid #b7dce6', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#1b6e8c', flexShrink: 0 }}>tips_and_updates</span>
+              <span style={{ fontSize: '0.74rem', color: '#124f66', lineHeight: 1.4 }}>
                 <strong>Impact Managériel :</strong> Tout déstockage réduit immédiatement le BFR (gain de trésorerie disponible) et génère une économie récurrente de portage de <strong>{totalTauxPossession}% par an</strong> sur chaque Dinar déstocké.
               </span>
             </div>
@@ -863,7 +863,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#d97706' }}>shield</span>
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>
                   Audit de Sécurité Logistique &amp; Rendement des Matières (SCF)
                 </h3>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
@@ -878,20 +878,20 @@ export function StockView({ rows, ratios, formatCurrency }) {
               <div style={{ padding: '16px', borderRadius: 12, background: securiteStatut.bg, border: `1px solid ${securiteStatut.bdr}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 22, color: securiteStatut.color }}>{securiteStatut.icon}</span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: securiteStatut.color, textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: securiteStatut.color, textTransform: 'uppercase' }}>
                     {securiteStatut.titre}
                   </span>
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700, marginBottom: 4 }}>
                     <span>Délai d'Écoulement / Couverture :</span>
-                    <span className="mono" style={{ fontSize: '0.90rem', fontWeight: 900, color: securiteStatut.color }}>{Math.round(rotationJours)} Jours</span>
+                    <span className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: securiteStatut.color }}>{Math.round(rotationJours)} Jours</span>
                   </div>
                   <div style={{ height: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
                       width: `${Math.min(100, (rotationJours / 120) * 100)}%`,
-                      background: rotationJours <= 15 ? '#ef4444' : rotationJours <= 45 ? '#3b82f6' : rotationJours <= 90 ? '#10b981' : '#f59e0b',
+                      background: rotationJours <= 15 ? '#ef4444' : rotationJours <= 45 ? '#2e96b3' : rotationJours <= 90 ? '#10b981' : '#f59e0b',
                       borderRadius: 4
                     }} />
                   </div>
@@ -902,7 +902,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                     <span>90j+ (Sur-stock)</span>
                   </div>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--text)', lineHeight: 1.45 }}>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text)', lineHeight: 1.45 }}>
                   {securiteStatut.description}
                 </p>
               </div>
@@ -915,16 +915,16 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>factory</span>
                       Rendement Matières / Absorption
                     </span>
-                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e40af' }}>
+                    <span className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: '#124f66' }}>
                       {analyticsSCF.ratioRendement.toFixed(1)}%
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: 8 }}>
                     Part des consommations d'approvisionnements absorbée par la production réalisée.
                   </div>
                 </div>
 
-                <div style={{ padding: '8px 10px', borderRadius: 8, background: '#fff', border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text)', lineHeight: 1.4 }}>
+                <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '0.74rem', color: 'var(--text)', lineHeight: 1.4 }}>
                   <strong>Diagnostic Anti-Gaspillage :</strong> {data.totalVariation < 0
                     ? 'Le déstockage constaté a été transformé en production vendue ou stockée. Aucun écart de surconsommation anormale relevé.'
                     : 'Le niveau des stocks de matières est en phase avec la cadence de production de l\'exercice.'}
@@ -935,15 +935,15 @@ export function StockView({ rows, ratios, formatCurrency }) {
             {/* ── MATRICE DÉTAILLÉE SCF : CHARGES MATIÈRES (60) vs PRODUITS FABRIQUÉS (70 / 72) ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
               {/* Colonne Gauche : Consommations Matières (60) + Déstockage PF (Débit 72) */}
-              <div style={{ border: '1px solid #bfdbfe', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
-                <div style={{ padding: '10px 14px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ border: '1px solid #b7dce6', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
+                <div style={{ padding: '10px 14px', background: '#f0f8fa', borderBottom: '1px solid #b7dce6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#2563eb' }}>inventory</span>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e40af' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#1b6e8c' }}>inventory</span>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#124f66' }}>
                       1. Consommations Matières &amp; Déstockage PF (Charges &amp; Sorties)
                     </span>
                   </div>
-                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e40af' }}>
+                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: '#124f66' }}>
                     {fmt(analyticsSCF.totalConsommationsGlobales)}
                   </span>
                 </div>
@@ -967,7 +967,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(37,99,235,0.06)', borderRadius: 6, fontWeight: 700 }}>
                     <span>Sous-total Consommations Matières &amp; Appro (60) :</span>
-                    <span className="mono" style={{ color: '#1e40af' }}>{fmt(analyticsSCF.consommationsMP_Appro)}</span>
+                    <span className="mono" style={{ color: '#124f66' }}>{fmt(analyticsSCF.consommationsMP_Appro)}</span>
                   </div>
 
                   <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
@@ -976,7 +976,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ color: 'var(--text)', fontWeight: 800 }}><strong>Compte 72 (Débit)</strong> — Déstockage de Produits Finis :</span>
-                      <span style={{ display: 'block', fontSize: '0.66rem', color: 'var(--text-muted)' }}>Consommation de PF antérieurs pour assurer les ventes</span>
+                      <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Consommation de PF antérieurs pour assurer les ventes</span>
                     </div>
                     <span className="mono" style={{ fontWeight: 800, color: analyticsSCF.destockagePF > 0 ? '#dc2626' : 'inherit' }}>
                       +{fmt(analyticsSCF.destockagePF)}
@@ -985,7 +985,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
                   <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#1e40af', fontSize: '0.78rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#124f66', fontSize: '0.80rem' }}>
                     <span>TOTAL CONSOMMATIONS GLOBALES (60 + Débit 72) :</span>
                     <span className="mono">{fmt(analyticsSCF.totalConsommationsGlobales)} DZD</span>
                   </div>
@@ -997,7 +997,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 <div style={{ padding: '10px 14px', background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#059669' }}>precision_manufacturing</span>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#065f46' }}>
+                    <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#065f46' }}>
                       2. Ventes &amp; Production de l'Exercice (Produits)
                     </span>
                   </div>
@@ -1022,12 +1022,12 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#065f46', fontSize: '0.78rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#065f46', fontSize: '0.80rem' }}>
                     <span>PRODUCTION TOTALE RÉALISÉE (70x ± 72) :</span>
                     <span className="mono">{fmt(analyticsSCF.productionTotaleRealisee)} DZD</span>
                   </div>
 
-                  <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                  <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-alt)', border: '1px solid var(--border)', fontSize: '0.70rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                     💡 <strong>Double lecture SCF &amp; Gestion :</strong> Le débit du 72 diminue la Production de l'année (car vendue sur stocks antérieurs) et correspond analytiquement à une consommation directe de stock de produits finis.
                   </div>
                 </div>
@@ -1043,7 +1043,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
               <div style={{ fontSize: '0.74rem', fontWeight: 800, color: Math.abs(comptesConcordance.net603 + comptesConcordance.net72) < 1 ? '#166534' : '#92400e', marginBottom: 4 }}>
                 Rapprochement Comptable : Compte 603 vs Compte 72
               </div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.72rem', color: 'var(--text-sub)' }}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.74rem', color: 'var(--text-sub)' }}>
                 <span>Solde net 603 (achats) : <strong className="mono">{fmt(comptesConcordance.net603)}</strong></span>
                 <span>Solde net 72 (production) : <strong className="mono">{fmt(comptesConcordance.net72)}</strong></span>
                 <span>

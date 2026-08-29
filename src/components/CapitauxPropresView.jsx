@@ -67,7 +67,7 @@ export function CapitauxPropresView({ data, fmt }) {
       <div className="card fade-in" style={{ maxWidth: 500, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_balance_wallet</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Tableau des Capitaux Propres indisponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Veuillez d'abord importer une balance comptable pour afficher le TVCP.</p>
+        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable pour afficher le TVCP.</p>
       </div>
     );
   }
@@ -81,14 +81,14 @@ export function CapitauxPropresView({ data, fmt }) {
       <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 4, background: '#f0f8fa', color: '#124f66', border: '1px solid #b7dce6' }}>
               ÉTAT FINANCIER SCF (IAS 1)
             </span>
             <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 4, background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}>
               CLASSE 1 — CAPITAUX PROPRES
             </span>
           </div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
+          <h1 style={{ fontSize: '1.3rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
             Tableau de Variation des Capitaux Propres (TVCP)
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.80rem', color: 'var(--text-muted)' }}>
@@ -102,7 +102,7 @@ export function CapitauxPropresView({ data, fmt }) {
             onClick={() => window.print()}
             style={{
               padding: '7px 14px', background: 'var(--surface-alt)', border: '1px solid var(--border)',
-              borderRadius: 8, fontSize: '0.76rem', fontWeight: 800, color: 'var(--text)', cursor: 'pointer',
+              borderRadius: 8, fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6
             }}
           >
@@ -117,17 +117,17 @@ export function CapitauxPropresView({ data, fmt }) {
         
         {/* 1. Capitaux d'ouverture */}
         <div className="card" style={{ padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-sub)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+          <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-sub)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Capitaux Propres d'Ouverture (1er Janv.)
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e40af', lineHeight: 1.2 }}>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: '#124f66', lineHeight: 1.2 }}>
             {fmtCurrency(kpis.totalDebut)}
           </div>
           <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', marginTop: 4 }}>
             Base initiale de l'exercice
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#1e40af' }}>start</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#124f66' }}>start</span>
           </div>
         </div>
 
@@ -139,13 +139,13 @@ export function CapitauxPropresView({ data, fmt }) {
           position: 'relative', 
           overflow: 'hidden' 
         }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+          <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Affectation Résultat (N-1) &amp; Dividendes
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#d97706', lineHeight: 1.2 }}>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: '#d97706', lineHeight: 1.2 }}>
             {fmtCurrency(kpis.resultatNetAnterieur || 0)}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 800, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontSize: '0.74rem', color: '#92400e', fontWeight: 800, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706' }}>pie_chart</span>
             {kpis.dividendesEstimes > 0 
               ? `Dividendes : ${fmtCurrency(kpis.dividendesEstimes)} • Réserves/RAN : ${fmtCurrency((kpis.affectationRAN || 0) + (kpis.affectationReserves || 0))}`
@@ -159,34 +159,34 @@ export function CapitauxPropresView({ data, fmt }) {
 
         {/* 3. Opérations de l'Exercice (Augmentation Capital + Dividendes N-1) */}
         <div className="card" style={{ padding: '16px 20px', background: 'rgba(37, 99, 235, 0.05)', border: '1px solid rgba(37, 99, 235, 0.25)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+          <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#124f66', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Opérations de l'Année (Capital &amp; Dividendes)
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e40af', lineHeight: 1.2 }}>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: '#124f66', lineHeight: 1.2 }}>
             {kpis.variationOperations >= 0 ? '+' : ''}{fmtCurrency(kpis.variationOperations)}
           </div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#124f66', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add_circle</span>
             Augmentation Capital : {fmtCurrency(kpis.varCapital || 0)} {kpis.dividendesEstimes > 0 ? `• Dividendes : -${fmtCurrency(kpis.dividendesEstimes)}` : '• Dividendes : 0 DA'}
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#1e40af' }}>account_balance</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#124f66' }}>account_balance</span>
           </div>
         </div>
 
         {/* 4. Capitaux de clôture */}
-        <div className="card" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)', border: '1px solid #93c5fd', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        <div className="card" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)', border: '1px solid #8fc6d6', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#124f66', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Capitaux Propres de Clôture (31 Déc.)
           </div>
-          <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e3a8a', lineHeight: 1.2 }}>
+          <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0b3446', lineHeight: 1.2 }}>
             {fmtCurrency(kpis.totalFin)}
           </div>
-          <div style={{ fontSize: '0.70rem', color: '#2563eb', fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: '0.70rem', color: '#1b6e8c', fontWeight: 700, marginTop: 4 }}>
             Total Passif — Capitaux Propres
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#1e3a8a' }}>verified</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 64, color: '#0b3446' }}>verified</span>
           </div>
         </div>
 
@@ -206,7 +206,7 @@ export function CapitauxPropresView({ data, fmt }) {
               padding: '6px 14px', borderRadius: 8, border: 'none',
               background: activeSubTab === t.id ? 'var(--primary)' : 'var(--surface-alt)',
               color: activeSubTab === t.id ? '#ffffff' : 'var(--text-muted)',
-              fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
+              fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
             }}
           >
@@ -226,7 +226,7 @@ export function CapitauxPropresView({ data, fmt }) {
               <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)' }}>
                 Tableau Matriciel des Variations de Capitaux Propres (DZD)
               </h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 Format officiel conforme au Système Comptable Financier (SCF — Loi 07-11)
               </p>
             </div>
@@ -237,10 +237,10 @@ export function CapitauxPropresView({ data, fmt }) {
           </div>
 
           <div style={{ overflowX: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.73rem', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                  <th style={{ width: '25%', padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', letterSpacing: '0.04em' }}>
+                  <th style={{ width: '25%', padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.04em' }}>
                     RUBRIQUES &amp; NATURE DES VARIATIONS
                   </th>
                   {colonnes.map(col => (
@@ -248,10 +248,10 @@ export function CapitauxPropresView({ data, fmt }) {
                       key={col.key}
                       style={{
                         width: col.isTotal ? '12%' : '10.5%',
-                        padding: '8px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.66rem',
+                        padding: '8px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem',
                         letterSpacing: '0.02em', whiteSpace: 'normal', lineHeight: 1.2,
                         background: col.isTotal ? '#0f172a' : 'transparent',
-                        color: col.isTotal ? '#60a5fa' : '#ffffff',
+                        color: col.isTotal ? '#4fb3cc' : '#ffffff',
                         borderLeft: '1px solid rgba(255,255,255,0.08)'
                       }}
                     >
@@ -276,7 +276,7 @@ export function CapitauxPropresView({ data, fmt }) {
                   } else if (isCloture) {
                     rowBg = 'rgba(30, 64, 175, 0.12)';
                     rowFontWeight = 900;
-                    borderTopStyle = '2px solid #3b82f6';
+                    borderTopStyle = '2px solid #2e96b3';
                   } else if (isResultat) {
                     rowBg = 'rgba(16, 185, 129, 0.04)';
                     rowFontWeight = 700;
@@ -288,20 +288,20 @@ export function CapitauxPropresView({ data, fmt }) {
                       style={{
                         background: rowBg,
                         borderTop: borderTopStyle,
-                        borderBottom: isCloture ? '2px solid #1e3a8a' : '1px solid var(--border)',
+                        borderBottom: isCloture ? '2px solid #0b3446' : '1px solid var(--border)',
                         transition: 'background 0.1s'
                       }}
                     >
                       {/* Libellé de ligne */}
                       <td style={{
                         padding: '7px 10px', fontWeight: rowFontWeight,
-                        color: isCloture ? '#1e3a8a' : isOuverture ? '#1e40af' : 'var(--text)',
+                        color: isCloture ? '#0b3446' : isOuverture ? '#124f66' : 'var(--text)',
                         fontSize: isCloture ? '0.78rem' : '0.73rem',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                       }} title={row.libelle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {isCloture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2563eb', flexShrink: 0 }}>check_circle</span>}
-                          {isOuverture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#3b82f6', flexShrink: 0 }}>play_circle</span>}
+                          {isCloture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#1b6e8c', flexShrink: 0 }}>check_circle</span>}
+                          {isOuverture && <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2e96b3', flexShrink: 0 }}>play_circle</span>}
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.libelle}</span>
                         </div>
                       </td>
@@ -320,7 +320,7 @@ export function CapitauxPropresView({ data, fmt }) {
                               padding: '7px 6px', textAlign: 'right',
                               fontWeight: isTotalCol || isCloture || isOuverture ? 900 : 700,
                               fontSize: isCloture || isTotalCol ? '0.76rem' : '0.72rem',
-                              color: isNegative ? '#dc2626' : (isTotalCol ? (isCloture ? '#1e3a8a' : '#1e40af') : 'var(--text)'),
+                              color: isNegative ? '#dc2626' : (isTotalCol ? (isCloture ? '#0b3446' : '#124f66') : 'var(--text)'),
                               background: isTotalCol ? (isCloture ? 'rgba(37, 99, 235, 0.18)' : 'rgba(241, 245, 249, 0.6)') : 'transparent',
                               borderLeft: '1px solid var(--border)',
                               whiteSpace: 'nowrap',
@@ -341,7 +341,7 @@ export function CapitauxPropresView({ data, fmt }) {
 
           {/* Diagnostic & Note SCF */}
           <div style={{ padding: '12px 20px', background: 'var(--surface-alt)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
               <strong>Principe SCF &amp; IAS 1 :</strong> L'affectation (Ligne 2) porte exclusivement sur le <strong>résultat antérieur (N-1)</strong> décidé en Assemblée Générale (virement aux réserves, report à nouveau, dividendes). Le <strong>résultat net de l'exercice N</strong> (Ligne 5 : {fmtCurrency(kpis.resultatNet)}) s'ajoute en clôture (Compte 12) pour constituer les capitaux propres au 31 Décembre ({fmtCurrency(kpis.totalFin)}).
             </p>
             <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#059669', background: '#dcfce7', padding: '3px 8px', borderRadius: 6, border: '1px solid #86efac' }}>
@@ -373,8 +373,8 @@ export function CapitauxPropresView({ data, fmt }) {
                     contentStyle={{ background: 'var(--surface)', borderColor: 'var(--border)', borderRadius: 8, fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                  <Bar dataKey="Ouverture" fill="#93c5fd" radius={[4, 4, 0, 0]} name="Ouverture (1er Janv.)" />
-                  <Bar dataKey="Cloture"   fill="#2563eb" radius={[4, 4, 0, 0]} name="Clôture (31 Déc.)" />
+                  <Bar dataKey="Ouverture" fill="#8fc6d6" radius={[4, 4, 0, 0]} name="Ouverture (1er Janv.)" />
+                  <Bar dataKey="Cloture"   fill="#1b6e8c" radius={[4, 4, 0, 0]} name="Clôture (31 Déc.)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -396,10 +396,10 @@ export function CapitauxPropresView({ data, fmt }) {
                       border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                     }}>
                       <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text)' }}>{mov.libelle}</div>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Mouvement de la période</div>
+                        <div style={{ fontSize: '0.80rem', fontWeight: 800, color: 'var(--text)' }}>{mov.libelle}</div>
+                        <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>Mouvement de la période</div>
                       </div>
-                      <div className="mono" style={{ fontSize: '0.88rem', fontWeight: 900, color: val === 0 ? 'var(--text-muted)' : isPos ? '#059669' : '#dc2626' }}>
+                      <div className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: val === 0 ? 'var(--text-muted)' : isPos ? '#059669' : '#dc2626' }}>
                         {val > 0 ? '+' : ''}{fmtCurrency(val)}
                       </div>
                     </div>
@@ -431,7 +431,7 @@ export function CapitauxPropresView({ data, fmt }) {
               <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)' }}>
                 Grand Livre de la Classe 1 (Capitaux Propres &amp; Financements)
               </h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 Soldes d'ouverture, mouvements de l'exercice et soldes de clôture compte par compte
               </p>
             </div>
@@ -446,7 +446,7 @@ export function CapitauxPropresView({ data, fmt }) {
                 onChange={e => setSearchAccount(e.target.value)}
                 style={{
                   width: '100%', padding: '5px 10px 5px 28px', borderRadius: 6, border: '1px solid var(--border)',
-                  background: 'var(--surface)', fontSize: '0.75rem', outline: 'none', color: 'var(--text)'
+                  background: 'var(--surface)', fontSize: '0.74rem', outline: 'none', color: 'var(--text)'
                 }}
               />
             </div>
@@ -456,13 +456,13 @@ export function CapitauxPropresView({ data, fmt }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ width: '10%', padding: '8px 12px', textAlign: 'left', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)' }}>COMPTE</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)' }}>INTITULÉ DU COMPTE</th>
-                  <th style={{ width: '15%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)' }}>SOLDE DÉBUT</th>
-                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)' }}>MOUV. DÉBIT</th>
-                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)' }}>MOUV. CRÉDIT</th>
-                  <th style={{ width: '15%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem', borderRight: '1px solid var(--border)', background: 'rgba(37,99,235,0.05)', color: '#1e40af' }}>SOLDE FIN</th>
-                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.68rem' }}>VARIATION</th>
+                  <th style={{ width: '10%', padding: '8px 12px', textAlign: 'left', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>COMPTE</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>INTITULÉ DU COMPTE</th>
+                  <th style={{ width: '15%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>SOLDE DÉBUT</th>
+                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>MOUV. DÉBIT</th>
+                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>MOUV. CRÉDIT</th>
+                  <th style={{ width: '15%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', borderRight: '1px solid var(--border)', background: 'rgba(37,99,235,0.05)', color: '#124f66' }}>SOLDE FIN</th>
+                  <th style={{ width: '14%', padding: '8px 12px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem' }}>VARIATION</th>
                 </tr>
               </thead>
               <tbody>
@@ -474,12 +474,12 @@ export function CapitauxPropresView({ data, fmt }) {
                   </tr>
                 ) : filteredAccounts.map((a, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td className="mono" style={{ fontWeight: 800, color: '#1e40af', padding: '6px 12px', borderRight: '1px solid var(--border)' }}>{a.compte}</td>
+                    <td className="mono" style={{ fontWeight: 800, color: '#124f66', padding: '6px 12px', borderRight: '1px solid var(--border)' }}>{a.compte}</td>
                     <td style={{ padding: '6px 12px', fontWeight: 600, color: 'var(--text)', borderRight: '1px solid var(--border)' }}>{a.libelle}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', borderRight: '1px solid var(--border)' }}>{fmtN(a.soldeDebut)}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: '#64748b', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementDebit)}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', color: '#64748b', borderRight: '1px solid var(--border)' }}>{fmtN(a.mouvementCredit)}</td>
-                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, color: '#1e40af', background: 'rgba(37,99,235,0.03)', borderRight: '1px solid var(--border)' }}>{fmtN(a.soldeFin)}</td>
+                    <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, color: '#124f66', background: 'rgba(37,99,235,0.03)', borderRight: '1px solid var(--border)' }}>{fmtN(a.soldeFin)}</td>
                     <td className="mono" style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 800, color: a.variation >= 0 ? '#059669' : '#dc2626' }}>
                       {a.variation > 0 ? '+' : ''}{fmtN(a.variation)}
                     </td>

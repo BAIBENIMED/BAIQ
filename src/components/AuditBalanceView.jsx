@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { auditBalanceAccounts, auditCrossAccountMovements, autoMatchAccounts } from '../utils/financeCalculations';
+import { auditBalanceAccounts, auditCrossAccountMovements, autoMatchAccounts, safeNum } from '../utils/financeCalculations';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -26,14 +26,6 @@ export function AuditBalanceView({ rows, formatCurrency }) {
       .trim();
   };
 
-  const safeNum = (v) => {
-    if (v === undefined || v === null || v === '') return 0;
-    if (typeof v === 'number') return isNaN(v) ? 0 : v;
-    const s = String(v).replace(/\s/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
-
   const fmt = (v) => {
     const num = safeNum(v);
     return formatCurrency ? formatCurrency(num) : num.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' DA';
@@ -44,7 +36,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
       <div className="card fade-in" style={{ maxWidth: 450, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>fact_check</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Audit non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Veuillez d'abord importer une balance comptable pour exécuter l'audit SCF.</p>
+        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable pour exécuter l'audit SCF.</p>
       </div>
     );
   }
@@ -100,7 +92,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           <h1 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, color: 'var(--text)' }}>
             Audit Balance SCF
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Contrôle de cohérence des comptes selon le Système Comptable Financier algérien (Loi 07-11)
           </p>
         </div>
@@ -132,12 +124,12 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           {
             id: 'natures',
             badge: `${audit.total} Comptes`,
-            badgeColor: '#2563eb',
-            badgeBg: '#eff6ff',
+            badgeColor: '#1b6e8c',
+            badgeBg: '#f0f8fa',
             title: '1. Natures de Comptes & Soldes (SCF)',
             subtitle: 'Contrôle individuel du sens normal (Débit / Crédit)',
             icon: 'manage_accounts',
-            accent: '#2563eb'
+            accent: '#1b6e8c'
           },
           {
             id: 'flux',
@@ -202,7 +194,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{t.icon}</span>
                 </div>
                 <span style={{
-                  fontSize: '0.68rem', fontWeight: 800,
+                  fontSize: '0.70rem', fontWeight: 800,
                   padding: '2px 9px', borderRadius: 12,
                   background: isActive ? t.accent : t.badgeBg,
                   color: isActive ? '#ffffff' : t.badgeColor,
@@ -217,7 +209,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
               {/* Titre & Sous-titre */}
               <div style={{ marginTop: 2 }}>
                 <div style={{
-                  fontSize: '0.88rem', fontWeight: 900,
+                  fontSize: '0.92rem', fontWeight: 900,
                   color: isActive ? t.accent : 'var(--text)',
                   lineHeight: 1.25,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
@@ -225,7 +217,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   {t.title}
                 </div>
                 <div style={{
-                  fontSize: '0.71rem', fontWeight: 600,
+                  fontSize: '0.70rem', fontWeight: 600,
                   color: isActive ? 'var(--text)' : 'var(--text-muted)',
                   marginTop: 2,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -289,8 +281,8 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 style={{
                   padding: '5px 12px', borderRadius: 8, border: '1px solid', fontSize: '0.74rem', fontWeight: 800,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
-                  background: hideZeroAccounts ? '#eff6ff' : 'var(--surface-alt)',
-                  borderColor: hideZeroAccounts ? '#bfdbfe' : 'var(--border)',
+                  background: hideZeroAccounts ? '#f0f8fa' : 'var(--surface-alt)',
+                  borderColor: hideZeroAccounts ? '#b7dce6' : 'var(--border)',
                   color: hideZeroAccounts ? '#1d4ed8' : 'var(--text-sub)',
                   transition: 'all 0.15s'
                 }}
@@ -324,7 +316,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 }}
                 title="Exporter la liste filtrée au format CSV"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#2563eb' }}>download</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#1b6e8c' }}>download</span>
                 Exporter CSV
               </button>
             </div>
@@ -337,7 +329,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 placeholder="Chercher compte..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                style={{ width: '100%', padding: '6px 10px 6px 34px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-alt)', fontSize: '0.8rem', outline: 'none', color: 'var(--text)' }}
+                style={{ width: '100%', padding: '6px 10px 6px 34px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-alt)', fontSize: '0.80rem', outline: 'none', color: 'var(--text)' }}
               />
             </div>
           </div>
@@ -347,13 +339,13 @@ export function AuditBalanceView({ rows, formatCurrency }) {
             <table className="data-table compact-table grid-lines" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.70rem' }}>
               <thead style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
                 <tr>
-                  <th style={{ width: '7%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>COMPTE</th>
-                  <th style={{ width: '21%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>INTITULÉ DU COMPTE</th>
-                  <th style={{ width: '15%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>NATURE SCF</th>
-                  <th style={{ width: '11%', padding: '6px 2px', textAlign: 'center', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>STATUT</th>
-                  <th className="right" style={{ width: '11%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.64rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOLDE DÉBIT</th>
-                  <th className="right" style={{ width: '11%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.64rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOLDE CRÉDIT</th>
-                  <th style={{ width: '24%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em' }}>DIAGNOSTIC SCF</th>
+                  <th style={{ width: '7%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>COMPTE</th>
+                  <th style={{ width: '21%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>INTITULÉ DU COMPTE</th>
+                  <th style={{ width: '15%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>NATURE SCF</th>
+                  <th style={{ width: '11%', padding: '6px 2px', textAlign: 'center', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>STATUT</th>
+                  <th className="right" style={{ width: '11%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOLDE DÉBIT</th>
+                  <th className="right" style={{ width: '11%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOLDE CRÉDIT</th>
+                  <th style={{ width: '24%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em' }}>DIAGNOSTIC SCF</th>
                 </tr>
               </thead>
               <tbody>
@@ -366,10 +358,10 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 ) : paginatedAccounts.map((c, idx) => (
                   <tr key={idx} style={{ verticalAlign: 'top', borderBottom: '1px solid var(--border)' }}>
                     <td className="mono" style={{ fontWeight: 800, color: 'var(--primary)', padding: '5px 6px', fontSize: '0.70rem', borderRight: '1px solid var(--border)' }}>{c.compte}</td>
-                    <td style={{ padding: '5px 6px', fontSize: '0.69rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'normal', lineHeight: 1.25, wordBreak: 'break-word', borderRight: '1px solid var(--border)' }}>
+                    <td style={{ padding: '5px 6px', fontSize: '0.70rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'normal', lineHeight: 1.25, wordBreak: 'break-word', borderRight: '1px solid var(--border)' }}>
                       {cleanLibelle(c.libelle)}
                     </td>
-                    <td style={{ fontSize: '0.67rem', color: 'var(--text-muted)', padding: '5px 6px', whiteSpace: 'normal', lineHeight: 1.25, borderRight: '1px solid var(--border)' }}>
+                    <td style={{ fontSize: '0.65rem', color: 'var(--text-muted)', padding: '5px 6px', whiteSpace: 'normal', lineHeight: 1.25, borderRight: '1px solid var(--border)' }}>
                       {cleanLibelle(c.verification.nature) || '—'}
                     </td>
                     <td style={{ textAlign: 'center', padding: '5px 2px', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
@@ -396,14 +388,14 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                         <span>{c.verification.statut}</span>
                       </span>
                     </td>
-                    <td className="right mono" style={{ padding: '5px 8px', color: c.deb >= 1 ? '#60a5fa' : 'var(--text-muted)', fontWeight: c.deb >= 1 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
+                    <td className="right mono" style={{ padding: '5px 8px', color: c.deb >= 1 ? '#4fb3cc' : 'var(--text-muted)', fontWeight: c.deb >= 1 ? 800 : 400, fontSize: '0.74rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
                       {c.deb >= 1 ? Math.round(c.deb).toLocaleString('fr-FR') : '—'}
                     </td>
-                    <td className="right mono" style={{ padding: '5px 8px', color: c.cred >= 1 ? '#34d399' : 'var(--text-muted)', fontWeight: c.cred >= 1 ? 800 : 400, fontSize: '0.72rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
+                    <td className="right mono" style={{ padding: '5px 8px', color: c.cred >= 1 ? '#34d399' : 'var(--text-muted)', fontWeight: c.cred >= 1 ? 800 : 400, fontSize: '0.74rem', whiteSpace: 'nowrap', borderRight: '1px solid var(--border)' }}>
                       {c.cred >= 1 ? Math.round(c.cred).toLocaleString('fr-FR') : '—'}
                     </td>
                     <td style={{
-                      fontSize: '0.68rem',
+                      fontSize: '0.70rem',
                       color: statutColor(c.verification.statut),
                       padding: '5px 8px',
                       whiteSpace: 'normal',
@@ -422,26 +414,26 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           {/* Pagination */}
           {totalPages > 1 && pageSize !== 'all' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 12 }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 {startIndex + 1}–{endIndex} sur {totalItems} comptes
               </span>
               <div style={{ display: 'flex', gap: 4 }}>
                 <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                  className="btn btn-secondary" style={{ padding: '3px 10px', fontSize: '0.75rem' }}>←</button>
+                  className="btn btn-secondary" style={{ padding: '3px 10px', fontSize: '0.74rem' }}>←</button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const page = Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
                   return page <= totalPages ? (
                     <button key={page} onClick={() => setCurrentPage(page)}
-                      style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: currentPage === page ? 900 : 600, background: currentPage === page ? 'var(--primary)' : 'var(--surface-alt)', color: currentPage === page ? '#fff' : 'var(--text)', cursor: 'pointer' }}>
+                      style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: '0.74rem', fontWeight: currentPage === page ? 900 : 600, background: currentPage === page ? 'var(--primary)' : 'var(--surface-alt)', color: currentPage === page ? '#fff' : 'var(--text)', cursor: 'pointer' }}>
                       {page}
                     </button>
                   ) : null;
                 })}
                 <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                  className="btn btn-secondary" style={{ padding: '3px 10px', fontSize: '0.75rem' }}>→</button>
+                  className="btn btn-secondary" style={{ padding: '3px 10px', fontSize: '0.74rem' }}>→</button>
               </div>
               <select value={pageSize} onChange={e => { setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setCurrentPage(1); }}
-                style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)', fontSize: '0.75rem', background: 'var(--surface)', color: 'var(--text)' }}>
+                style={{ padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)', fontSize: '0.74rem', background: 'var(--surface)', color: 'var(--text)' }}>
                 {[25, 50, 100, 'all'].map(n => <option key={n} value={n}>{n === 'all' ? 'Tout afficher' : `${n} / page`}</option>)}
               </select>
             </div>
@@ -457,14 +449,14 @@ export function AuditBalanceView({ rows, formatCurrency }) {
           {/* Résumé flux — 4 cartes d'indicateurs sans score */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
             {[
-              { label: 'Règles vérifiées',  val: crossAudit.regles.length,     bg: 'rgba(59, 130, 246, 0.12)', bdr: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd' },
+              { label: 'Règles vérifiées',  val: crossAudit.regles.length,     bg: 'rgba(59, 130, 246, 0.12)', bdr: 'rgba(59, 130, 246, 0.25)', color: '#8fc6d6' },
               { label: 'Conformes',          val: crossAudit.totalConformesFlux, bg: 'rgba(16, 185, 129, 0.12)', bdr: 'rgba(16, 185, 129, 0.25)', color: '#34d399' },
               { label: 'Atypiques',          val: crossAudit.totalAtypiquesFlux, bg: 'rgba(245, 158, 11, 0.12)', bdr: 'rgba(245, 158, 11, 0.25)', color: '#fbbf24' },
               { label: 'Anomalies Flux',     val: crossAudit.totalAnomaliesFlux, bg: 'rgba(239, 68, 68, 0.12)', bdr: 'rgba(239, 68, 68, 0.25)', color: '#f87171' },
             ].map((s, i) => (
               <div key={i} className="card" style={{ padding: '8px 14px', background: s.bg, border: `1px solid ${s.bdr}`, borderRadius: 10 }}>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: s.color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{s.label}</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.val}</div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: s.color, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>{s.label}</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.val}</div>
               </div>
             ))}
           </div>
@@ -494,7 +486,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                     background: isSel ? '#1e293b' : 'var(--surface-alt)',
                     borderColor: isSel ? '#334155' : 'var(--border)',
-                    color: isSel ? '#38bdf8' : 'var(--text-muted)',
+                    color: isSel ? '#4fb3cc' : 'var(--text-muted)',
                     boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
                     transition: 'all 0.15s'
                   }}>
@@ -535,13 +527,13 @@ export function AuditBalanceView({ rows, formatCurrency }) {
             <table className="data-table compact-table grid-lines" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.70rem' }}>
               <thead style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
                 <tr>
-                  <th style={{ width: '11%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>CYCLE</th>
-                  <th style={{ width: '22%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>RÈGLE DE CONTRÔLE</th>
-                  <th style={{ width: '11%', padding: '6px 2px', textAlign: 'center', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>STATUT</th>
-                  <th className="right" style={{ width: '16%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.64rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOURCE</th>
-                  <th className="right" style={{ width: '16%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.64rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>CIBLE</th>
-                  <th className="right" style={{ width: '18%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.64rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>ÉCART</th>
-                  <th style={{ width: '6%', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.64rem', letterSpacing: '0.03em' }}>DÉTAIL</th>
+                  <th style={{ width: '11%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>CYCLE</th>
+                  <th style={{ width: '22%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>RÈGLE DE CONTRÔLE</th>
+                  <th style={{ width: '11%', padding: '6px 2px', textAlign: 'center', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>STATUT</th>
+                  <th className="right" style={{ width: '16%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>SOURCE</th>
+                  <th className="right" style={{ width: '16%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>CIBLE</th>
+                  <th className="right" style={{ width: '18%', padding: '6px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem', whiteSpace: 'nowrap', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>ÉCART</th>
+                  <th style={{ width: '6%', padding: '6px 4px', textAlign: 'center', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em' }}>DÉTAIL</th>
                 </tr>
               </thead>
               <tbody>
@@ -555,14 +547,14 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   <tr key={idx} style={{ verticalAlign: 'top', borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '6px 6px', borderRight: '1px solid var(--border)' }}>
                       <span style={{
-                        fontSize: '0.60rem', fontWeight: 800, padding: '2px 5px', borderRadius: 4,
-                        background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.3)',
+                        fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: 4,
+                        background: 'rgba(59, 130, 246, 0.15)', color: '#8fc6d6', border: '1px solid rgba(59, 130, 246, 0.3)',
                         display: 'inline-block', lineHeight: 1.2, whiteSpace: 'normal', wordBreak: 'break-word'
                       }}>
                         {r.cycle}
                       </span>
                     </td>
-                    <td style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--text)', borderRight: '1px solid var(--border)', fontSize: '0.68rem', whiteSpace: 'normal', lineHeight: 1.25, wordBreak: 'break-word' }}>
+                    <td style={{ padding: '6px 6px', fontWeight: 700, color: 'var(--text)', borderRight: '1px solid var(--border)', fontSize: '0.70rem', whiteSpace: 'normal', lineHeight: 1.25, wordBreak: 'break-word' }}>
                       {r.titre}
                     </td>
                     <td style={{ textAlign: 'center', padding: '6px 2px', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
@@ -587,10 +579,10 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                         {statutLabel(r.statut)}
                       </span>
                     </td>
-                    <td className="right mono" style={{ padding: '6px 8px', color: '#60a5fa', fontWeight: 800, whiteSpace: 'nowrap', fontSize: '0.72rem', borderRight: '1px solid var(--border)' }}>
+                    <td className="right mono" style={{ padding: '6px 8px', color: '#4fb3cc', fontWeight: 800, whiteSpace: 'nowrap', fontSize: '0.74rem', borderRight: '1px solid var(--border)' }}>
                       {Math.round(r.sourceVal || 0).toLocaleString('fr-FR')}
                     </td>
-                    <td className="right mono" style={{ padding: '6px 8px', color: '#34d399', fontWeight: 800, whiteSpace: 'nowrap', fontSize: '0.72rem', borderRight: '1px solid var(--border)' }}>
+                    <td className="right mono" style={{ padding: '6px 8px', color: '#34d399', fontWeight: 800, whiteSpace: 'nowrap', fontSize: '0.74rem', borderRight: '1px solid var(--border)' }}>
                       {Math.round(r.cibleVal || 0).toLocaleString('fr-FR')}
                     </td>
                     <td className="right mono" style={{ padding: '6px 8px', color: r.ecart < 1 ? '#34d399' : '#f87171', fontWeight: 900, whiteSpace: 'nowrap', fontSize: '0.74rem', borderRight: '1px solid var(--border)' }}>
@@ -600,13 +592,13 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                       <button
                         onClick={() => setSelectedRuleForDetail(r)}
                         style={{
-                          padding: '2px 8px', borderRadius: 5, border: '1px solid #3b82f6',
-                          background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
+                          padding: '2px 8px', borderRadius: 4, border: '1px solid #2e96b3',
+                          background: 'rgba(59, 130, 246, 0.15)', color: '#4fb3cc',
                           fontSize: '0.65rem', fontWeight: 900, cursor: 'pointer',
                           transition: 'all 0.15s'
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#2563eb'; e.currentTarget.style.color = '#ffffff'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; e.currentTarget.style.color = '#60a5fa'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#1b6e8c'; e.currentTarget.style.color = '#ffffff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; e.currentTarget.style.color = '#4fb3cc'; }}
                       >
                         Voir
                       </button>
@@ -645,10 +637,10 @@ function AccountTable({
   const someChecked = !allChecked && accounts.some(a => checked.has(String(a.compte)));
 
   const headerGradient = isSource
-    ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
+    ? 'linear-gradient(135deg, #0b3446 0%, #1b6e8c 100%)'
     : 'linear-gradient(135deg, #064e3b 0%, #059669 100%)';
-  const tagColor = isSource ? '#bfdbfe' : '#a7f3d0';
-  const codeColor = isSource ? '#60a5fa' : '#34d399';
+  const tagColor = isSource ? '#b7dce6' : '#a7f3d0';
+  const codeColor = isSource ? '#4fb3cc' : '#34d399';
   const accentBorder = isSource ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)';
   const thBg = isSource ? '#0f2744' : '#0a2e22';
 
@@ -678,14 +670,14 @@ function AccountTable({
         flexShrink: 0
       }}>
         <div>
-          <div style={{ fontSize: '0.6rem', fontWeight: 900, color: tagColor, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>
+          <div style={{ fontSize: '0.58rem', fontWeight: 900, color: tagColor, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 1 }}>
             {isSource ? '↗ FLUX SOURCE' : '↙ CONTREPARTIE'}
           </div>
-          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#ffffff' }}>{label}</div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff' }}>{label}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '0.58rem', color: tagColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>TOTAL CONTRÔLÉ</div>
-          <div className="mono" style={{ fontSize: '1.02rem', fontWeight: 900, color: '#ffffff' }}>{fmt(totalVal)}</div>
+          <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>{fmt(totalVal)}</div>
         </div>
       </div>
 
@@ -696,7 +688,7 @@ function AccountTable({
         overflowX: 'hidden',
         minHeight: 0
       }}>
-        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.74rem' }}>
           <thead>
             <tr style={{ background: thBg, color: '#94a3b8', position: 'sticky', top: 0, zIndex: 2 }}>
               <th style={{ width: '38px', padding: '6px 4px', borderBottom: `2px solid ${accentBorder}`, textAlign: 'center' }}>
@@ -705,19 +697,19 @@ function AccountTable({
                   checked={allChecked}
                   ref={el => { if (el) el.indeterminate = someChecked; }}
                   onChange={() => onToggleAll(allChecked)}
-                  style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
+                  style={{ cursor: 'pointer', accentColor: isSource ? '#2e96b3' : '#10b981', width: 14, height: 14 }}
                   title="Tout cocher / décocher"
                 />
               </th>
-              <th style={{ width: '17%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>COMPTE</th>
-              <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.67rem', color: '#cbd5e1', borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>INTITULÉ DU COMPTE</th>
-              <th style={{ width: '27%', padding: '6px 10px', textAlign: 'right', fontWeight: 900, fontSize: '0.67rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>{colLabel}</th>
+              <th style={{ width: '17%', padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>COMPTE</th>
+              <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', color: '#cbd5e1', borderBottom: `2px solid ${accentBorder}`, letterSpacing: '0.04em' }}>INTITULÉ DU COMPTE</th>
+              <th style={{ width: '27%', padding: '6px 10px', textAlign: 'right', fontWeight: 900, fontSize: '0.65rem', color: tagColor, borderBottom: `2px solid ${accentBorder}`, whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>{colLabel}</th>
             </tr>
           </thead>
           <tbody>
             {accounts.length === 0 ? (
               <tr>
-                <td colSpan="4" style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8', fontSize: '0.78rem' }}>
+                <td colSpan="4" style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8', fontSize: '0.80rem' }}>
                   {hasJointures
                     ? '✓ Tous les comptes de ce côté sont rapprochés dans le tableau des jointures ci-dessous'
                     : '⚪ Aucun compte avec mouvement > 0 DA'}
@@ -732,7 +724,7 @@ function AccountTable({
 
               if (isChecked) {
                 rowBg = isSource ? 'rgba(37, 99, 235, 0.22)' : 'rgba(16, 185, 129, 0.22)';
-                borderLeft = isSource ? '3px solid #3b82f6' : '3px solid #10b981';
+                borderLeft = isSource ? '3px solid #2e96b3' : '3px solid #10b981';
               }
 
               return (
@@ -761,7 +753,7 @@ function AccountTable({
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => onToggle(String(a.compte))}
-                      style={{ cursor: 'pointer', accentColor: isSource ? '#3b82f6' : '#10b981', width: 14, height: 14 }}
+                      style={{ cursor: 'pointer', accentColor: isSource ? '#2e96b3' : '#10b981', width: 14, height: 14 }}
                     />
                   </td>
                   <td className="mono" style={{ padding: '5px 8px', fontWeight: 800, color: codeColor, fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
@@ -769,7 +761,7 @@ function AccountTable({
                       <span>{a.compte}</span>
                       {joinedMap.has(String(a.compte)) && (
                         <span style={{
-                          fontSize: '0.56rem', fontWeight: 900, padding: '1px 4px', borderRadius: 3,
+                          fontSize: '0.58rem', fontWeight: 900, padding: '1px 4px', borderRadius: 4,
                           background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid #059669'
                         }}>
                           ✓ #{joinedMap.get(String(a.compte))}
@@ -785,7 +777,7 @@ function AccountTable({
                     color: 'var(--text)',
                     fontWeight: 600,
                     maxWidth: 0,
-                    fontSize: '0.73rem'
+                    fontSize: '0.74rem'
                   }} title={a.libelle}>
                     {a.libelle}
                   </td>
@@ -795,7 +787,7 @@ function AccountTable({
                     fontWeight: 800,
                     color: 'var(--text)',
                     whiteSpace: 'nowrap',
-                    fontSize: '0.8rem'
+                    fontSize: '0.80rem'
                   }}>
                     {fmtN(amount)}
                   </td>
@@ -806,18 +798,18 @@ function AccountTable({
           {accounts.length > 0 && (
             <tfoot>
               <tr style={{ background: thBg, borderTop: `2px solid ${accentBorder}` }}>
-                <td colSpan="2" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.73rem', color: '#ffffff' }}>
+                <td colSpan="2" style={{ padding: '6px 8px', fontWeight: 900, fontSize: '0.74rem', color: '#ffffff' }}>
                   TOTAL ({accounts.length} compte{accounts.length > 1 ? 's' : ''})
                   {checked.size > 0 && (
-                    <span style={{ marginLeft: 8, fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: isSource ? '#2563eb' : '#059669', color: '#ffffff' }}>
+                    <span style={{ marginLeft: 8, fontSize: '0.65rem', fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: isSource ? '#1b6e8c' : '#059669', color: '#ffffff' }}>
                       {checked.size} sélectionné{checked.size > 1 ? 's' : ''}
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.68rem', color: tagColor, fontWeight: 800 }}>
-                  Solde net : <strong className="mono" style={{ color: '#ffffff', fontSize: '0.76rem' }}>{fmt(totalVal)}</strong>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: '0.70rem', color: tagColor, fontWeight: 800 }}>
+                  Solde net : <strong className="mono" style={{ color: '#ffffff', fontSize: '0.74rem' }}>{fmt(totalVal)}</strong>
                 </td>
-                <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#ffffff', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+                <td className="mono" style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 900, color: '#ffffff', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                   {fmtN(sumTotal)}
                 </td>
               </tr>
@@ -1019,7 +1011,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
       <div style={{
         width: '100%', maxWidth: 1400, maxHeight: '98vh', height: '94vh',
         background: 'var(--surface)',
-        borderRadius: 14,
+        borderRadius: 16,
         boxShadow: '0 32px 64px -16px rgba(0,0,0,0.65)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
@@ -1036,11 +1028,11 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
         }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.64rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: 'rgba(59, 130, 246, 0.25)', color: '#8fc6d6', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 {rule.cycle}
               </span>
               <span style={{
-                fontSize: '0.64rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4,
+                fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4,
                 background: isOk ? 'rgba(16, 185, 129, 0.25)' : isAno ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)',
                 color: isOk ? '#6ee7b7' : isAno ? '#fca5a5' : '#fde68a',
                 border: `1px solid ${isOk ? '#059669' : isAno ? '#dc2626' : '#d97706'}`
@@ -1048,7 +1040,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 {isOk ? '✓ CONFORME' : isAno ? '✕ ANOMALIE' : '△ ATYPIQUE'}
               </span>
             </div>
-            <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {rule.titre}
             </h3>
           </div>
@@ -1057,13 +1049,13 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Source</div>
-                <div className="mono" style={{ fontSize: '0.9rem', fontWeight: 900, color: '#60a5fa' }}>{fmt(rule.sourceVal)}</div>
+                <div className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: '#4fb3cc' }}>{fmt(rule.sourceVal)}</div>
               </div>
               {hasCible && (<>
-                <span style={{ color: '#64748b', fontSize: '1.0rem', fontWeight: 900 }}>⇔</span>
+                <span style={{ color: '#64748b', fontSize: '1rem', fontWeight: 900 }}>⇔</span>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Cible</div>
-                  <div className="mono" style={{ fontSize: '0.9rem', fontWeight: 900, color: '#34d399' }}>{fmt(rule.cibleVal)}</div>
+                  <div className="mono" style={{ fontSize: '0.92rem', fontWeight: 900, color: '#34d399' }}>{fmt(rule.cibleVal)}</div>
                 </div>
               </>)}
               <div style={{
@@ -1109,7 +1101,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 onChange={e => setFilterText(e.target.value)}
                 style={{
                   padding: '4px 10px 4px 28px', borderRadius: 6, border: '1px solid var(--border)',
-                  background: 'var(--surface)', fontSize: '0.73rem', outline: 'none', color: 'var(--text)', width: 200
+                  background: 'var(--surface)', fontSize: '0.74rem', outline: 'none', color: 'var(--text)', width: 200
                 }}
               />
             </div>
@@ -1118,15 +1110,15 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
               <button
                 onClick={runSmartAutoMatch}
                 style={{
-                  padding: '5px 12px', borderRadius: 6, border: '1px solid #3b82f6',
+                  padding: '5px 12px', borderRadius: 6, border: '1px solid #2e96b3',
                   background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.35) 100%)',
-                  color: '#93c5fd', fontSize: '0.73rem', fontWeight: 900, cursor: 'pointer',
+                  color: '#8fc6d6', fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6,
                   boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
                 }}
                 title="Rapprochement automatique intelligent (symétrie de racines SCF, suffixes 68x/28x, montants et libellés)"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#60a5fa' }}>auto_fix_high</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#4fb3cc' }}>auto_fix_high</span>
                 <span>⚡ Jointure Automatique (SCF)</span>
               </button>
             )}
@@ -1138,7 +1130,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 border: `1px solid ${showZeroInModal ? 'var(--primary)' : 'var(--border)'}`,
                 background: showZeroInModal ? 'var(--primary)' : 'var(--surface)',
                 color: showZeroInModal ? '#ffffff' : 'var(--text-muted)',
-                fontSize: '0.71rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
               }}
               title="Afficher ou masquer les comptes non mouvementés (0 DA)"
             >
@@ -1148,11 +1140,11 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
 
             {/* ── Indicateur debug comptes bruts ── */}
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700 }}>Collectés :</span>
+              <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>Collectés :</span>
               <span style={{
                 padding: '2px 7px', borderRadius: 4,
-                background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
-                fontSize: '0.68rem', fontWeight: 900, border: '1px solid rgba(59, 130, 246, 0.3)'
+                background: 'rgba(59, 130, 246, 0.15)', color: '#4fb3cc',
+                fontSize: '0.70rem', fontWeight: 900, border: '1px solid rgba(59, 130, 246, 0.3)'
               }}>
                 ↗ {rule.sourceAccounts?.length ?? 0} cpt(s) source
               </span>
@@ -1160,7 +1152,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 <span style={{
                   padding: '2px 7px', borderRadius: 4,
                   background: 'rgba(16, 185, 129, 0.15)', color: '#34d399',
-                  fontSize: '0.68rem', fontWeight: 900, border: '1px solid rgba(16, 185, 129, 0.3)'
+                  fontSize: '0.70rem', fontWeight: 900, border: '1px solid rgba(16, 185, 129, 0.3)'
                 }}>
                   ↙ {rule.cibleAccounts?.length ?? 0} cpt(s) cible
                 </span>
@@ -1173,7 +1165,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
               <button
                 onClick={createJointure}
                 style={{
-                  padding: '5px 12px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#ffffff',
+                  padding: '5px 12px', borderRadius: 6, border: 'none', background: '#1b6e8c', color: '#ffffff',
                   fontSize: '0.74rem', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
                   boxShadow: '0 2px 8px rgba(37,99,235,0.4)'
                 }}
@@ -1188,7 +1180,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 onClick={clearSelection}
                 style={{
                   padding: '4px 8px', borderRadius: 6, border: '1px solid #f87171', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171',
-                  fontSize: '0.71rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                  fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>cancel</span>
@@ -1266,41 +1258,41 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#38bdf8' }}>join_inner</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#4fb3cc' }}>join_inner</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#4fb3cc', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   Tableau des Jointures & Rapprochements ({jointures.length})
                 </span>
               </div>
 
               {jointures.length > 0 && (
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 5, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #1e40af', color: '#93c5fd' }}>
-                    Pointé Source : <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.78rem' }}>{fmt(totalJointuresSrc)}</strong>
+                  <span style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #124f66', color: '#8fc6d6' }}>
+                    Pointé Source : <strong className="mono" style={{ color: '#4fb3cc', fontSize: '0.80rem' }}>{fmt(totalJointuresSrc)}</strong>
                   </span>
-                  <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
-                    Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.78rem' }}>{fmt(totalJointuresTgt)}</strong>
+                  <span style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 4, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #065f46', color: '#6ee7b7' }}>
+                    Pointé Cible : <strong className="mono" style={{ color: '#34d399', fontSize: '0.80rem' }}>{fmt(totalJointuresTgt)}</strong>
                   </span>
                   <span style={{
-                    fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
+                    fontSize: '0.74rem', padding: '3px 8px', borderRadius: 4,
                     background: resteSrcNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                     border: `1px solid ${resteSrcNonPointe > 1 ? '#dc2626' : '#059669'}`,
                     color: resteSrcNonPointe > 1 ? '#fca5a5' : '#34d399'
                   }}>
-                    Reste Source : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmt(resteSrcNonPointe)}</strong>
+                    Reste Source : <strong className="mono" style={{ fontSize: '0.80rem' }}>{fmt(resteSrcNonPointe)}</strong>
                   </span>
                   <span style={{
-                    fontSize: '0.72rem', padding: '3px 8px', borderRadius: 4,
+                    fontSize: '0.74rem', padding: '3px 8px', borderRadius: 4,
                     background: resteTgtNonPointe > 1 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                     border: `1px solid ${resteTgtNonPointe > 1 ? '#dc2626' : '#059669'}`,
                     color: resteTgtNonPointe > 1 ? '#fca5a5' : '#34d399'
                   }}>
-                    Reste Cible : <strong className="mono" style={{ fontSize: '0.78rem' }}>{fmt(resteTgtNonPointe)}</strong>
+                    Reste Cible : <strong className="mono" style={{ fontSize: '0.80rem' }}>{fmt(resteTgtNonPointe)}</strong>
                   </span>
                   <button
                     onClick={() => { setJointures([]); setNextJointureId(1); }}
                     style={{
                       background: 'rgba(255,255,255,0.06)', border: '1px solid #475569', color: '#cbd5e1',
-                      borderRadius: 5, padding: '3px 8px', fontSize: '0.70rem', cursor: 'pointer', fontWeight: 800,
+                      borderRadius: 4, padding: '3px 8px', fontSize: '0.70rem', cursor: 'pointer', fontWeight: 800,
                       transition: 'all 0.15s'
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#f87171'; }}
@@ -1315,18 +1307,18 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
             {jointures.length === 0 ? (
               <div style={{
                 padding: '16px 20px', background: 'rgba(255,255,255,0.03)', borderRadius: 8,
-                border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem'
+                border: '1px dashed #334155', textAlign: 'center', color: '#94a3b8', fontSize: '0.80rem'
               }}>
                 💡 Cliquez sur <strong>« ⚡ Jointure Automatique (SCF) »</strong> ci-dessus pour rapprocher automatiquement vos comptes, ou cochez des comptes pour une jointure manuelle.
               </div>
             ) : (
               <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', tableLayout: 'fixed' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
                   <thead>
                     <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
                       <th style={{ width: '65px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>
-                      <th style={{ width: '26%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#93c5fd' }}>SOURCE POINTÉE</th>
-                      <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#60a5fa', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
+                      <th style={{ width: '26%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#8fc6d6' }}>SOURCE POINTÉE</th>
+                      <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#4fb3cc', whiteSpace: 'nowrap' }}>TOTAL SOURCE</th>
                       <th style={{ width: '26%', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem', color: '#6ee7b7' }}>CONTREPARTIE POINTÉE</th>
                       <th style={{ width: '13%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#34d399', whiteSpace: 'nowrap' }}>TOTAL CIBLE</th>
                       <th style={{ width: '11%', padding: '7px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.70rem', color: '#fca5a5', whiteSpace: 'nowrap' }}>ÉCART</th>
@@ -1340,16 +1332,16 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                       <td style={{ padding: '6px 6px', verticalAlign: 'top' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
                           <span style={{
-                            fontSize: '0.68rem', fontWeight: 900, padding: '2px 6px', borderRadius: 4,
-                            background: '#1e3a8a', color: '#93c5fd', border: '1px solid #3b82f6', display: 'inline-block'
+                            fontSize: '0.70rem', fontWeight: 900, padding: '2px 6px', borderRadius: 4,
+                            background: '#0b3446', color: '#8fc6d6', border: '1px solid #2e96b3', display: 'inline-block'
                           }}>
                             #{j.id}
                           </span>
                           {j.methode && (
                             <span style={{
-                              fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: 3,
+                              fontSize: '0.58rem', fontWeight: 800, padding: '1px 4px', borderRadius: 4,
                               background: j.badgeColor ? `${j.badgeColor}25` : 'rgba(59, 130, 246, 0.15)',
-                              color: j.badgeColor || '#60a5fa',
+                              color: j.badgeColor || '#4fb3cc',
                               border: `1px solid ${j.badgeColor ? `${j.badgeColor}50` : 'rgba(59, 130, 246, 0.3)'}`,
                               whiteSpace: 'nowrap'
                             }} title={j.methode}>
@@ -1363,7 +1355,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {j.sources.map((s, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                              <strong className="mono" style={{ color: '#60a5fa', fontSize: '0.80rem', flexShrink: 0 }}>{s.compte}</strong>
+                              <strong className="mono" style={{ color: '#4fb3cc', fontSize: '0.80rem', flexShrink: 0 }}>{s.compte}</strong>
                               <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.74rem' }} title={s.libelle}>
                                 {s.libelle ? `(${s.libelle})` : ''}
                               </span>
@@ -1376,7 +1368,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           ))}
                         </div>
                       </td>
-                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#60a5fa', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#4fb3cc', fontSize: '0.85rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                         {fmtN(j.totalSource)}
                       </td>
                       {/* Target accounts — multi-lignes */}
@@ -1397,18 +1389,18 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           ))}
                         </div>
                       </td>
-                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                      <td className="mono" style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.85rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                         {fmtN(j.totalCible)}
                       </td>
                       <td className="mono" style={{
                         padding: '8px 8px', textAlign: 'right', fontWeight: 900,
-                        color: j.isEquilibre ? '#34d399' : '#f87171', fontSize: '0.84rem', verticalAlign: 'top', whiteSpace: 'nowrap'
+                        color: j.isEquilibre ? '#34d399' : '#f87171', fontSize: '0.85rem', verticalAlign: 'top', whiteSpace: 'nowrap'
                       }}>
                         {fmtN(j.ecart)}
                       </td>
                       <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
                         <span style={{
-                          fontSize: '0.66rem', fontWeight: 900, padding: '3px 6px', borderRadius: 4,
+                          fontSize: '0.65rem', fontWeight: 900, padding: '3px 6px', borderRadius: 4,
                           whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3,
                           background: j.isEquilibre ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                           color: j.isEquilibre ? '#34d399' : '#f87171',
@@ -1422,7 +1414,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                           onClick={() => deleteJointure(j.id)}
                           style={{
                             background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)',
-                            color: '#f87171', cursor: 'pointer', padding: '4px 6px', borderRadius: 5,
+                            color: '#f87171', cursor: 'pointer', padding: '4px 6px', borderRadius: 4,
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.15s'
                           }}
@@ -1439,10 +1431,10 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 <tfoot>
                   <tr style={{ background: '#0f172a', borderTop: '2px solid #334155', fontWeight: 900 }}>
                     <td colSpan="2" style={{ padding: '6px 6px', color: '#ffffff' }}>TOTAL POINTÉ ({jointures.length})</td>
-                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: '#60a5fa', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresSrc)}</td>
+                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: '#4fb3cc', fontSize: '0.80rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresSrc)}</td>
                     <td></td>
-                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: '#34d399', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresTgt)}</td>
-                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: totalJointuresEcart < 1 ? '#34d399' : '#f87171', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresEcart)}</td>
+                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: '#34d399', fontSize: '0.80rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresTgt)}</td>
+                    <td className="mono" style={{ padding: '6px 6px', textAlign: 'right', color: totalJointuresEcart < 1 ? '#34d399' : '#f87171', fontSize: '0.80rem', whiteSpace: 'nowrap' }}>{fmtN(totalJointuresEcart)}</td>
                     <td colSpan="2"></td>
                   </tr>
                 </tfoot>
@@ -1461,14 +1453,14 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
           flexWrap: 'wrap', gap: 8, flexShrink: 0
         }}>
           {rule.explication && (
-            <p style={{ margin: 0, fontSize: '0.73rem', color: 'var(--text-muted)', maxWidth: '75%', lineHeight: 1.35 }}>
+            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', maxWidth: '75%', lineHeight: 1.35 }}>
               <span style={{ fontWeight: 800, color: 'var(--text)' }}>Diagnostic : </span>{rule.explication}
             </p>
           )}
           <button
             onClick={onClose}
             className="btn btn-primary"
-            style={{ padding: '6px 20px', fontSize: '0.78rem', fontWeight: 800, borderRadius: 6, marginLeft: 'auto' }}
+            style={{ padding: '6px 20px', fontSize: '0.80rem', fontWeight: 800, borderRadius: 6, marginLeft: 'auto' }}
           >
             Fermer
           </button>

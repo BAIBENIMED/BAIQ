@@ -82,10 +82,10 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
           alignItems: 'center'
         }}>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em', marginBottom: 2 }}>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.05em', marginBottom: 2 }}>
               Détail &amp; Drill-down du Poste (SCF)
             </div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>
               {title}
             </h3>
           </div>
@@ -106,11 +106,11 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
         <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="badge badge-blue" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+              <span className="badge badge-blue" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
                 {matchingRows.length} compte{matchingRows.length > 1 ? 's' : ''} sous-jacent{matchingRows.length > 1 ? 's' : ''}
               </span>
               {accountPrefixes.length > 0 && (
-                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-sub)', background: 'var(--surface-alt)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <span className="mono" style={{ fontSize: '0.74rem', color: 'var(--text-sub)', background: 'var(--surface-alt)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
                   Prefix: {accountPrefixes.join(', ')}
                 </span>
               )}
@@ -135,7 +135,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
               style={{
                 width: '100%', padding: '8px 12px 8px 34px', borderRadius: 8,
                 border: '1px solid var(--border)', background: 'var(--surface-alt)',
-                fontSize: '0.8rem', outline: 'none', color: 'var(--text)'
+                fontSize: '0.80rem', outline: 'none', color: 'var(--text)'
               }}
             />
             {searchQuery && (
@@ -154,7 +154,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
               <p style={{ margin: 0, fontWeight: 600 }}>Aucun compte trouvé pour ce poste.</p>
             </div>
           ) : (
-            <table className="data-table" style={{ width: '100%', fontSize: '0.78rem' }}>
+            <table className="data-table" style={{ width: '100%', fontSize: '0.80rem' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface-alt)' }}>
                 <tr>
                   <th style={{ width: '90px' }}>COMPTE</th>
@@ -187,7 +187,7 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
                       <td className="right mono">
                         {cred > 0.01 ? fmt(cred) : <span style={{ color: 'var(--text-sub)' }}>—</span>}
                       </td>
-                      <td className="right mono" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <td className="right mono" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                         {pct}%
                       </td>
                     </tr>
@@ -206,11 +206,11 @@ export function AccountDetailDrawer({ isOpen, onClose, title, accountPrefixes = 
           display: 'flex',
           justify: 'space-between',
           alignItems: 'center',
-          fontSize: '0.75rem',
+          fontSize: '0.74rem',
           color: 'var(--text-muted)'
         }}>
           <span>Source: Balance Comptable SCF</span>
-          <button className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '4px 12px' }} onClick={onClose}>
+          <button className="btn btn-ghost" style={{ fontSize: '0.74rem', padding: '4px 12px' }} onClick={onClose}>
             Fermer le détail
           </button>
         </div>

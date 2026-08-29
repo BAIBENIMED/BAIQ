@@ -21,7 +21,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
       <div style={{ padding: '48px 32px', textAlign: 'center' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_tree</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Bilan non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Veuillez importer une balance comptable.</p>
+        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez importer une balance comptable.</p>
       </div>
     </div>
   );
@@ -48,21 +48,21 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
           <div style={{ display: 'flex', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
             <button
               onClick={() => setViewMode('single')}
-              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'single' ? 'var(--primary)' : 'transparent', color: viewMode === 'single' ? '#fff' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'single' ? 'var(--primary)' : 'transparent', color: viewMode === 'single' ? '#fff' : 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
             >
               Exercice N
             </button>
             {hasN1 && (
               <button
                 onClick={() => setViewMode('comparative')}
-                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'comparative' ? 'var(--primary)' : 'transparent', color: viewMode === 'comparative' ? '#fff' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'comparative' ? 'var(--primary)' : 'transparent', color: viewMode === 'comparative' ? '#fff' : 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 📊 N vs N-1
               </button>
             )}
             <button
               onClick={() => setViewMode('history')}
-              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'history' ? 'var(--primary)' : 'transparent', color: viewMode === 'history' ? '#fff' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: viewMode === 'history' ? 'var(--primary)' : 'transparent', color: viewMode === 'history' ? '#fff' : 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
             >
               📈 Historique N-2
             </button>
@@ -78,15 +78,15 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
         /* ── 📊 MODE HISTORIQUE N vs N-1 vs N-2 ── */
         <div className="fade-in space-y-6">
           <div className="card" style={{ padding: 24 }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 800 }}>Analyse Graphique des Tendances (3 ans)</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0 0 20px 0' }}>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 800 }}>Analyse Graphique des Tendances (3 ans)</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.80rem', margin: '0 0 20px 0' }}>
               Visualisation pluriannuelle de l'équilibre financier (Fonds de Roulement, Besoin en FR, Trésorerie Nette).
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
               {/* Ajustement Manuel de N-2 */}
               <div style={{ background: 'var(--surface-alt)', padding: 18, borderRadius: 12, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)' }}>tune</span>
                   Ajuster l'Exercice N-2
                 </span>
@@ -102,7 +102,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                     max={Math.max(frngN2 * 1.8, 1000000)}
                     value={frngN2}
                     onChange={e => setFrngN2(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: '#2563eb' }}
+                    style={{ width: '100%', accentColor: '#1b6e8c' }}
                   />
                 </div>
 
@@ -152,8 +152,8 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                     <XAxis dataKey="year" style={{ fontSize: '0.7rem' }} />
                     <YAxis style={{ fontSize: '0.7rem' }} tickFormatter={v => `${(v/1000000).toFixed(1)}M`} />
                     <Tooltip formatter={v => fmt(v)} />
-                    <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
-                    <Line type="monotone" dataKey="FRNG" stroke="#2563eb" strokeWidth={3} activeDot={{ r: 8 }} />
+                    <Legend wrapperStyle={{ fontSize: '0.74rem' }} />
+                    <Line type="monotone" dataKey="FRNG" stroke="#1b6e8c" strokeWidth={3} activeDot={{ r: 8 }} />
                     <Line type="monotone" dataKey="BFR" stroke="#d97706" strokeWidth={3} />
                     <Line type="monotone" dataKey="Trésorerie Nette" stroke="#059669" strokeWidth={3} />
                   </LineChart>
@@ -176,7 +176,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                 </thead>
                 <tbody>
                   {[
-                    { label: 'Fonds de Roulement (FRNG)', valN2: frngN2, valN1: hasN1 ? dataN1.bilan.frng : data.frng * 0.9, valN: data.frng, color: '#2563eb' },
+                    { label: 'Fonds de Roulement (FRNG)', valN2: frngN2, valN1: hasN1 ? dataN1.bilan.frng : data.frng * 0.9, valN: data.frng, color: '#1b6e8c' },
                     { label: 'Besoin en FR (BFR)', valN2: bfrN2, valN1: hasN1 ? dataN1.bilan.bfr : data.bfr * 0.9, valN: data.bfr, color: '#d97706' },
                     { label: 'Trésorerie Nette (TN)', valN2: tnN2, valN1: hasN1 ? dataN1.bilan.tn : data.tn * 0.9, valN: data.tn, color: '#059669' }
                   ].map((item, idx) => {
@@ -208,11 +208,11 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
           {/* KPI Cards */}
           <div className="grid-3">
             {[
-              { label: 'FRNG', sub: 'Fonds de Roulement Net Global', value: data.frng, valN1: dataN1?.bilan?.frng, good: data.frng >= 0, icon: 'account_balance_wallet', tag: data.frng >= 0 ? 'Excédent' : 'Déficit', color: data.frng >= 0 ? '#059669' : '#dc2626' },
-              { label: 'BFR', sub: 'Besoin en Fonds de Roulement', value: data.bfr, valN1: dataN1?.bilan?.bfr, good: true, icon: 'sync_alt', tag: 'Besoin', color: '#d97706' },
-              { label: 'Trésorerie Nette', sub: 'Disponibilités réelles', value: data.tn, valN1: dataN1?.bilan?.tn, good: data.tn >= 0, icon: 'payments', tag: data.tn >= 0 ? 'Solide' : 'Tension', color: data.tn >= 0 ? '#2563eb' : '#dc2626' },
+              { label: 'FRNG', sub: 'Fonds de Roulement Net Global', value: data.frng, valN1: dataN1?.bilan?.frng, good: data.frng >= 0, icon: 'account_balance_wallet', tag: data.frng >= 0 ? 'Excédent' : 'Déficit', color: data.frng >= 0 ? '#059669' : '#dc2626', status: data.frng >= 0 ? 'kpi-good' : 'kpi-bad' },
+              { label: 'BFR', sub: 'Besoin en Fonds de Roulement', value: data.bfr, valN1: dataN1?.bilan?.bfr, good: true, icon: 'sync_alt', tag: 'Besoin', color: '#d97706', status: 'kpi-warning' },
+              { label: 'Trésorerie Nette', sub: 'Disponibilités réelles', value: data.tn, valN1: dataN1?.bilan?.tn, good: data.tn >= 0, icon: 'payments', tag: data.tn >= 0 ? 'Solide' : 'Tension', color: data.tn >= 0 ? '#1b6e8c' : '#dc2626', status: data.tn >= 0 ? 'kpi-good' : 'kpi-bad' },
             ].map((k, i) => (
-              <div key={i} className="kpi-card" style={{ position: 'relative', overflow: 'hidden' }}>
+              <div key={i} className={`kpi-card ${k.status}`} style={{ position: 'relative', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <span className="kpi-label">{k.label}</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: k.color, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -222,11 +222,11 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                 </div>
                 <div className="kpi-value" style={{ color: k.color }}>{fmt(k.value)}</div>
                 {hasN1 && k.valN1 !== undefined && (
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 4 }}>
                     N-1: <strong>{fmt(k.valN1)}</strong> ({fmtPct(k.valN1 ? ((k.value - k.valN1) / Math.abs(k.valN1)) * 100 : 0)})
                   </div>
                 )}
-                <div style={{ marginTop: 4, fontSize: '0.72rem', color: '#94a3b8' }}>{k.sub}</div>
+                <div style={{ marginTop: 4, fontSize: '0.74rem', color: '#94a3b8' }}>{k.sub}</div>
               </div>
             ))}
           </div>
@@ -252,8 +252,8 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style={{ background: '#eff6ff' }}>
-                    <td colSpan={isComparative ? 6 : 3} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1e3a8a' }}>I. ACTIF (EMPLOIS)</td>
+                  <tr style={{ background: '#f0f8fa' }}>
+                    <td colSpan={isComparative ? 6 : 3} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#0b3446' }}>I. ACTIF (EMPLOIS)</td>
                   </tr>
                   {[
                     { label: 'Emplois Stables (Immobilisations brut)', val: data.emploisStables, valN1: dataN1?.bilan?.emploisStables, prefixes: ['2'], exclude: ['28', '29'] },
@@ -270,7 +270,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                         {isComparative && <td className="right mono" style={{ color: diff >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{diff > 0 ? '+' : ''}{fmt(diff)}</td>}
                         {isComparative && <td className="right mono" style={{ color: diff >= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtPct(pct)}</td>}
                         <td style={{ textAlign: 'center' }}>
-                          <span className="badge badge-blue" style={{ fontSize: '0.62rem', cursor: 'pointer' }}>
+                          <span className="badge badge-blue" style={{ fontSize: '0.65rem', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 11 }}>visibility</span> Voir
                           </span>
                         </td>
@@ -295,7 +295,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                         {isComparative && <td className="right mono" style={{ color: diff <= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{diff > 0 ? '+' : ''}{fmt(diff)}</td>}
                         {isComparative && <td className="right mono" style={{ color: diff <= 0 ? 'var(--green)' : 'var(--red)' }}>{fmtPct(pct)}</td>}
                         <td style={{ textAlign: 'center' }}>
-                          <span className="badge badge-blue" style={{ fontSize: '0.62rem', cursor: 'pointer' }}>
+                          <span className="badge badge-blue" style={{ fontSize: '0.65rem', cursor: 'pointer' }}>
                             <span className="material-symbols-outlined" style={{ fontSize: 11 }}>visibility</span> Voir
                           </span>
                         </td>
@@ -305,8 +305,8 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e40af' }}>TOTAL BILAN (ACTIF / PASSIF)</td>
-                    <td className="right" style={{ color: '#1e40af', fontSize: '1rem' }}>{fmt(totalActifN)}</td>
+                    <td style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#124f66' }}>TOTAL BILAN (ACTIF / PASSIF)</td>
+                    <td className="right" style={{ color: '#124f66', fontSize: '1rem' }}>{fmt(totalActifN)}</td>
                     {isComparative && <td className="right mono">{fmt(totalActifN1)}</td>}
                     {isComparative && <td className="right mono">{fmt(totalActifN - totalActifN1)}</td>}
                     {isComparative && <td className="right mono">{fmtPct(totalActifN1 ? ((totalActifN - totalActifN1) / totalActifN1) * 100 : 0)}</td>}
@@ -321,22 +321,22 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
           <div className="card">
             <div className="card-header">
               <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>balance</span>
+                <span className="material-symbols-outlined" style={{ color: '#1b6e8c', fontSize: 20 }}>balance</span>
                 Équilibre Financier
               </h3>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { title: 'FRNG = Ressources Stables − Emplois Stables', val: fmt(data.frng), color: '#2563eb', note: data.frng >= 0 ? "Les ressources stables couvrent l'intégralité des emplois stables, générant un surplus de sécurité." : "Les emplois stables dépassent les ressources stables, créant un déficit de structure." },
+                { title: 'FRNG = Ressources Stables − Emplois Stables', val: fmt(data.frng), color: '#1b6e8c', note: data.frng >= 0 ? "Les ressources stables couvrent l'intégralité des emplois stables, générant un surplus de sécurité." : "Les emplois stables dépassent les ressources stables, créant un déficit de structure." },
                 { title: 'BFR = Actif Circulant − Passif Circulant', val: fmt(data.bfr), color: 'var(--text)', note: "Décalage de trésorerie entre le paiement des fournisseurs et l'encaissement des ventes." },
-                { title: 'TN = FRNG − BFR', val: fmt(data.tn), color: '#2563eb', note: data.tn >= 0 ? "L'excédent du FRNG est suffisant pour financer le BFR, laissant une trésorerie disponible." : "Le BFR absorbe tout le FRNG et nécessite des concours bancaires de court terme.", blue: true },
+                { title: 'TN = FRNG − BFR', val: fmt(data.tn), color: '#1b6e8c', note: data.tn >= 0 ? "L'excédent du FRNG est suffisant pour financer le BFR, laissant une trésorerie disponible." : "Le BFR absorbe tout le FRNG et nécessite des concours bancaires de court terme.", blue: true },
               ].map((item, i) => (
-                <div key={i} style={{ padding: '14px 18px', borderRadius: 10, border: `1px solid ${item.blue ? '#bfdbfe' : 'var(--border)'}`, background: item.blue ? '#eff6ff' : 'var(--surface-alt)' }}>
+                <div key={i} style={{ padding: '14px 18px', borderRadius: 10, border: `1px solid ${item.blue ? '#b7dce6' : 'var(--border)'}`, background: item.blue ? '#f0f8fa' : 'var(--surface-alt)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: item.blue ? '#1e40af' : 'var(--text-muted)' }}>{item.title}</span>
-                    <span className="mono" style={{ fontWeight: 800, fontSize: '0.875rem', color: item.color }}>{item.val}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: item.blue ? '#124f66' : 'var(--text-muted)' }}>{item.title}</span>
+                    <span className="mono" style={{ fontWeight: 800, fontSize: '0.92rem', color: item.color }}>{item.val}</span>
                   </div>
-                  <p style={{ fontSize: '0.78rem', color: item.blue ? '#1e40af' : 'var(--text-muted)' }}>{item.note}</p>
+                  <p style={{ fontSize: '0.80rem', color: item.blue ? '#124f66' : 'var(--text-muted)' }}>{item.note}</p>
                 </div>
               ))}
             </div>

@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component {
           {this.state.error?.message && (
             <div style={{
               background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
-              padding: '10px 12px', marginBottom: 20, fontSize: '0.72rem', fontFamily: 'monospace',
+              padding: '10px 12px', marginBottom: 20, fontSize: '0.74rem', fontFamily: 'monospace',
               color: '#94a3b8', wordBreak: 'break-word'
             }}>
               {this.state.error.message}
@@ -67,8 +67,8 @@ export class ErrorBoundary extends Component {
             onClick={this.handleReload}
             style={{
               width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#ffffff',
-              fontSize: '0.88rem', fontWeight: 800, cursor: 'pointer',
+              background: 'linear-gradient(135deg, #1b6e8c, #1d4ed8)', color: '#ffffff',
+              fontSize: '0.92rem', fontWeight: 800, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             }}
           >

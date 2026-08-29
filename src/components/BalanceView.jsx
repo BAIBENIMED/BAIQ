@@ -72,7 +72,7 @@ export function BalanceView({ rows }) {
       <div className="card fade-in" style={{ maxWidth: 450, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>account_balance</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Balance non disponible</h3>
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Veuillez d'abord importer une balance comptable.</p>
+        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez d'abord importer une balance comptable.</p>
       </div>
     );
   }
@@ -210,15 +210,15 @@ export function BalanceView({ rows }) {
       <div className="card" style={{ padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h2 className="section-title" style={{ fontSize: '1.35rem', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 className="section-title" style={{ fontSize: '1.3rem', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
               Balance Générale des Comptes
               {activeDivisor > 1 && (
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 10px', borderRadius: 20 }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#f0f8fa', color: '#1b6e8c', border: '1px solid #b7dce6', padding: '2px 10px', borderRadius: 20 }}>
                   en {getDivisorLabel()}
                 </span>
               )}
             </h2>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)', marginTop: 2 }}>
               Consultation interactive du Grand Livre et contrôle des mouvements.
             </div>
           </div>
@@ -229,7 +229,7 @@ export function BalanceView({ rows }) {
             {/* 🧮 Sélecteur de Diviseur / Échelle d'affichage */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#2563eb' }}>tune</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#1b6e8c' }}>tune</span>
                 Diviseur :
               </span>
               {[
@@ -241,8 +241,8 @@ export function BalanceView({ rows }) {
                   key={d.val}
                   onClick={() => { setDivisor(d.val); setIsCustomMode(false); }}
                   style={{
-                    padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-                    background: !isCustomMode && activeDivisor === d.val ? '#2563eb' : 'transparent',
+                    padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                    background: !isCustomMode && activeDivisor === d.val ? '#1b6e8c' : 'transparent',
                     color: !isCustomMode && activeDivisor === d.val ? '#fff' : 'var(--text-muted)',
                     transition: 'all 0.15s'
                   }}
@@ -265,14 +265,14 @@ export function BalanceView({ rows }) {
                       setIsCustomMode(true);
                     }
                   }}
-                  style={{ width: 64, padding: '3px 6px', fontSize: '0.72rem', fontWeight: 800, border: isCustomMode ? '1px solid #2563eb' : '1px solid var(--border)', borderRadius: 6, outline: 'none', background: isCustomMode ? '#eff6ff' : '#fff' }}
+                  style={{ width: 64, padding: '3px 6px', fontSize: '0.74rem', fontWeight: 800, border: isCustomMode ? '1px solid #1b6e8c' : '1px solid var(--border)', borderRadius: 6, outline: 'none', background: isCustomMode ? '#f0f8fa' : '#fff' }}
                 />
               </div>
             </div>
 
             {/* Sélecteur d'Arrondi (0, 1, 2 décimales) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '3px 8px', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>ARRONDI :</span>
+              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>ARRONDI :</span>
               <div style={{ display: 'flex', background: '#e2e8f0', padding: 2, borderRadius: 6, gap: 1 }}>
                 {[
                   { id: 0, label: '0 (Entier)' },
@@ -284,12 +284,12 @@ export function BalanceView({ rows }) {
                     onClick={() => setRounding(r.id)}
                     style={{
                       padding: '3px 7px',
-                      borderRadius: 5,
+                      borderRadius: 4,
                       border: 'none',
-                      fontSize: '0.71rem',
+                      fontSize: '0.70rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      background: rounding === r.id ? '#2563eb' : 'transparent',
+                      background: rounding === r.id ? '#1b6e8c' : 'transparent',
                       color: rounding === r.id ? '#ffffff' : 'var(--text)',
                       boxShadow: rounding === r.id ? '0 1px 3px rgba(37,99,235,0.3)' : 'none',
                       transition: 'all 0.15s ease'
@@ -309,7 +309,7 @@ export function BalanceView({ rows }) {
                   padding: '5px 10px',
                   borderRadius: 6,
                   border: 'none',
-                  fontSize: '0.73rem',
+                  fontSize: '0.74rem',
                   fontWeight: 700,
                   cursor: 'pointer',
                   background: isSummary ? '#ffffff' : 'transparent',
@@ -325,7 +325,7 @@ export function BalanceView({ rows }) {
                   padding: '5px 10px',
                   borderRadius: 6,
                   border: 'none',
-                  fontSize: '0.73rem',
+                  fontSize: '0.74rem',
                   fontWeight: 700,
                   cursor: 'pointer',
                   background: !isSummary ? '#ffffff' : 'transparent',
@@ -351,7 +351,7 @@ export function BalanceView({ rows }) {
                   borderRadius: 8,
                   border: '1px solid var(--border)',
                   background: '#f8fafc',
-                  fontSize: '0.82rem',
+                  fontSize: '0.85rem',
                   outline: 'none',
                   color: 'var(--text)',
                   fontFamily: 'Inter, sans-serif'
@@ -381,7 +381,7 @@ export function BalanceView({ rows }) {
                   onClick={() => handleMainFilter(f.id)}
                   className={`btn ${mainFilter === f.id ? 'btn-primary' : 'btn-ghost'}`}
                   style={{
-                    fontSize: '0.76rem',
+                    fontSize: '0.74rem',
                     padding: '6px 12px',
                     borderRadius: 8,
                     fontWeight: 700,
@@ -404,7 +404,7 @@ export function BalanceView({ rows }) {
                   key={s.id}
                   onClick={() => { setSimFilter(s.id); setCurrentPage(1); }}
                   style={{
-                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
                     background: simFilter === s.id ? '#059669' : 'transparent',
                     color: simFilter === s.id ? '#ffffff' : '#166534',
                     transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4
@@ -428,7 +428,7 @@ export function BalanceView({ rows }) {
                   key={af.id}
                   onClick={() => { setAuditFilter(af.id); setCurrentPage(1); }}
                   style={{
-                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                    padding: '4px 10px', borderRadius: 6, border: 'none', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
                     background: auditFilter === af.id ? '#c2410c' : 'transparent',
                     color: auditFilter === af.id ? '#ffffff' : '#9a3412',
                     transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4
@@ -472,22 +472,22 @@ export function BalanceView({ rows }) {
       {/* Account Counter & Pagination Controls Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '0 4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="badge badge-blue" style={{ fontSize: '0.73rem', padding: '4px 10px' }}>
+          <span className="badge badge-blue" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 13, marginRight: 4 }}>tag</span>
             {totalItems} comptes affichés
           </span>
           {activeDivisor > 1 && (
-            <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.74rem', color: '#1b6e8c', fontWeight: 700 }}>
               (Montants divisés par ÷ {activeDivisor.toLocaleString('fr-FR')})
             </span>
           )}
           {auditFilter !== 'all' && (
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: auditFilter === 'anomalies' ? '#dc2626' : auditFilter === 'atypiques' ? '#d97706' : '#059669' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: auditFilter === 'anomalies' ? '#dc2626' : auditFilter === 'atypiques' ? '#d97706' : '#059669' }}>
               [Filtre Audit : {auditFilter.toUpperCase()}]
             </span>
           )}
           {searchQuery && (
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
               pour « <strong>{searchQuery}</strong> »
             </span>
           )}
@@ -495,7 +495,7 @@ export function BalanceView({ rows }) {
 
         {/* Pagination & Rows per page */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
             <span>Afficher:</span>
             <select
               value={pageSize}
@@ -509,7 +509,7 @@ export function BalanceView({ rows }) {
                 borderRadius: 6,
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
-                fontSize: '0.75rem',
+                fontSize: '0.74rem',
                 color: 'var(--text)',
                 outline: 'none',
                 cursor: 'pointer'
@@ -528,12 +528,12 @@ export function BalanceView({ rows }) {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 className="btn btn-ghost"
-                style={{ padding: '3px 6px', fontSize: '0.75rem', opacity: currentPage === 1 ? 0.4 : 1 }}
+                style={{ padding: '3px 6px', fontSize: '0.74rem', opacity: currentPage === 1 ? 0.4 : 1 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_left</span>
               </button>
 
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', padding: '0 4px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text)', padding: '0 4px' }}>
                 Page {currentPage} / {totalPages}
               </span>
 
@@ -541,7 +541,7 @@ export function BalanceView({ rows }) {
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 className="btn btn-ghost"
-                style={{ padding: '3px 6px', fontSize: '0.75rem', opacity: currentPage === totalPages ? 0.4 : 1 }}
+                style={{ padding: '3px 6px', fontSize: '0.74rem', opacity: currentPage === totalPages ? 0.4 : 1 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>chevron_right</span>
               </button>
@@ -592,14 +592,14 @@ export function BalanceView({ rows }) {
                     return (
                       <tr key={i} style={{ opacity: row.ignore ? 0.5 : 1, background: row.isSimulation ? 'rgba(16,185,129,0.08)' : row.isSimulationImpacted ? 'rgba(59,130,246,0.08)' : 'transparent' }}>
                         <td style={{ padding: '5px 8px' }}>
-                          <span className="mono" style={{ fontWeight: 700, color: row.isSimulation ? '#059669' : 'var(--primary-dk)', fontSize: '0.78rem' }}>
+                          <span className="mono" style={{ fontWeight: 700, color: row.isSimulation ? '#059669' : 'var(--primary-dk)', fontSize: '0.80rem' }}>
                             {row.compte}
                           </span>
                         </td>
                         <td style={{ padding: '5px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cleanedLib}>
                           {cleanedLib}
                           {(row.isSimulation || row.isSimulationImpacted) && (
-                            <span style={{ marginLeft: 8, fontSize: '0.62rem', background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>
+                            <span style={{ marginLeft: 8, fontSize: '0.65rem', background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>
                               SIMULATION 📝
                             </span>
                           )}
@@ -613,14 +613,14 @@ export function BalanceView({ rows }) {
                   return (
                     <tr key={i} style={{ opacity: row.ignore ? 0.5 : 1, background: row.isSimulation ? 'rgba(16,185,129,0.08)' : row.isSimulationImpacted ? 'rgba(59,130,246,0.08)' : 'transparent' }}>
                       <td style={{ padding: '4px 6px' }}>
-                        <span className="mono" style={{ fontWeight: 700, color: row.isSimulation ? '#059669' : 'var(--primary-dk)', fontSize: '0.75rem' }}>
+                        <span className="mono" style={{ fontWeight: 700, color: row.isSimulation ? '#059669' : 'var(--primary-dk)', fontSize: '0.74rem' }}>
                           {row.compte}
                         </span>
                       </td>
                       <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cleanedLib}>
                         {cleanedLib}
                         {(row.isSimulation || row.isSimulationImpacted) && (
-                          <span style={{ marginLeft: 8, fontSize: '0.62rem', background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>
+                          <span style={{ marginLeft: 8, fontSize: '0.65rem', background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>
                             SIMULATION 📝
                           </span>
                         )}

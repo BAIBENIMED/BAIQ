@@ -39,7 +39,7 @@ export function SIGView({ data, rows, formatCurrency }) {
       <div style={{ padding: '48px 32px', textAlign: 'center' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: '#cbd5e1', display: 'block', marginBottom: 16 }}>analytics</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>TCR / SIG non disponibles</h3>
-        <p style={{ color: '#64748b', fontSize: '0.875rem' }}>Veuillez importer une balance comptable.</p>
+        <p style={{ color: '#64748b', fontSize: '0.92rem' }}>Veuillez importer une balance comptable.</p>
       </div>
     </div>
   );
@@ -147,7 +147,7 @@ export function SIGView({ data, rows, formatCurrency }) {
 
   /* ── Bar chart des marges ── */
   const margesBarData = [
-    { name: 'Marge VA', val: Math.round(tauxVA * 100), color: '#2563eb' },
+    { name: 'Marge VA', val: Math.round(tauxVA * 100), color: '#1b6e8c' },
     { name: 'Marge EBE', val: Math.round(margeEBE * 100), color: '#059669' },
     { name: 'Marge Opérat.', val: Math.round(margeOperationnelle * 100), color: '#d97706' },
     { name: 'Marge Nette', val: Math.round(margeNette * 100), color: margeNette >= 0 ? '#7c3aed' : '#dc2626' },
@@ -196,7 +196,7 @@ export function SIGView({ data, rows, formatCurrency }) {
 
   const statusColor = (ok) => ok === true ? '#059669' : ok === false ? '#dc2626' : '#94a3b8';
   const statusIcon  = (ok) => ok === true ? 'check_circle' : ok === false ? 'cancel' : 'radio_button_unchecked';
-  const statusBg    = (ok) => ok === true ? '#f0fdf4' : ok === false ? '#fff1f2' : '#f8fafc';
+  const statusBg    = (ok) => ok === true ? '#f0fdf4' : ok === false ? '#fff1f2' : 'var(--surface-alt)';
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>
@@ -210,12 +210,12 @@ export function SIGView({ data, rows, formatCurrency }) {
       {/* ── KPI Grid ── */}
       <div className="kpi-grid">
         {kpis.map((kpi, i) => (
-          <div key={i} className="kpi-card" style={{ position: 'relative', overflow: 'hidden' }}>
+          <div key={i} className={`kpi-card ${kpi.positive ? 'kpi-good' : 'kpi-bad'}`} style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <span className="kpi-label">{kpi.title}</span>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563eb' }}>{kpi.icon}</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#1b6e8c' }}>{kpi.icon}</span>
             </div>
-            <div className="kpi-value" style={{ fontSize: '1.35rem', color: kpi.positive ? '#059669' : '#dc2626' }}>{fmt(kpi.value)}</div>
+            <div className="kpi-value" style={{ fontSize: '1.3rem', color: kpi.positive ? '#059669' : '#dc2626' }}>{fmt(kpi.value)}</div>
             <div style={{ marginTop: 10 }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -237,7 +237,7 @@ export function SIGView({ data, rows, formatCurrency }) {
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="card-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563eb' }}>receipt_long</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#1b6e8c' }}>receipt_long</span>
             Tableau des Comptes de Résultat (TCR Officiel SCF)
           </h3>
           <span className="badge badge-blue">Norme SCF (Loi 07-11)</span>
@@ -258,9 +258,9 @@ export function SIGView({ data, rows, formatCurrency }) {
                 const isSubtotal   = r.type === 'subtotal';
                 const isCompte     = r.type === 'compte';
                 let rowBg = 'transparent', fontWeight = 400, color = 'inherit';
-                if (isGrandTotal)  { rowBg = '#dbeafe'; fontWeight = 800; color = '#1e40af'; }
-                else if (isTotal)  { rowBg = '#eff6ff'; fontWeight = 700; color = '#1e3a8a'; }
-                else if (isSubtotal){ rowBg = '#f8fafc'; fontWeight = 700; color = '#0f172a'; }
+                if (isGrandTotal)  { rowBg = '#dceef2'; fontWeight = 800; color = '#124f66'; }
+                else if (isTotal)  { rowBg = '#f0f8fa'; fontWeight = 700; color = '#0b3446'; }
+                else if (isSubtotal){ rowBg = 'var(--surface-alt)'; fontWeight = 700; color = 'var(--text)'; }
                 const displayVal = r.isCharge && r.val > 0 ? -r.val : r.val;
                 return (
                   <tr
@@ -269,18 +269,18 @@ export function SIGView({ data, rows, formatCurrency }) {
                     style={{ background: rowBg, fontWeight, color, cursor: isCompte ? 'pointer' : 'default' }}
                   >
                     <td>
-                      <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: isCompte ? '#2563eb' : '#0f172a' }}>{r.code}</span>
+                      <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: isCompte ? '#1b6e8c' : '#0f172a' }}>{r.code}</span>
                     </td>
                     <td style={{ paddingLeft: isCompte ? 24 : 12 }}>
-                      {isTotal && <span style={{ color: '#2563eb', marginRight: 6 }}>►</span>}
+                      {isTotal && <span style={{ color: '#1b6e8c', marginRight: 6 }}>►</span>}
                       {r.label}
                       {isCompte && (
-                        <span className="badge badge-blue" style={{ fontSize: '0.6rem', marginLeft: 8, padding: '2px 6px' }}>
+                        <span className="badge badge-blue" style={{ fontSize: '0.58rem', marginLeft: 8, padding: '2px 6px' }}>
                           🔍 Détail
                         </span>
                       )}
                     </td>
-                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? '#dc2626' : (isGrandTotal ? '#1e40af' : '#0f172a') }}>
+                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? '#dc2626' : (isGrandTotal ? '#124f66' : '#0f172a') }}>
                       {fmt(displayVal)}
                     </td>
                   </tr>
@@ -295,7 +295,7 @@ export function SIGView({ data, rows, formatCurrency }) {
       <div className="card">
         <div className="card-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563eb' }}>ssid_chart</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#1b6e8c' }}>ssid_chart</span>
             Cascade du Résultat
           </h3>
         </div>
@@ -305,8 +305,8 @@ export function SIGView({ data, rows, formatCurrency }) {
               <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 60 }}>
                 <defs>
                   <linearGradient id="sigGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}    />
+                    <stop offset="5%"  stopColor="#1b6e8c" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#1b6e8c" stopOpacity={0}    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -314,10 +314,10 @@ export function SIGView({ data, rows, formatCurrency }) {
                 <YAxis tickFormatter={v => `${Math.round(v / 1000)}k`} stroke="#94a3b8" fontSize={11} />
                 <Tooltip
                   formatter={v => [fmt(v), 'Montant']}
-                  contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 12 }}
+                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text)' }}
                 />
                 <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="4 4" />
-                <Area type="monotone" dataKey="Valeur" stroke="#2563eb" strokeWidth={2.5} fill="url(#sigGrad)" />
+                <Area type="monotone" dataKey="Valeur" stroke="#1b6e8c" strokeWidth={2.5} fill="url(#sigGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -330,9 +330,9 @@ export function SIGView({ data, rows, formatCurrency }) {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: 22 }}>auto_graph</span>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text)' }}>Ratios de Performance &amp; Rendement</h2>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text)' }}>Ratios de Performance &amp; Rendement</h2>
         </div>
-        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 20 }}>
           Indicateurs de productivité, marges, rendement des charges et levier opérationnel dérivés du TCR.
         </p>
 
@@ -344,17 +344,17 @@ export function SIGView({ data, rows, formatCurrency }) {
             { label: 'Marge Nette',         val: pct(margeNette),         ok: margeNette > 0,   icon: 'pie_chart',   sub: 'RN / CA' },
             { label: 'Taux de VA',          val: pct(tauxVA),             ok: tauxVA >= 0.20,   icon: 'add_circle',  sub: 'VA / CA' },
           ].map((k, i) => (
-            <div key={i} className="kpi-card" style={{ borderTop: `3px solid ${k.ok ? '#059669' : '#dc2626'}` }}>
+            <div key={i} className={`kpi-card ${k.ok ? 'kpi-good' : 'kpi-bad'}`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span className="kpi-label" style={{ margin: 0 }}>{k.label}</span>
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>{k.icon}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '6px 0 10px' }}>
-                <span className="mono" style={{ fontSize: '1.7rem', fontWeight: 900, color: k.ok ? '#059669' : '#dc2626', lineHeight: 1 }}>{k.val}</span>
+                <span className="mono" style={{ fontSize: '1.6rem', fontWeight: 900, color: k.ok ? '#059669' : '#dc2626', lineHeight: 1 }}>{k.val}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <span style={{ color: 'var(--text-muted)' }}>{k.sub}</span>
-                <span className="badge" style={{ background: k.ok ? '#d1fae5' : '#fee2e2', color: k.ok ? '#059669' : '#dc2626', borderColor: k.ok ? '#6ee7b7' : '#fca5a5', fontSize: '0.62rem' }}>
+                <span className="badge" style={{ background: k.ok ? '#d1fae5' : '#fee2e2', color: k.ok ? '#059669' : '#dc2626', borderColor: k.ok ? '#6ee7b7' : '#fca5a5', fontSize: '0.65rem' }}>
                   {k.ok ? 'CONFORME' : 'ATTENTION'}
                 </span>
               </div>
@@ -367,7 +367,7 @@ export function SIGView({ data, rows, formatCurrency }) {
           {/* Bar chart des marges */}
           <div className="card">
             <div className="card-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.92rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>bar_chart</span>
                 Niveaux de Marges (% du CA)
               </h3>
@@ -394,7 +394,7 @@ export function SIGView({ data, rows, formatCurrency }) {
           {/* Radar performance */}
           <div className="card">
             <div className="card-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.92rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>radar</span>
                 Radar de Performance Globale
               </h3>
@@ -418,7 +418,7 @@ export function SIGView({ data, rows, formatCurrency }) {
           <div key={si} className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ padding: '12px 18px', background: '#f5f3ff', borderBottom: '1px solid #ddd6fe', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: 18 }}>auto_graph</span>
-              <span style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5b21b6' }}>{section.categorie}</span>
+              <span style={{ fontSize: '0.74rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5b21b6' }}>{section.categorie}</span>
             </div>
             <table className="data-table" style={{ width: '100%' }}>
               <thead>
@@ -433,12 +433,12 @@ export function SIGView({ data, rows, formatCurrency }) {
               <tbody>
                 {section.rows.map((row, ri) => (
                   <tr key={ri} style={{ background: statusBg(row.ok) }}>
-                    <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>{row.label}</td>
-                    <td className="right mono" style={{ fontWeight: 800, fontSize: '0.9rem', color: row.ok === true ? '#059669' : row.ok === false ? '#dc2626' : 'var(--text)' }}>{row.val}</td>
+                    <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{row.label}</td>
+                    <td className="right mono" style={{ fontWeight: 800, fontSize: '0.92rem', color: row.ok === true ? '#059669' : row.ok === false ? '#dc2626' : 'var(--text)' }}>{row.val}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>{row.norme}</span>
+                      <span className="mono" style={{ fontSize: '0.74rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>{row.norme}</span>
                     </td>
-                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{row.detail}</td>
+                    <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{row.detail}</td>
                     <td style={{ textAlign: 'center' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 18, color: statusColor(row.ok) }}>
                         {statusIcon(row.ok)}
@@ -455,11 +455,11 @@ export function SIGView({ data, rows, formatCurrency }) {
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '12px 18px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 18 }}>savings</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#166534' }}>SYNTHÈSE — FLUX & AUTOFINANCEMENT</span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#166534' }}>SYNTHÈSE — FLUX & AUTOFINANCEMENT</span>
           </div>
           <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {[
-              { label: 'Total Produits',        val: fmt(fluxProduitsTotal), color: '#2563eb',  icon: 'north' },
+              { label: 'Total Produits',        val: fmt(fluxProduitsTotal), color: '#1b6e8c',  icon: 'north' },
               { label: 'Total Charges',         val: fmt(fluxChargesTotal),  color: '#dc2626',  icon: 'south' },
               { label: 'Résultat Net',          val: fmt(rnet),              color: rnet >= 0 ? '#059669' : '#dc2626', icon: rnet >= 0 ? 'trending_up' : 'trending_down' },
               { label: 'CAF Estimée',           val: fmt(cafBrute),          color: cafBrute >= 0 ? '#059669' : '#dc2626', icon: 'savings' },
@@ -469,7 +469,7 @@ export function SIGView({ data, rows, formatCurrency }) {
               <div key={label} style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', borderLeft: `3px solid ${color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 14, color }}>{icon}</span>
-                  <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-sub)' }}>{label}</span>
+                  <span style={{ fontSize: '0.70rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-sub)' }}>{label}</span>
                 </div>
                 <div className="mono" style={{ fontWeight: 800, fontSize: '0.92rem', color }}>{val}</div>
               </div>

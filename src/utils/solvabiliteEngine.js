@@ -55,7 +55,13 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   }
 
   // Fallback si la balance détaillée n'est pas décomposée
+  // ⚠️ Ceci est une ESTIMATION FORFAITAIRE (non une donnée réelle de la balance) :
+  // elle doit être signalée à l'utilisateur (cf. estimationPartielle ci-dessous) partout
+  // où le Z''-Score / rating est affiché, pour ne pas laisser croire à une précision
+  // qu'elle n'a pas.
+  let estimationPartielle = false;
   if (capital === 0 && reservesAndRetained === 0) {
+    estimationPartielle = true;
     capitauxPropres = Math.max(0, (bilan.ressourcesStables || 0) * 0.7);
     reservesAndRetained = Math.max(0, capitauxPropres * 0.4);
     capital = capitauxPropres - reservesAndRetained;
@@ -90,7 +96,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#059669';
     zoneBg = '#f0fdf4';
     zoneBorder = '#86efac';
-    risqueDefaillance = 'Négligeable (< 2%)';
+    risqueDefaillance = 'Négligeable';
   } else if (zScore >= 2.60) {
     rating = 'A';
     zone = 'safe';
@@ -98,7 +104,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#2563eb';
     zoneBg = '#eff6ff';
     zoneBorder = '#bfdbfe';
-    risqueDefaillance = 'Faible (< 5%)';
+    risqueDefaillance = 'Faible';
   } else if (zScore >= 1.80) {
     rating = 'B+';
     zone = 'grey';
@@ -106,7 +112,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#d97706';
     zoneBg = '#fffbeb';
     zoneBorder = '#fde68a';
-    risqueDefaillance = 'Modéré (10% - 20%)';
+    risqueDefaillance = 'Modéré';
   } else if (zScore >= 1.10) {
     rating = 'B';
     zone = 'grey';
@@ -114,7 +120,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#ea580c';
     zoneBg = '#fff7ed';
     zoneBorder = '#fed7aa';
-    risqueDefaillance = 'Sensible (20% - 35%)';
+    risqueDefaillance = 'Sensible';
   } else if (zScore >= 0) {
     rating = 'C';
     zone = 'distress';
@@ -122,7 +128,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#dc2626';
     zoneBg = '#fef2f2';
     zoneBorder = '#fca5a5';
-    risqueDefaillance = 'Élevé (> 50%)';
+    risqueDefaillance = 'Élevé';
   } else {
     rating = 'D';
     zone = 'distress';
@@ -130,7 +136,7 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneColor = '#991b1b';
     zoneBg = '#450a0a';
     zoneBorder = '#7f1d1d';
-    risqueDefaillance = 'Critique (> 80%)';
+    risqueDefaillance = 'Critique';
   }
 
   // Capacité de Remboursement Bancaire (Dettes Nettes / EBE)
@@ -180,6 +186,11 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zoneBg,
     zoneBorder,
     risqueDefaillance,
+    risqueDefaillanceDisclaimer: "Niveau de risque indicatif dérivé des zones Altman Z'' — il ne s'agit pas d'une probabilité statistique calibrée sur des données algériennes.",
+    estimationPartielle,
+    estimationPartielleMessage: estimationPartielle
+      ? "Structure du capital estimée (comptes 10 à 14 non détaillés dans la balance importée) : les capitaux propres et le rating ont été calculés à partir d'une répartition forfaitaire des ressources stables, à titre indicatif."
+      : null,
     ratios: {
       x1: { val: x1, label: 'FRNG / Total Bilan', desc: 'Liquidité nette structurelle', poids: '6.56' },
       x2: { val: x2, label: 'Réserves & RN / Total Bilan', desc: 'Capacité d\'autofinancement cumulée', poids: '3.26' },

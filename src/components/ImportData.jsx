@@ -23,10 +23,25 @@ export function ImportData({ onDataImported }) {
   const [previewTarget, setPreviewTarget] = useState(null); // null, 'N' ou 'N-1'
   useEscapeKey(Boolean(previewTarget), () => setPreviewTarget(null));
 
+  // Durée de rétention des dossiers sauvegardés en local (navigateur uniquement).
+  // Passé ce délai, un dossier est purgé automatiquement au prochain chargement de l'écran.
+  const DUREE_RETENTION_JOURS = 30;
+  const DUREE_RETENTION_MS = DUREE_RETENTION_JOURS * 24 * 60 * 60 * 1000;
+
   // ── Multi-Dossiers localStorage ──
   const [savedDossiers, setSavedDossiers] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('finanalyze_saved_dossiers') || '[]');
+      const stored = JSON.parse(localStorage.getItem('finanalyze_saved_dossiers') || '[]');
+      const maintenant = Date.now();
+      // Purge silencieuse des dossiers expirés (au-delà de DUREE_RETENTION_JOURS) et
+      // rétro-compatibilité : un dossier sauvegardé avant l'introduction de `savedAtTs`
+      // se voit attribuer un horodatage "maintenant" pour ne pas être supprimé abusivement.
+      const withTimestamps = stored.map(d => ({ ...d, savedAtTs: d.savedAtTs || maintenant }));
+      const nonExpires = withTimestamps.filter(d => (maintenant - d.savedAtTs) < DUREE_RETENTION_MS);
+      if (nonExpires.length !== stored.length) {
+        try { localStorage.setItem('finanalyze_saved_dossiers', JSON.stringify(nonExpires)); } catch { /* silencieux */ }
+      }
+      return nonExpires;
     } catch {
       return [];
     }
@@ -40,6 +55,7 @@ export function ImportData({ onDataImported }) {
       id: Date.now().toString(),
       nom: dossierTitle,
       date: dDate,
+      savedAtTs: Date.now(),
       profil,
       data: payloadData,
     };
@@ -51,6 +67,15 @@ export function ImportData({ onDataImported }) {
     } catch (e) {
       console.warn('Erreur sauvegarde localStorage:', e);
       setSaveError("Le dossier n'a pas pu être sauvegardé (espace de stockage du navigateur saturé). Supprimez d'anciens dossiers puis réessayez, ou continuez sans sauvegarder — l'analyse en cours reste disponible.");
+    }
+  };
+
+  const deleteAllDossiersFromStorage = () => {
+    setSavedDossiers([]);
+    try {
+      localStorage.removeItem('finanalyze_saved_dossiers');
+    } catch (err) {
+      console.warn('Erreur suppression localStorage:', err);
     }
   };
 
@@ -216,10 +241,10 @@ export function ImportData({ onDataImported }) {
       {/* Header Simplifié */}
       <div style={{ background: '#ffffff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Importation &amp; Configuration en 1 Étape</h2>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0' }}>Saisissez les informations de l'entreprise et déposez vos balances comptables SCF.</p>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Importation &amp; Configuration en 1 Étape</h2>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0 0' }}>Saisissez les informations de l'entreprise et déposez vos balances comptables SCF.</p>
         </div>
-        <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px 14px', borderRadius: 20, fontSize: '0.74rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ background: '#f0f8fa', color: '#1b6e8c', padding: '6px 14px', borderRadius: 20, fontSize: '0.74rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Sparkles size={14} /> Activités de Production par Défaut
         </div>
       </div>
@@ -227,13 +252,13 @@ export function ImportData({ onDataImported }) {
       {saveError && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10,
-          background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.78rem', marginBottom: 4
+          background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.80rem', marginBottom: 4
         }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>warning</span>
           <span style={{ flex: 1 }}>{saveError}</span>
           <button
             onClick={() => setSaveError(null)}
-            style={{ border: 'none', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem', lineHeight: 1, padding: 0 }}
+            style={{ border: 'none', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1, padding: 0 }}
             aria-label="Fermer"
           >×</button>
         </div>
@@ -248,10 +273,24 @@ export function ImportData({ onDataImported }) {
           {/* Dossiers Sauvegardés */}
           {savedDossiers.length > 0 && (
             <div className="card" style={{ padding: 18, border: '1px solid var(--border)' }}>
-              <h4 style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px 0' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px 0' }}>
                 <FolderOpen size={16} className="text-blue-600" />
                 Dossiers Enregistrés ({savedDossiers.length})
               </h4>
+
+              <div style={{ display: 'flex', gap: 8, padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 10 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706', flexShrink: 0 }}>lock</span>
+                <p style={{ fontSize: '0.65rem', color: '#92400e', margin: 0, lineHeight: 1.45 }}>
+                  Ces dossiers sont conservés <strong>uniquement dans ce navigateur</strong> (non chiffrés, non envoyés à un serveur).
+                  Toute personne ayant accès à ce poste peut les consulter. Ils sont supprimés automatiquement après {DUREE_RETENTION_JOURS} jours,
+                  ou <button
+                    type="button"
+                    onClick={deleteAllDossiersFromStorage}
+                    style={{ background: 'none', border: 'none', padding: 0, color: '#92400e', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: '0.65rem' }}
+                  >supprimez-les tous maintenant</button>.
+                </p>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {savedDossiers.slice(0, 3).map(d => (
                   <div
@@ -263,8 +302,8 @@ export function ImportData({ onDataImported }) {
                     }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.nom}</div>
-                      <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>Modifié le {d.date}</div>
+                      <div style={{ fontWeight: 800, fontSize: '0.80rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.nom}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Modifié le {d.date}</div>
                     </div>
                     <button
                       onClick={(e) => deleteDossierFromStorage(d.id, e)}
@@ -281,7 +320,7 @@ export function ImportData({ onDataImported }) {
           {/* Formulaire Profil */}
           <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563eb' }}>business</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#1b6e8c' }}>business</span>
               Identité de l'Entreprise
             </h3>
 
@@ -291,7 +330,7 @@ export function ImportData({ onDataImported }) {
                 type="text"
                 value={profil.nomEntreprise}
                 onChange={e => handleProfilChange('nomEntreprise', e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.8rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.80rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
               />
             </div>
 
@@ -302,7 +341,7 @@ export function ImportData({ onDataImported }) {
                 placeholder="Ex: 45"
                 value={profil.effectif}
                 onChange={e => handleProfilChange('effectif', e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.8rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.80rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none' }}
               />
             </div>
 
@@ -311,7 +350,7 @@ export function ImportData({ onDataImported }) {
               <select
                 value={profil.secteurId}
                 onChange={e => handleProfilChange('secteurId', e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.8rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.80rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}
               >
                 {SECTEURS.map(sec => (
                   <option key={sec.id} value={sec.id}>{sec.label}</option>
@@ -320,7 +359,7 @@ export function ImportData({ onDataImported }) {
             </div>
 
             {/* Récapitulatif Fiscal du Secteur */}
-            <div style={{ background: `${selectedSecteurObj.couleur}08`, border: `1px solid ${selectedSecteurObj.couleur}30`, borderRadius: 10, padding: 12, fontSize: '0.72rem' }}>
+            <div style={{ background: `${selectedSecteurObj.couleur}08`, border: `1px solid ${selectedSecteurObj.couleur}30`, borderRadius: 10, padding: 12, fontSize: '0.74rem' }}>
               <div style={{ fontWeight: 800, color: selectedSecteurObj.couleur, marginBottom: 4 }}>Paramètres {selectedSecteurObj.label} :</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, color: 'var(--text-sub)' }}>
                 <span>• IBS standard applicable : <strong>{selectedSecteurObj.tauxIBS}</strong></span>
@@ -335,8 +374,8 @@ export function ImportData({ onDataImported }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           
           {/* Jeux de démonstration rapide */}
-          <div style={{ background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%)', border: '1px solid #bfdbfe', borderRadius: 16, padding: 16 }}>
-            <h4 style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 10px 0' }}>
+          <div style={{ background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%)', border: '1px solid #b7dce6', borderRadius: 16, padding: 16 }}>
+            <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#124f66', display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 10px 0' }}>
               <Sparkles size={15} />
               Chargement Rapide (Démos &amp; Exemples réels)
             </h4>
@@ -348,10 +387,10 @@ export function ImportData({ onDataImported }) {
                     title="Charger dans l'aperçu (vérifier avant de lancer)"
                     style={{
                       padding: '6px 12px', border: 'none', background: '#ffffff',
-                      fontSize: '0.70rem', fontWeight: 800, color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      fontSize: '0.70rem', fontWeight: 800, color: '#124f66', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
                       transition: 'all 0.15s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f8fa'}
                     onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
                   >
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.badgeColor }}></span>
@@ -362,9 +401,9 @@ export function ImportData({ onDataImported }) {
                     title="Lancer directement l'analyse (sans aperçu)"
                     style={{
                       padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
-                      color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                      color: '#124f66', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f8fa'}
                     onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
                   >
                     <Play size={12} fill="currentColor" />
@@ -374,9 +413,9 @@ export function ImportData({ onDataImported }) {
                     title="Télécharger cet exemple au format Excel"
                     style={{
                       padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
-                      color: '#1e40af', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                      color: '#124f66', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f0f8fa'}
                     onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
                   >
                     <Download size={12} />
@@ -395,8 +434,8 @@ export function ImportData({ onDataImported }) {
 
             {/* BALANCE N (PRINCIPALE) */}
             <div style={{
-              border: `2px dashed ${fileN ? '#059669' : '#2563eb'}`,
-              background: fileN ? '#f0fdf4' : '#eff6ff',
+              border: `2px dashed ${fileN ? '#059669' : '#1b6e8c'}`,
+              background: fileN ? '#f0fdf4' : '#f0f8fa',
               borderRadius: 12, padding: 18, textAlign: 'center', cursor: 'pointer', position: 'relative'
             }} onClick={() => !fileN && document.getElementById('unified-upload-n').click()}>
               <input
@@ -412,24 +451,24 @@ export function ImportData({ onDataImported }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <File size={22} className="text-emerald-600" />
                     <div style={{ textAlign: 'left', minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }} className="truncate">{fileN.name}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.80rem', color: '#0f172a' }} className="truncate">{fileN.name}</div>
+                      <div style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 700 }}>
                         {parsedN ? `✅ ${parsedN.length} lignes valides` : 'Traitement...'}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {parsedN && (
-                      <button onClick={(e) => { e.stopPropagation(); setPreviewTarget('N'); }} style={{ padding: '4px 8px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700 }}>👁 Voir</button>
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewTarget('N'); }} style={{ padding: '4px 8px', background: '#1b6e8c', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700 }}>👁 Voir</button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); setFileN(null); setParsedN(null); setErrorN(null); }} style={{ padding: '4px 8px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: '0.65rem', color: '#dc2626', fontWeight: 700 }}>✕</button>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <Upload size={22} style={{ margin: '0 auto 6px', color: '#2563eb' }} />
-                  <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>Balance Exercice N (Obligatoire)</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Glissez-déposez ou cliquez pour parcourir (.xlsx, .csv)</div>
+                  <Upload size={22} style={{ margin: '0 auto 6px', color: '#1b6e8c' }} />
+                  <div style={{ fontWeight: 800, fontSize: '0.80rem', color: '#1e293b' }}>Balance Exercice N (Obligatoire)</div>
+                  <div style={{ fontSize: '0.70rem', color: '#64748b' }}>Glissez-déposez ou cliquez pour parcourir (.xlsx, .csv)</div>
                 </div>
               )}
             </div>
@@ -454,15 +493,15 @@ export function ImportData({ onDataImported }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <File size={22} className="text-emerald-600" />
                     <div style={{ textAlign: 'left', minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.78rem', color: '#0f172a' }} className="truncate">{fileN1.name}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.80rem', color: '#0f172a' }} className="truncate">{fileN1.name}</div>
+                      <div style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 700 }}>
                         {parsedN1 ? `✅ ${parsedN1.length} lignes valides` : 'Traitement...'}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {parsedN1 && (
-                      <button onClick={(e) => { e.stopPropagation(); setPreviewTarget('N-1'); }} style={{ padding: '4px 8px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700 }}>👁 Voir</button>
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewTarget('N-1'); }} style={{ padding: '4px 8px', background: '#1b6e8c', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700 }}>👁 Voir</button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); setFileN1(null); setParsedN1(null); setErrorN1(null); }} style={{ padding: '4px 8px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: '0.65rem', color: '#dc2626', fontWeight: 700 }}>✕</button>
                   </div>
@@ -470,8 +509,8 @@ export function ImportData({ onDataImported }) {
               ) : (
                 <div>
                   <Upload size={22} style={{ margin: '0 auto 6px', color: '#94a3b8' }} />
-                  <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569' }}>Balance Exercice N-1 (Optionnel)</div>
-                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Permet de débloquer le comparatif d'évolution et l'historique</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.80rem', color: '#475569' }}>Balance Exercice N-1 (Optionnel)</div>
+                  <div style={{ fontSize: '0.70rem', color: '#94a3b8' }}>Permet de débloquer le comparatif d'évolution et l'historique</div>
                 </div>
               )}
             </div>
@@ -484,7 +523,7 @@ export function ImportData({ onDataImported }) {
               style={{
                 width: '100%', padding: '14px', borderRadius: 10, border: 'none',
                 background: parsedN ? 'linear-gradient(135deg, #059669, #047857)' : '#e2e8f0',
-                color: parsedN ? '#ffffff' : '#94a3b8', fontWeight: 800, fontSize: '0.9rem',
+                color: parsedN ? '#ffffff' : '#94a3b8', fontWeight: 800, fontSize: '0.92rem',
                 cursor: parsedN ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: parsedN ? '0 4px 12px rgba(5,150,105,0.2)' : 'none', transition: 'all 0.2s'
               }}
@@ -525,19 +564,19 @@ export function ImportData({ onDataImported }) {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.7)', zIndex: 99999, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h3 style={{ color: '#1e40af', fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>Contrôle &amp; Prévisualisation — Balance {previewTarget}</h3>
+              <h3 style={{ color: '#124f66', fontSize: '1.15rem', margin: 0, fontWeight: 800 }}>Contrôle &amp; Prévisualisation — Balance {previewTarget}</h3>
               <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Cochez les lignes à ignorer lors du traitement comptable (ex: sous-totaux).</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 800,
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, fontSize: '0.80rem', fontWeight: 800,
                 background: balanceOk ? '#dcfce7' : '#fee2e2', color: balanceOk ? '#166534' : '#991b1b',
                 border: `1px solid ${balanceOk ? '#86efac' : '#fca5a5'}`
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{balanceOk ? 'check_circle' : 'error'}</span>
                 {balanceOk ? 'Balance équilibrée' : `Déséquilibre détecté (${Math.round(Math.max(ecartDebut, ecartMouv, ecartFin)).toLocaleString('fr-FR')} DA)`}
               </span>
-              <button onClick={() => setPreviewTarget(null)} style={{ padding: '6px 16px', borderRadius: 8, cursor: 'pointer', background: '#2563eb', color: 'white', border: 'none', fontSize: '0.8rem', fontWeight: 700 }}>Fermer</button>
+              <button onClick={() => setPreviewTarget(null)} style={{ padding: '6px 16px', borderRadius: 8, cursor: 'pointer', background: '#1b6e8c', color: 'white', border: 'none', fontSize: '0.80rem', fontWeight: 700 }}>Fermer</button>
             </div>
           </div>
           {!balanceOk && (
@@ -552,11 +591,11 @@ export function ImportData({ onDataImported }) {
             </div>
           )}
           <div style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.80rem' }}>
               <thead style={{ position: 'sticky', top: 0, background: '#ffffff', zIndex: 1 }}>
                 <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                   {['Ignorer', 'Compte', 'Libellé', 'S. Début D', 'S. Début C', 'Mouv. Débit', 'Mouv. Crédit', 'S. Fin Débit', 'S. Fin Crédit'].map((h, i) => (
-                    <th key={i} style={{ padding: '10px 12px', color: '#475569', fontWeight: 700, fontSize: '0.68rem', textTransform: 'uppercase', textAlign: i > 2 ? 'right' : 'left' }}>{h}</th>
+                    <th key={i} style={{ padding: '10px 12px', color: '#475569', fontWeight: 700, fontSize: '0.70rem', textTransform: 'uppercase', textAlign: i > 2 ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -566,7 +605,7 @@ export function ImportData({ onDataImported }) {
                   return (
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: row.ignore ? '#fff1f2' : (isDuplicate ? '#fffbeb' : '#ffffff') }}>
                     <td style={{ padding: '6px 12px', textAlign: 'center' }}><input type="checkbox" checked={row.ignore} onChange={() => toggleIgnoreRow(previewTarget, i)} /></td>
-                    <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 700, color: isDuplicate ? '#b45309' : '#2563eb' }}>
+                    <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 700, color: isDuplicate ? '#b45309' : '#1b6e8c' }}>
                       {row.compte}{isDuplicate && <span title="Ce numéro de compte apparaît plusieurs fois" style={{ marginLeft: 4 }}>⚠</span>}
                     </td>
                     <td style={{ padding: '6px 12px' }}>{row.libelle}</td>
@@ -579,7 +618,7 @@ export function ImportData({ onDataImported }) {
               </tbody>
               <tfoot style={{ position: 'sticky', bottom: 0 }}>
                 <tr style={{ borderTop: '2px solid #cbd5e1', background: balanceOk ? '#f0fdf4' : '#fef2f2' }}>
-                  <td colSpan={3} style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b', fontSize: '0.78rem' }}>
+                  <td colSpan={3} style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b', fontSize: '0.80rem' }}>
                     TOTAUX ({activeRows.length} lignes actives{previewRows.length !== activeRows.length ? `, ${previewRows.length - activeRows.length} ignorée(s)` : ''})
                   </td>
                   {[

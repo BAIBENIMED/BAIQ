@@ -508,7 +508,7 @@ export function generateLocalStructuredReport(data, reportType = 'audit_diagnost
 ### 1. SYNTHÈSE MANAGÉRIALE & TABLEAU DE BORD MULTICRITÈRES
 - **Score Global de Santé Financière** : **${a.scoreGlobal} / 100 — ${a.niveau.emoji} Situation ${a.niveau.label}**
 - **Score Banque d'Algérie (Centrale des Risques)** : **${solv.bancaire?.scoreBA || 14} / 20 points** (Rating : **${solv.bancaire?.ratingBA || 'Favorable'}**)
-- **Score Altman Z'' (Modèle EM-Score Marchés Émergents)** : **${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'} — Probabilité de défaillance : **${solv.risqueDefaillance || 'Faible'}**)
+- **Score Altman Z'' (Modèle EM-Score Marchés Émergents)** : **${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'} — Niveau de risque indicatif (Altman Z'') : **${solv.risqueDefaillance || 'Faible'}**)${solv.estimationPartielle ? `\n  ⚠️ *${solv.estimationPartielleMessage}*` : ''}
 - **Effectif Salarié Déclaré** : ${a.profil?.effectif ? `${a.profil.effectif} ETP` : 'Non communiqué'} | **Productivité RH** : ${m.vaParSalarie ? fmtDZD(m.vaParSalarie) + ' de VA / salarié' : 'N/D'}
 
 ${a.resume}
@@ -758,7 +758,7 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 - **Score Global de la Centrale des Risques** : **${solv.bancaire?.scoreBA || 14} / 20 points**
 - **Profil de Risque Attribué** : **${solv.bancaire?.ratingBA || 'Favorable'}** (Avis : **${solv.bancaire?.statutCredit || 'FAVORABLE'}**)
 - **Modèle Altman Z'' (EM-Score Marchés Émergents)** : **${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'})
-- **Probabilité de Défaillance Estimée** : **${solv.risqueDefaillance || 'Faible'}**
+- **Niveau de Risque de Défaillance (indicatif, non calibré statistiquement)** : **${solv.risqueDefaillance || 'Faible'}**
 
 | Pilier de Notation Banque d'Algérie | Indicateur Financier | Score Attribué | Barème Max | Appréciation du Risque |
 |---|---|---|---|---|
@@ -859,7 +859,7 @@ Effectue une analyse financière approfondie, critique, chiffrée et ultra-rigou
 ## V. SOLVABILITÉ, RATING BANQUE D'ALGÉRIE & RISQUE DE DÉFAILLANCE
 - Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA || 14} / 20 (Rating : ${solv.bancaire?.ratingBA || 'Favorable'})
 - Score Altman Z'' (Modèle EM-Score) : ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'} — Rating synthétique : ${solv.rating || 'N/D'})
-- Risque de défaillance estimé : ${solv.risqueDefaillance || 'Faible'}
+- Niveau de risque de défaillance indicatif (zone Altman Z'') : ${solv.risqueDefaillance || 'Faible'}
 - Liquidité Générale : ${m.liq.toFixed(2)}x (Norme : ${sec.benchmarks?.liquiditeGenerale?.norme})
 - Autonomie Financière : ${pct_(m.autFin)} (Norme : ${sec.benchmarks?.autonomieFinanciere?.norme})
 

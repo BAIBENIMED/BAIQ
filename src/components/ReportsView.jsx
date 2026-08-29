@@ -10,10 +10,10 @@ import { generateFullPDF } from '../utils/pdfExporter';
 
 const KpiRow = ({ label, value, sub, ok }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{label}</span>
+    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{label}</span>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      {sub && <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)' }}>{sub}</span>}
-      <span className="mono" style={{ fontSize: '0.9rem', fontWeight: 700, color: ok === true ? '#059669' : ok === false ? '#dc2626' : 'var(--text)' }}>{value}</span>
+      {sub && <span style={{ fontSize: '0.74rem', color: 'var(--text-sub)' }}>{sub}</span>}
+      <span className="mono" style={{ fontSize: '0.92rem', fontWeight: 700, color: ok === true ? '#059669' : ok === false ? '#dc2626' : 'var(--text)' }}>{value}</span>
     </div>
   </div>
 );
@@ -23,7 +23,7 @@ function renderInlineMarkdown(text) {
   const parts = text.split(/(\*\*.*?\*\*)/g);
   return parts.map((part, idx) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={idx} style={{ color: '#0f172a', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+      return <strong key={idx} style={{ color: 'var(--text)', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
     }
     return part;
   });
@@ -46,7 +46,7 @@ function MarkdownReportViewer({ content }) {
 
     elements.push(
       <div key={`tbl-${key}`} style={{ overflowX: 'auto', maxWidth: '100%', margin: '14px 0', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.80rem' }}>
           <thead>
             <tr style={{ background: '#f1f5f9', borderBottom: '2px solid var(--border)' }}>
               {headers.map((h, hIdx) => {
@@ -64,7 +64,7 @@ function MarkdownReportViewer({ content }) {
               const cells = r.split('|').map(s => s.trim()).filter((s, i, a) => (i > 0 && i < a.length - 1) || (a.length <= 2 && s));
               const isEven = rIdx % 2 === 0;
               return (
-                <tr key={rIdx} style={{ background: isEven ? 'transparent' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <tr key={rIdx} style={{ background: isEven ? 'transparent' : 'var(--surface-alt)', borderBottom: '1px solid var(--border)' }}>
                   {cells.map((c, cIdx) => {
                     const isNum = c.includes('DZD') || c.includes('%') || !isNaN(Number(c.replace(/\s/g, '')));
                     return (
@@ -111,7 +111,7 @@ function MarkdownReportViewer({ content }) {
 
     if (trimmed.startsWith('# ')) {
       elements.push(
-        <h2 key={`h1-${i}`} style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <h2 key={`h1-${i}`} style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text)', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
           {trimmed.slice(2)}
         </h2>
       );
@@ -120,7 +120,7 @@ function MarkdownReportViewer({ content }) {
 
     if (trimmed.startsWith('### ')) {
       elements.push(
-        <h3 key={`h3-${i}`} style={{ fontSize: '0.98rem', fontWeight: 800, color: '#1e3a8a', margin: '16px 0 8px', borderLeft: '4px solid #2563eb', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0b3446', margin: '16px 0 8px', borderLeft: '4px solid #1b6e8c', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
           {trimmed.slice(4)}
         </h3>
       );
@@ -129,7 +129,7 @@ function MarkdownReportViewer({ content }) {
 
     if (trimmed.startsWith('#### ')) {
       elements.push(
-        <h4 key={`h4-${i}`} style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: '10px 0 4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <h4 key={`h4-${i}`} style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)', margin: '10px 0 4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
           {trimmed.slice(5)}
         </h4>
       );
@@ -140,8 +140,8 @@ function MarkdownReportViewer({ content }) {
       const isCheck = trimmed.startsWith('✓');
       const isCross = trimmed.startsWith('✗');
       elements.push(
-        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.83rem', color: '#334155', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
-          <span style={{ color: isCheck ? '#059669' : isCross ? '#dc2626' : '#2563eb', fontWeight: 800, flexShrink: 0 }}>
+        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.85rem', color: '#334155', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
+          <span style={{ color: isCheck ? '#059669' : isCross ? '#dc2626' : '#1b6e8c', fontWeight: 800, flexShrink: 0 }}>
             {isCheck ? '✓' : isCross ? '✗' : '•'}
           </span>
           <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
@@ -153,7 +153,7 @@ function MarkdownReportViewer({ content }) {
     }
 
     elements.push(
-      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.85rem', color: '#334155', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
         {renderInlineMarkdown(trimmed)}
       </p>
     );
@@ -255,12 +255,12 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 40 }}>
       <div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Rapport Financier Complet</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Analyse détaillée avec diagnostic, forces &amp; faiblesses (SCF Algérie).</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse détaillée avec diagnostic, forces &amp; faiblesses (SCF Algérie).</p>
       </div>
       <div className="card" style={{ maxWidth: 480, margin: '20px auto', textAlign: 'center', padding: '48px 32px' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: 'var(--text-sub)', display: 'block', marginBottom: 16 }}>description</span>
         <h3 style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Aucune donnée disponible</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Importez une balance comptable pour générer le rapport complet.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Importez une balance comptable pour générer le rapport complet.</p>
       </div>
     </div>
   );
@@ -500,7 +500,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Rapport Financier Complet</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Diagnostic complet avec analyse des forces, faiblesses, solvabilité &amp; recommandations — référentiel SCF Algérie</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Diagnostic complet avec analyse des forces, faiblesses, solvabilité &amp; recommandations — référentiel SCF Algérie</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
@@ -520,7 +520,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               color: '#fff', border: 'none', borderRadius: 10, padding: '9px 18px',
               fontWeight: 900, cursor: isPdfGenerating ? 'wait' : 'pointer',
               boxShadow: isPdfGenerating ? 'none' : '0 4px 14px rgba(220,38,38,0.35)',
-              fontSize: '0.88rem', transition: 'all 0.2s'
+              fontSize: '0.92rem', transition: 'all 0.2s'
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
@@ -534,7 +534,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
       {/* ── Bannière PDF ── */}
       <div style={{
         background: 'linear-gradient(135deg, #1e1b4b 0%, #b91c1c 100%)',
-        borderRadius: 14, padding: '18px 24px',
+        borderRadius: 16, padding: '18px 24px',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16,
         boxShadow: '0 8px 24px rgba(185,28,28,0.2)'
       }}>
@@ -544,7 +544,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           </div>
           <div>
             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff' }}>Export PDF & Excel Professionnel — Rapport Annuel Complet</div>
-            <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
+            <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
               Page de garde · Bilan fonctionnel · SIG/TCR · Ratios · Rating Bancaire · Audit SCF · 6 Feuilles Excel
             </div>
           </div>
@@ -555,7 +555,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             disabled={!data}
             style={{
               padding: '10px 18px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
-              background: '#059669', color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer',
+              background: '#059669', color: '#fff', fontWeight: 900, fontSize: '0.92rem', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
               transition: 'all 0.2s', flexShrink: 0
             }}
@@ -570,7 +570,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             style={{
               padding: '10px 22px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',
               background: isPdfGenerating ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
-              color: '#fff', fontWeight: 900, fontSize: '0.88rem', cursor: isPdfGenerating ? 'wait' : 'pointer',
+              color: '#fff', fontWeight: 900, fontSize: '0.92rem', cursor: isPdfGenerating ? 'wait' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
               transition: 'all 0.2s', flexShrink: 0
             }}
@@ -604,12 +604,12 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>Générateur de Rapports &amp; Diagnostics avec Google Gemini IA</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#ffffff' }}>Générateur de Rapports &amp; Diagnostics avec Google Gemini IA</h3>
                 <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 20, background: 'rgba(196, 181, 253, 0.25)', color: '#e9d5ff', border: '1px solid rgba(196, 181, 253, 0.4)' }}>
                   IA Générative SCF
                 </span>
               </div>
-              <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#c7d2fe' }}>
+              <p style={{ margin: '3px 0 0', fontSize: '0.80rem', color: '#c7d2fe' }}>
                 Générez des analyses stratégiques, plans d'action chiffrés et diagnostics bancaires complets en 1 clic.
               </p>
             </div>
@@ -625,7 +625,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               borderRadius: 6,
               background: hasUsedQuota ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
               border: `1px solid ${hasUsedQuota ? '#d97706' : '#059669'}`,
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               fontWeight: 800,
               color: hasUsedQuota ? '#fde68a' : '#6ee7b7'
             }}>
@@ -638,7 +638,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 <button
                   onClick={handleCopyReport}
                   className="btn"
-                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.80rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{copied ? 'check' : 'content_copy'}</span>
                   {copied ? 'Copié !' : 'Copier'}
@@ -646,7 +646,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 <button
                   onClick={() => window.print()}
                   className="btn"
-                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.80rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>print</span>
                   Imprimer
@@ -665,7 +665,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                     border: '1px solid rgba(255,255,255,0.12)',
                     borderRadius: 8,
                     padding: '8px 14px',
-                    fontSize: '0.78rem',
+                    fontSize: '0.80rem',
                     fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
@@ -689,7 +689,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                   border: 'none',
                   borderRadius: 8,
                   padding: '9px 18px',
-                  fontSize: '0.84rem',
+                  fontSize: '0.85rem',
                   fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
@@ -733,22 +733,22 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                   <span className="material-symbols-outlined" style={{ color: '#f59e0b', fontSize: 20 }}>warning</span>
                 </div>
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#fff' }}>Confirmation de Génération IA</h4>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#cbd5e1' }}>Limite stricte : 1 rapport par dossier importé</p>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#fff' }}>Confirmation de Génération IA</h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#cbd5e1' }}>Limite stricte : 1 rapport par dossier importé</p>
                 </div>
               </div>
 
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ padding: '14px 16px', background: '#fffbeb', borderRadius: 10, border: '1px solid #fde68a', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 22, marginTop: 1 }}>info</span>
-                  <div style={{ fontSize: '0.82rem', color: '#92400e', lineHeight: 1.55 }}>
+                  <div style={{ fontSize: '0.85rem', color: '#92400e', lineHeight: 1.55 }}>
                     <strong>Attention :</strong> Cette action va consommer <strong>1 appel IA</strong> pour cette balance comptable.
                     <br />
                     Une fois généré, le rapport restera sauvegardé et consultable sans consommer d'appel supplémentaire.
                   </div>
                 </div>
 
-                <div style={{ padding: '12px 16px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px solid var(--border)', fontSize: '0.8rem' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px solid var(--border)', fontSize: '0.80rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ color: 'var(--text-muted)' }}>Type de rapport :</span>
                     <strong style={{ color: 'var(--primary)' }}>
@@ -779,14 +779,14 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 <button
                   onClick={() => setShowConfirmModal(false)}
                   className="btn"
-                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.80rem', fontWeight: 800, cursor: 'pointer' }}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={executeGeneration}
                   className="btn btn-primary"
-                  style={{ padding: '8px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: '#fff', border: 'none', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)' }}
+                  style={{ padding: '8px 20px', borderRadius: 8, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: '#fff', border: 'none', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)' }}
                 >
                   Confirmer &amp; Générer (Consommer 1 crédit)
                 </button>
@@ -808,11 +808,11 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 onClick={() => setReportType(tab.id)}
                 style={{
                   padding: '6px 12px',
-                  borderRadius: 7,
+                  borderRadius: 6,
                   border: `1px solid ${reportType === tab.id ? '#6366f1' : 'var(--border)'}`,
                   background: reportType === tab.id ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface)',
                   color: reportType === tab.id ? '#6366f1' : 'var(--text-muted)',
-                  fontSize: '0.76rem',
+                  fontSize: '0.74rem',
                   fontWeight: 800,
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
@@ -827,7 +827,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           {/* Saisie rapide clé Gemini si absente */}
           {!effectiveKey && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 800 }}>⚠️ Clé Gemini requise :</span>
+              <span style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 800 }}>⚠️ Clé Gemini requise :</span>
               <input
                 type="password"
                 placeholder="Coller clé AI Studio..."
@@ -844,7 +844,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
 
         {/* Message d'erreur éventuel */}
         {geminiError && (
-          <div style={{ padding: '12px 24px', background: '#fee2e2', borderBottom: '1px solid #fca5a5', color: '#b91c1c', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ padding: '12px 24px', background: '#fee2e2', borderBottom: '1px solid #fca5a5', color: '#b91c1c', fontSize: '0.80rem', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>error</span>
             <span>{geminiError}</span>
           </div>
@@ -855,10 +855,10 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           {isGenerating ? (
             <div style={{ textAlign: 'center', padding: '48px 20px' }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', border: '4px solid #e0e7ff', borderTopColor: '#6366f1', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-              <h4 style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text)', margin: '0 0 6px' }}>
+              <h4 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text)', margin: '0 0 6px' }}>
                 Gemini analyse votre balance et vos états financiers...
               </h4>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
                 Diagnostic approfondi de l'équilibre financier (FRNG/BFR/TN), calcul des ratios SCF et formulation des recommandations stratégiques.
               </p>
               <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
@@ -870,7 +870,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               padding: '24px 28px',
               border: '1px solid var(--border)',
               lineHeight: 1.75,
-              fontSize: '0.86rem',
+              fontSize: '0.85rem',
               color: 'var(--text)',
               fontFamily: 'Inter, -apple-system, system-ui, sans-serif',
               wordBreak: 'break-word',
@@ -883,10 +883,10 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px dashed var(--border)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#818cf8', display: 'block', marginBottom: 10 }}>psychology</span>
-              <h4 style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--text)', margin: '0 0 4px' }}>
+              <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text)', margin: '0 0 4px' }}>
                 Prêt pour l'analyse financière augmentée par IA
               </h4>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 540, margin: '0 auto 16px' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.80rem', maxWidth: 540, margin: '0 auto 16px' }}>
                 Sélectionnez un type de rapport ci-dessus pour afficher le diagnostic complet.
               </p>
             </div>
@@ -900,7 +900,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '20px 24px', background: `${scoreColor}10`, borderBottom: `3px solid ${scoreColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: scoreColor, marginBottom: 4 }}>Score de Santé Financière</div>
+              <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: scoreColor, marginBottom: 4 }}>Score de Santé Financière</div>
               <div style={{ fontSize: '2rem', fontWeight: 900, color: scoreColor, lineHeight: 1 }} className="mono">{score} / 100</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>{scoreLabel}</div>
             </div>
@@ -928,19 +928,19 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '20px 24px', background: solv.zoneBg, borderBottom: `3px solid ${solv.zoneColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: solv.zoneColor, marginBottom: 4 }}>Rating Crédit &amp; Altman Z''</div>
+              <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: solv.zoneColor, marginBottom: 4 }}>Rating Crédit &amp; Altman Z''</div>
               <div style={{ fontSize: '2rem', fontWeight: 900, color: solv.zoneColor, lineHeight: 1 }} className="mono">Rating : {solv.rating}</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginTop: 4 }}>Score Z'' : {solv.zScore.toFixed(2)} ({solv.zoneLabel.split('—')[0]})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>Score Z'' : {solv.zScore.toFixed(2)} ({solv.zoneLabel.split('—')[0]})</div>
             </div>
-            <div style={{ background: '#fff', padding: '10px 14px', borderRadius: 10, border: `1px solid ${solv.zoneBorder}`, textAlign: 'right' }}>
-              <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>Risque de Défaillance</div>
+            <div style={{ background: 'var(--surface)', padding: '10px 14px', borderRadius: 10, border: `1px solid ${solv.zoneBorder}`, textAlign: 'right' }}>
+              <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 700 }}>Risque de Défaillance</div>
               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: solv.zoneColor }}>{solv.risqueDefaillance}</div>
               <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: 2 }}>Statut Crédit : <strong>{solv.bancaire.statutCredit}</strong></div>
             </div>
           </div>
           <div style={{ padding: '10px 20px', background: 'var(--surface-alt)', display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b' }}>
             <span>Désendettement : <strong>{solv.bancaire.ratioDetteSurEBE < 90 ? `${solv.bancaire.ratioDetteSurEBE.toFixed(1)} ans d'EBE` : 'N/A'}</strong></span>
-            <span>Capacité emprunt : <strong style={{ color: '#2563eb' }}>{fmt(solv.bancaire.capaciteEndettementMax)}</strong></span>
+            <span>Capacité emprunt : <strong style={{ color: '#1b6e8c' }}>{fmt(solv.bancaire.capaciteEndettementMax)}</strong></span>
           </div>
         </div>
       </div>
@@ -953,20 +953,20 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         </div>
         <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           {[
-            { label: 'Emplois Stables',      val: b.emploisStables,    sub: 'Actif Non Courant', color: '#2563eb' },
+            { label: 'Emplois Stables',      val: b.emploisStables,    sub: 'Actif Non Courant', color: '#1b6e8c' },
             { label: 'Ressources Stables',   val: b.ressourcesStables, sub: 'Capitaux Permanents', color: '#059669' },
             { label: 'FRNG',                 val: b.frng,              sub: 'Ressources − Emplois', color: (b.frng||0)>=0 ? '#059669':'#dc2626', bold: true },
-            { label: 'Actif Circulant',      val: b.actifCirculant,    sub: 'Stocks + Créances', color: '#2563eb' },
+            { label: 'Actif Circulant',      val: b.actifCirculant,    sub: 'Stocks + Créances', color: '#1b6e8c' },
             { label: 'Passif Circulant',     val: b.passifCirculant,   sub: 'Dettes CT', color: '#d97706' },
             { label: 'BFR',                  val: b.bfr,               sub: 'Actif Circ. − Passif Circ.', color: (b.bfr||0)>=0 ? '#d97706':'#059669', bold: true },
-            { label: 'Trésorerie Active',    val: b.tresorerieActive,  sub: 'Liquidités', color: '#2563eb' },
+            { label: 'Trésorerie Active',    val: b.tresorerieActive,  sub: 'Liquidités', color: '#1b6e8c' },
             { label: 'Trésorerie Passive',   val: b.tresoreriePassive, sub: 'Concours bancaires', color: '#dc2626' },
             { label: 'Trésorerie Nette',     val: b.tn,                sub: 'FRNG − BFR', color: (b.tn||0)>=0 ? '#059669':'#dc2626', bold: true },
           ].map(({ label, val, sub, color, bold }) => (
             <div key={label} style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', borderLeft: `3px solid ${color}` }}>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>{label}</div>
               <div className="mono" style={{ fontSize: bold ? '1.05rem' : '0.95rem', fontWeight: bold ? 900 : 700, color }}>{fmt(val)}</div>
-              <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', marginTop: 2 }}>{sub}</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-sub)', marginTop: 2 }}>{sub}</div>
             </div>
           ))}
         </div>
@@ -980,7 +980,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
-            { label: "Chiffre d'Affaires (CA)", value: fmt(s.chiffreAffaires), indent: 0, bold: true, color: '#2563eb' },
+            { label: "Chiffre d'Affaires (CA)", value: fmt(s.chiffreAffaires), indent: 0, bold: true, color: '#1b6e8c' },
             { label: 'Production de l\'exercice', value: fmt(s.productionExercice), indent: 1, sub: '70+72+73+74' },
             { label: '− Consommations de l\'exercice', value: fmt(s.consommationExercice), indent: 1, sub: '60+61+62', negative: true },
             { label: '= Valeur Ajoutée (VA)', value: fmt(s.valeurAjoutee), indent: 0, bold: true, highlight: true, pct: fmtPct(tauxVA) + ' du CA' },
@@ -1006,12 +1006,12 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
               background: highlight ? 'var(--surface-alt)' : 'transparent',
               borderRadius: highlight ? 8 : 0,
               fontWeight: bold ? 700 : 400,
-              borderBottom: '1px solid #f8fafc'
+              borderBottom: '1px solid var(--border)'
             }}>
-              <span style={{ fontSize: '0.82rem', color: color || 'var(--text)' }}>{label}</span>
+              <span style={{ fontSize: '0.85rem', color: color || 'var(--text)' }}>{label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {sub && <span style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>{sub}</span>}
-                {pct && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary-dk)', background: 'var(--primary-lt)', padding: '2px 8px', borderRadius: 6 }}>{pct}</span>}
+                {pct && <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary-dk)', background: 'var(--primary-lt)', padding: '2px 8px', borderRadius: 6 }}>{pct}</span>}
                 <span className="mono" style={{ fontSize: bold ? '0.92rem' : '0.82rem', fontWeight: bold ? 800 : 500, color: bigColor || (negative ? '#dc2626' : 'var(--text)') }}>
                   {value}
                 </span>
@@ -1029,14 +1029,14 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         </div>
         <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Délais &amp; Cycles d'Exploitation</div>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Délais &amp; Cycles d'Exploitation</div>
             <KpiRow label="DSO — Délai Recouvrement Clients" value={fmtDays(dso)} sub={r.tauxRotationCreances ? `${r.tauxRotationCreances.toFixed(1)}x/an` : ''} ok={dso <= 60} />
             <KpiRow label="DPO — Délai Paiement Fournisseurs" value={fmtDays(dpo)} sub={fmt(r.dettesFournisseurs)} ok={dpo >= 30 && dpo <= 90} />
             <KpiRow label="Rotation des Stocks" value={fmtDays(rotStock)} sub={r.tauxRotationStocks ? `${r.tauxRotationStocks.toFixed(1)}x/an` : ''} ok={rotStock <= 90} />
             <KpiRow label="BFR en jours de CA" value={fmtDays(bfrJCA)} sub="j CA" ok={bfrJCA <= 60} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Structure &amp; Rentabilité</div>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Structure &amp; Rentabilité</div>
             <KpiRow label="Liquidité Générale" value={fmtRatio(liqGen)} sub="Norme ≥ 1.2x" ok={liqGen >= 1.2} />
             <KpiRow label="Autonomie Financière" value={fmtPct(autFinanc)} sub="Norme ≥ 30%" ok={autFinanc >= 0.3} />
             <KpiRow label="Marge EBE" value={fmtPct(margeEBE)} sub="Norme ≥ 10%" ok={margeEBE >= 0.1} />
@@ -1053,7 +1053,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           </div>
           <div>
             <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#166534' }}>Forces &amp; Atouts Financiers</h3>
-            <span style={{ fontSize: '0.72rem', color: '#059669' }}>{nbForces} point{nbForces > 1 ? 's' : ''} fort{nbForces > 1 ? 's' : ''} identifié{nbForces > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: '0.74rem', color: '#059669' }}>{nbForces} point{nbForces > 1 ? 's' : ''} fort{nbForces > 1 ? 's' : ''} identifié{nbForces > 1 ? 's' : ''}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1066,15 +1066,15 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: '#166534', lineHeight: 1.55 }}>{item.detail}</p>
+                  <p style={{ fontSize: '0.80rem', color: '#166534', lineHeight: 1.55 }}>{item.detail}</p>
                 </div>
               </div>
             );
           })}
-          {nbForces === 0 && <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>Aucune force identifiée — analyse approfondie recommandée.</div>}
+          {nbForces === 0 && <div style={{ padding: 16, background: 'var(--surface-alt)', borderRadius: 10, color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>Aucune force identifiée — analyse approfondie recommandée.</div>}
         </div>
       </div>
 
@@ -1087,7 +1087,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             </div>
             <div>
               <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#92400e' }}>Points à Surveiller</h3>
-              <span style={{ fontSize: '0.72rem', color: '#d97706' }}>{nbNeutre} point{nbNeutre > 1 ? 's' : ''} à surveiller</span>
+              <span style={{ fontSize: '0.74rem', color: '#d97706' }}>{nbNeutre} point{nbNeutre > 1 ? 's' : ''} à surveiller</span>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1100,10 +1100,10 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: '#92400e', lineHeight: 1.55 }}>{item.detail}</p>
+                    <p style={{ fontSize: '0.80rem', color: '#92400e', lineHeight: 1.55 }}>{item.detail}</p>
                   </div>
                 </div>
               );
@@ -1120,7 +1120,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
           </div>
           <div>
             <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#be123c' }}>Faiblesses &amp; Points de Vigilance</h3>
-            <span style={{ fontSize: '0.72rem', color: '#dc2626' }}>{nbFaiblesses} risque{nbFaiblesses > 1 ? 's' : ''} identifié{nbFaiblesses > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: '0.74rem', color: '#dc2626' }}>{nbFaiblesses} risque{nbFaiblesses > 1 ? 's' : ''} identifié{nbFaiblesses > 1 ? 's' : ''}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1133,10 +1133,10 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: ts.color }}>{item.titre}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', background: `${ts.color}20`, color: ts.color, padding: '2px 8px', borderRadius: 20 }}>{item.cat}</span>
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: '#be123c', lineHeight: 1.55 }}>{item.detail}</p>
+                  <p style={{ fontSize: '0.80rem', color: '#be123c', lineHeight: 1.55 }}>{item.detail}</p>
                 </div>
               </div>
             );
@@ -1147,9 +1147,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
 
       {/* ── Section 7 : Recommandations ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="material-symbols-outlined" style={{ color: '#2563eb', fontSize: 20 }}>lightbulb</span>
-          <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e40af' }}>7. Recommandations &amp; Plan d'Action</h3>
+        <div style={{ padding: '14px 20px', background: '#f0f8fa', borderBottom: '1px solid #b7dce6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="material-symbols-outlined" style={{ color: '#1b6e8c', fontSize: 20 }}>lightbulb</span>
+          <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#124f66' }}>7. Recommandations &amp; Plan d'Action</h3>
         </div>
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
@@ -1160,7 +1160,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
             ...(margeNette < 0 ? [{ icon: 'trending_down', color: '#dc2626', action: 'Plan de redressement de la rentabilité', detail: 'Résultat net négatif. Analyser poste par poste les charges pour identifier les surcoûts. Revoir la politique tarifaire et la mix produit/service.' }] : []),
             ...(autFinanc < 0.3 ? [{ icon: 'shield', color: '#d97706', action: 'Renforcer les fonds propres', detail: `Autonomie de ${fmtPct(autFinanc)}. Envisager une augmentation de capital, la mise en réserve des bénéfices futurs ou le remboursement progressif des dettes financières.` }] : []),
             ...(bfrJCA > 60 ? [{ icon: 'loop', color: '#d97706', action: 'Réduire le Besoin en Fonds de Roulement', detail: `BFR de ${fmtDays(bfrJCA)} de CA. Agir simultanément sur les 3 leviers : accélérer les encaissements clients, rallonger les délais fournisseurs, réduire les stocks.` }] : []),
-            { icon: 'bar_chart', color: '#2563eb', action: 'Mettre en place un tableau de bord mensuel', detail: 'Suivre mensuellement les 8 indicateurs clés : CA, EBE, trésorerie, DSO, DPO, stock, BFR et résultat net. Toute dérive > 10% doit déclencher une action corrective.' },
+            { icon: 'bar_chart', color: '#1b6e8c', action: 'Mettre en place un tableau de bord mensuel', detail: 'Suivre mensuellement les 8 indicateurs clés : CA, EBE, trésorerie, DSO, DPO, stock, BFR et résultat net. Toute dérive > 10% doit déclencher une action corrective.' },
           ].map(({ icon, color, action, detail }, i) => (
             <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '12px 16px', background: `${color}08`, borderRadius: 10, border: `1px solid ${color}25` }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1170,7 +1170,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
                 <div style={{ fontSize: '0.85rem', fontWeight: 800, color, marginBottom: 4 }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-sub)', marginRight: 6 }}>{i + 1}.</span>{action}
                 </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{detail}</p>
+                <p style={{ fontSize: '0.80rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{detail}</p>
               </div>
             </div>
           ))}
@@ -1178,7 +1178,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
       </div>
 
       {/* ── Pied de rapport ── */}
-      <div style={{ padding: '14px 20px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '14px 20px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
         <span>📋 Rapport généré par <strong>BAIQ — Balance and Financial Analytics</strong> — Référentiel SCF Algérie (Système Comptable Financier)</span>
         <span className="mono" style={{ color: 'var(--text-sub)' }}>{new Date().toLocaleDateString('fr-DZ', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </div>

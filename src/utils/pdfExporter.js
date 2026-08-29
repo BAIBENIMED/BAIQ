@@ -6,6 +6,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { calculateAltmanZScore } from './solvabiliteEngine';
 
 // ── Palette Typographique & Teintes LaTeX ──────────────────────────────
 const T = {
@@ -437,8 +438,8 @@ export async function generateFullPDF(data, _unused, isSimulated = false) {
     ['2. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '3'],
     ['3. Ratios Financiers, Solvabilité & Délais de Rotation', '4'],
     ['4. Analyse Comparative Pluriannuelle (N vs N-1)', '5'],
-    ['5. Matrice Analytique des Forces, Faiblesses et Risques', '6'],
-    ['6. Audit des Natures de Comptes & Anomalies d\'Écritures', '7'],
+    ['5. Matrice des Risques & Notation de Solvabilité (Altman Z\'\')', '6'],
+    ['6. Audit des Natures de Comptes & Anomalies d\'Écritures', '8'],
   ];
 
   toc.forEach(([title, pageNum]) => {
@@ -819,6 +820,72 @@ export async function generateFullPDF(data, _unused, isSimulated = false) {
     doc.text(act, margin + 2, y);
     y += 5;
   });
+
+  // ──────────────────────────────────────────────────────────────────
+  // SECTION 5.2 — NOTATION DE SOLVABILITÉ (ALTMAN Z'' & BANQUE D'ALGÉRIE)
+  // ──────────────────────────────────────────────────────────────────
+  doc.addPage();
+  y = 22;
+
+  y = latexSubSection(doc, '5.2. Notation de Solvabilité — Modèle Altman Z\'\' & Score Banque d\'Algérie', y);
+
+  const solv = calculateAltmanZScore(bilan, sig, rows);
+
+  y = latexMathBox(
+    doc,
+    "Z'' = 6.56·X1 + 3.26·X2 + 6.72·X3 + 1.05·X4",
+    "X1 = FRNG/Bilan · X2 = Réserves/Bilan · X3 = EBIT/Bilan · X4 = Capitaux Propres/Dettes — Modèle EM-Score (marchés émergents, entreprises non cotées)",
+    y
+  );
+
+  y = latexKpiRow(doc, [
+    {
+      label: "SCORE ALTMAN Z''",
+      val: solv.zScore.toFixed(2),
+      sub: solv.zoneLabel.split('—')[0].trim(),
+      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'warn'
+    },
+    {
+      label: 'RATING SYNTHÉTIQUE',
+      val: solv.rating,
+      sub: `Niveau de risque : ${solv.risqueDefaillance}`,
+      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'warn'
+    },
+    {
+      label: "SCORE BANQUE D'ALGÉRIE",
+      val: `${solv.bancaire.scoreBA.toFixed(1)} / 20`,
+      sub: solv.bancaire.ratingBA,
+      status: solv.bancaire.scoreBA >= 16 ? 'ok' : solv.bancaire.scoreBA >= 8 ? 'warn' : 'danger'
+    }
+  ], y);
+
+  const detailsBA = solv.bancaire.detailsBA;
+  const scoreHead = [['CRITÈRE (SUR 5 PTS)', 'RATIO OBSERVÉ', 'POINTS']];
+  const scoreBody = [
+    [detailsBA.autonomie.label, detailsBA.autonomie.displayVal, `${detailsBA.autonomie.score} / 5`],
+    [detailsBA.rentabilite.label, detailsBA.rentabilite.displayVal, `${detailsBA.rentabilite.score} / 5`],
+    [detailsBA.liquidite.label, detailsBA.liquidite.displayVal, `${detailsBA.liquidite.score} / 5`],
+    [detailsBA.couverture.label, detailsBA.couverture.displayVal, `${detailsBA.couverture.score} / 5`],
+  ];
+  y = drawBooktabsTable(doc, scoreHead, scoreBody, y, {
+    columnStyles: {
+      0: { cellWidth: 90 },
+      1: { halign: 'center', cellWidth: 40 },
+      2: { halign: 'center', fontStyle: 'bold', cellWidth: 30 }
+    }
+  });
+
+  // Avertissement méthodologique — précision du modèle & estimation éventuelle
+  doc.setFont('times', 'italic');
+  doc.setFontSize(7.2);
+  doc.setTextColor(...T.inkMuted);
+  const disclaimerLines = doc.splitTextToSize(
+    solv.risqueDefaillanceDisclaimer +
+    (solv.estimationPartielle ? ` ${solv.estimationPartielleMessage}` : ''),
+    W - margin * 2
+  );
+  doc.text(disclaimerLines, margin, y);
+  y += disclaimerLines.length * 3.6 + 4;
 
   // ──────────────────────────────────────────────────────────────────
   // PAGE 7 — SECTION 6 : AUDIT DES SOLDES & ANOMALIES SCF
