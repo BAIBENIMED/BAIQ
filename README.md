@@ -1,4 +1,4 @@
-# Finanalyze (BAIQ) — Plateforme d'Analyse Financière SCF Algérie
+# BAIQ — Plateforme d'Analyse Financière SCF Algérie
 
 Application d'analyse comptable et financière (Bilan, SIG, Ratios, Solvabilité, Audit de balance)
 conforme au Système Comptable Financier (SCF, Loi 07-11), avec assistant IA optionnel (Google Gemini).

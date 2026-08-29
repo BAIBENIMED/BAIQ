@@ -1,5 +1,5 @@
 /**
- * Serveur Finanalyze — sert le build de production et relaie les appels à l'API Gemini.
+ * Serveur BAIQ — sert le build de production et relaie les appels à l'API Gemini.
  *
  * Pourquoi ce serveur ?
  * Dans une application 100% front-end, la clé API Gemini serait forcément intégrée
@@ -153,5 +153,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Finanalyze démarré sur le port ${PORT} ${GEMINI_API_KEY ? '(clé Gemini configurée ✓)' : '(⚠ GEMINI_API_KEY manquante — les rapports IA seront indisponibles)'}`);
+  console.log(`BAIQ démarré sur le port ${PORT} ${GEMINI_API_KEY ? '(clé Gemini configurée ✓)' : '(⚠ GEMINI_API_KEY manquante — les rapports IA seront indisponibles)'}`);
 });

@@ -15,6 +15,7 @@ import { AIView } from './components/AIView';
 import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { CalculationsIndexView } from './components/CalculationsIndexView';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { PostImportConfigModal } from './components/PostImportConfigModal';
 import { PresentationView } from './components/PresentationView';
 import { exportFinancialWorkbook } from './utils/excelExporter';
 import { generateFullPDF } from './utils/pdfExporter';
@@ -47,6 +48,7 @@ export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showPostImportConfig, setShowPostImportConfig] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(() => parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10));
   
   /* ── Recherche Avancée (Ctrl+K) & Mode Présentation DAF ── */
@@ -93,6 +95,7 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   });
 
+
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
@@ -101,9 +104,12 @@ export default function App() {
   };
 
   const fmt = (v) => {
-    const num = Math.round(Number(v) || 0);
+    const decimals = data?.profil?.rounding ?? 0;
+    const num = Number(v) || 0;
     const sign = num < 0 ? '-' : '';
-    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${cur}`;
+    const [intPart, decPart] = Math.abs(num).toFixed(decimals).split('.');
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${sign}${formattedInt}${decPart ? ',' + decPart : ''} ${cur}`;
   };
 
   const fmtPct = (p) => {
@@ -115,6 +121,7 @@ export default function App() {
   const onImported = (d) => {
     setData(d);
     setTab('dashboard');
+    setShowPostImportConfig(true);
     const newCount = (parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10)) + 1;
     localStorage.setItem('baiq_analysis_count', String(newCount));
     setAnalysisCount(newCount);
@@ -124,6 +131,16 @@ export default function App() {
     setData(prev => prev ? {
       ...prev,
       profil: { ...(prev.profil || {}), secteurId }
+    } : prev);
+  };
+
+  // Patch générique du profil (nom, effectif, arrondi...) — déclenché depuis la fenêtre
+  // de finalisation post-import ou depuis Paramètres. Reste local (localStorage), jamais
+  // envoyé à un serveur.
+  const updateProfil = (patch) => {
+    setData(prev => prev ? {
+      ...prev,
+      profil: { ...(prev.profil || {}), ...patch }
     } : prev);
   };
 
@@ -512,10 +529,10 @@ export default function App() {
     if (tab === 'sig')      return <SIGView data={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'capitaux') return <CapitauxPropresView data={activeData} fmt={fmt} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
-    if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
+    if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} cur={cur} />;
     if (tab === 'whatif')      return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
     if (tab === 'methodology') return <CalculationsIndexView />;
-    if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
+    if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} cur={cur} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
     if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
     if (tab === 'settings')    return <SettingsView cur={cur} setCur={setCur} geminiKey={geminiKey} setGeminiKey={(k) => { setGeminiKey(k); localStorage.setItem('finanalyze_gemini_key', k); }} data={activeData} onUpdateSecteur={updateSecteur} onUpdateTvaRegime={updateTvaRegime} />;
 
@@ -567,7 +584,9 @@ export default function App() {
             { label:'Trésorerie Nette', value: b.tn, color:'var(--text)', barColor:'#d97706', pct: kpiPct(b.tn), trend: tnTrend.label, up: tnTrend.up },
             { label:'Résultat Net', value: s.resultatNet, color:'#059669', barColor:'#1b6e8c', pct: kpiPct(s.resultatNet), trend: rnTrend.label, up: rnTrend.up },
           ].map((k,i) => {
-            const numFormatted = Math.round(k.value || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            const kDecimals = data?.profil?.rounding ?? 0;
+            const [kInt, kDec] = Math.abs(Number(k.value) || 0).toFixed(kDecimals).split('.');
+            const numFormatted = `${(k.value || 0) < 0 ? '-' : ''}${kInt.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${kDec ? ',' + kDec : ''}`;
             const len = numFormatted.length;
             const adaptiveFontSize = len > 14 ? '1.05rem' : len > 11 ? '1.18rem' : len > 9 ? '1.3rem' : '1.45rem';
 
@@ -962,22 +981,17 @@ export default function App() {
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div style={{
                 width: 34, height: 34, borderRadius: 10,
-                background: 'linear-gradient(135deg, var(--ink), var(--primary-dk))',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(11,52,70,0.35)',
-                border: '1px solid var(--ink)'
+                background: '#0a0a0a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                border: '1px solid #000000'
               }}>
-                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1 }}>BQ</span>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.92rem', color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1 }}>B</span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#e5484d' }} />
+                  <span style={{ width: 2.5, height: 10, background: '#ffffff', borderRadius: 1 }} />
+                </span>
               </div>
-              {/* Gold dot — top-right, signature accent */}
-              <span style={{
-                position: 'absolute', top: -3, right: -3,
-                width: 9, height: 9, borderRadius: '50%',
-                background: 'var(--accent)',
-                border: '2px solid var(--surface)',
-                boxShadow: '0 0 6px rgba(192,138,46,0.7)',
-                display: 'block'
-              }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
@@ -1231,6 +1245,18 @@ export default function App() {
         </div>
       )}
 
+      {/* ── FINALISATION POST-IMPORT (Effectif, TVA, Devise, Arrondi) ── */}
+      <PostImportConfigModal
+        key={analysisCount}
+        isOpen={showPostImportConfig}
+        onClose={() => setShowPostImportConfig(false)}
+        data={data}
+        cur={cur}
+        setCur={setCur}
+        onUpdateProfil={updateProfil}
+        onUpdateTvaRegime={updateTvaRegime}
+      />
+
       {/* ── PALETTE DE COMMANDES (Ctrl+K) ── */}
       <CommandPaletteModal
         isOpen={isCommandPaletteOpen}
@@ -1238,8 +1264,8 @@ export default function App() {
         onNavigate={(id) => setTab(id)}
         rows={activeData?.rows}
         data={activeData}
-        onExportExcel={() => exportFinancialWorkbook(activeData)}
-        onExportPDF={() => generateFullPDF(activeData, undefined, isSimulationActive)}
+        onExportExcel={() => exportFinancialWorkbook(activeData, undefined, cur)}
+        onExportPDF={() => generateFullPDF(activeData, cur, isSimulationActive)}
         onTogglePresentation={() => setIsPresentationOpen(true)}
         isSimulationActive={isSimulationActive}
         setIsSimulationActive={setIsSimulationActive}

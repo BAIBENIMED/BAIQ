@@ -15,10 +15,13 @@ import { getSecteur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
 import { auditBalanceAccounts, auditCrossAccountMovements } from './financeCalculations';
 
-export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx') {
+export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx', cur) {
   if (!data) return false;
 
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 = null } = data;
+  // Devise déclarée par l'utilisateur (fenêtre de finalisation post-import / Paramètres) —
+  // remplace le "DZD" générique par défaut dans les en-têtes de ce classeur.
+  const currency = cur || profil?.currency || 'DZD';
   const secteur = getSecteur(profil.secteurId);
   const bm = secteur.benchmarks;
   const solv = calculateAltmanZScore(bilan, sig, rows);
@@ -49,14 +52,14 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['Score de Solvabilité Globale', `${solv.scoreSolvabilite} / 100`],
     ['Score Banque d\'Algérie', `${solv.bancaire.scoreBA} / 20 points`],
     ['Avis d\'Accord Crédit Bancaire', solv.bancaire.statutCredit],
-    ['Capacité d\'Endettement Théorique Max (DZD)', Math.round(solv.bancaire.capaciteEndettementMax || 0)],
+    [`Capacité d'Endettement Théorique Max (${currency})`, Math.round(solv.bancaire.capaciteEndettementMax || 0)],
     ['Règle Bancaire Appliquée', 'Dettes Financières LT ≤ 3.5 × EBE'],
     ['Couverture des Charges Financières (EBE / Intérêts)', solv.bancaire.couvertureChargesFin >= 90 ? 'Aucune charge financière' : `${solv.bancaire.couvertureChargesFin.toFixed(2)}x`],
     ['Dette Nette / EBE (Années de remboursement)', `${solv.bancaire.ratioDetteSurEBE.toFixed(2)} an(s)`],
     ...(solv.estimationPartielle ? [['⚠️ Avertissement', solv.estimationPartielleMessage]] : []),
     [],
-    ['3. GRANDS AGRÉGATS FINANCIERS DE GESTION (DZD)'],
-    ['Indicateur Financier', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Variation (DZD)', 'Variation (%)'],
+    [`3. GRANDS AGRÉGATS FINANCIERS DE GESTION (${currency})`],
+    ['Indicateur Financier', `Exercice N (${currency})`, `Exercice N-1 (${currency})`, `Variation (${currency})`, 'Variation (%)'],
     ['Chiffre d\'Affaires (CA)', sig.chiffreAffaires || 0, dataN1?.sig?.chiffreAffaires || '', (sig.chiffreAffaires || 0) - (dataN1?.sig?.chiffreAffaires || 0), dataN1?.sig?.chiffreAffaires ? `${(((sig.chiffreAffaires || 0) - dataN1.sig.chiffreAffaires) / dataN1.sig.chiffreAffaires * 100).toFixed(1)}%` : ''],
     ['Valeur Ajoutée (VA)', sig.valeurAjoutee || 0, dataN1?.sig?.valeurAjoutee || '', (sig.valeurAjoutee || 0) - (dataN1?.sig?.valeurAjoutee || 0), ''],
     ['Excédent Brut d\'Exploitation (EBE)', sig.ebe || 0, dataN1?.sig?.ebe || '', (sig.ebe || 0) - (dataN1?.sig?.ebe || 0), ''],
@@ -80,21 +83,21 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
 
   const ws2Data = [
     ['BILAN FONCTIONNEL CONDENSÉ (SCF ALGÉRIE)'],
-    ['Devise : Dinars Algériens (DZD)'],
+    [`Devise : ${currency}`],
     [],
-    ['I. ACTIF DU BILAN (EMPLOIS)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Actif N (%)'],
+    ['I. ACTIF DU BILAN (EMPLOIS)', `Exercice N (${currency})`, `Exercice N-1 (${currency})`, 'Part Actif N (%)'],
     ['Emplois Stables (Actifs non courants bruts)', bilan.emploisStables || 0, dataN1?.bilan?.emploisStables || '', `${(((bilan.emploisStables || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
     ['Actif Circulant d\'Exploitation (Stocks + Créances clients)', bilan.actifCirculant || 0, dataN1?.bilan?.actifCirculant || '', `${(((bilan.actifCirculant || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
     ['Trésorerie Active (Disponibilités & Banques débitrices)', bilan.tresorerieActive || 0, dataN1?.bilan?.tresorerieActive || '', `${(((bilan.tresorerieActive || 0) / (totActifN || 1)) * 100).toFixed(1)}%`],
     ['TOTAL GÉNÉRAL DE L\'ACTIF', totActifN, totActifN1 || '', '100.0%'],
     [],
-    ['II. PASSIF DU BILAN (RESSOURCES)', 'Exercice N (DZD)', 'Exercice N-1 (DZD)', 'Part Passif N (%)'],
+    ['II. PASSIF DU BILAN (RESSOURCES)', `Exercice N (${currency})`, `Exercice N-1 (${currency})`, 'Part Passif N (%)'],
     ['Ressources Stables (Capitaux Propres + Dettes LT + Amort.)', bilan.ressourcesStables || 0, dataN1?.bilan?.ressourcesStables || '', `${(((bilan.ressourcesStables || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
     ['Passif Circulant d\'Exploitation (Fournisseurs + Dettes fiscales/sociales)', bilan.passifCirculant || 0, dataN1?.bilan?.passifCirculant || '', `${(((bilan.passifCirculant || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
     ['Trésorerie Passive (Concours bancaires courants & soldes créditeurs)', bilan.tresoreriePassive || 0, dataN1?.bilan?.tresoreriePassive || '', `${(((bilan.tresoreriePassive || 0) / (totPassifN || 1)) * 100).toFixed(1)}%`],
     ['TOTAL GÉNÉRAL DU PASSIF', totPassifN, totPassifN1 || '', '100.0%'],
     [],
-    ['III. ÉQUILIBRE FINANCIER STRUCTUREL', 'Montant N (DZD)', 'Formule de calcul', 'Interprétation'],
+    ['III. ÉQUILIBRE FINANCIER STRUCTUREL', `Montant N (${currency})`, 'Formule de calcul', 'Interprétation'],
     ['Fonds de Roulement Net Global (FRNG)', bilan.frng || 0, 'Ressources Stables − Emplois Stables', (bilan.frng || 0) >= 0 ? 'Excédent de financement stable (Sécurisé)' : 'Déficit structurel (Risque)'],
     ['Besoin en Fonds de Roulement (BFR)', bilan.bfr || 0, 'Actif Circulant − Passif Circulant', (bilan.bfr || 0) >= 0 ? 'Besoin de trésorerie d\'exploitation' : 'Ressource d\'exploitation'],
     ['Trésorerie Nette (TN)', bilan.tn || 0, 'FRNG − BFR = Trésorerie Active − Passive', (bilan.tn || 0) >= 0 ? 'Liquidités nettes disponibles' : 'Tension de trésorerie'],
@@ -110,7 +113,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['TABLEAU DES COMPTES DE RÉSULTATS — TCR PAR NATURE (SCF)'],
     ['Nomenclature officielle Système Comptable Financier Algérie'],
     [],
-    ['Code', 'Rubrique du Compte de Résultat', 'Montant N (DZD)', '% du CA', 'Observations'],
+    ['Code', 'Rubrique du Compte de Résultat', `Montant N (${currency})`, '% du CA', 'Observations'],
     ['70', 'Ventes et produits annexes (Chiffre d\'affaires)', sig.c70 || sig.chiffreAffaires || 0, '100.0%', 'Base d\'activité'],
     ['72', 'Variation des stocks de produits finis et en-cours', sig.c72 || 0, `${(((sig.c72 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Production stockée/déstockée (MIXTE)'],
     ['73', 'Production immobilisée', sig.c73 || 0, `${(((sig.c73 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Travaux faits par l\'entreprise pour elle-même'],
@@ -172,7 +175,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['Score Global de Conformité :', `${auditNatures.scoreCoherence} %`],
     [],
     ['1. CONTRÔLE DES JEUX D\'ÉCRITURES ET FLUX CROISÉS (7 RÈGLES SCF)'],
-    ['Cycle', 'Règle de Contrôle', 'Statut', 'Montant Source (DZD)', 'Montant Cible (DZD)', 'Écart (DZD)', 'Diagnostic'],
+    ['Cycle', 'Règle de Contrôle', 'Statut', `Montant Source (${currency})`, `Montant Cible (${currency})`, `Écart (${currency})`, 'Diagnostic'],
   ];
   (auditFlux.regles || []).forEach(r => {
     ws5Data.push([
@@ -188,7 +191,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
 
   ws5Data.push([]);
   ws5Data.push(['2. RELEVÉ DES ANOMALIES DE SOLDES INVERSÉS (CLASSES 1 À 7)']);
-  ws5Data.push(['Compte', 'Intitulé du Compte', 'Solde Débiteur (DZD)', 'Solde Créditeur (DZD)', 'Statut SCF', 'Observation Normative']);
+  ws5Data.push(['Compte', 'Intitulé du Compte', `Solde Débiteur (${currency})`, `Solde Créditeur (${currency})`, 'Statut SCF', 'Observation Normative']);
 
   const anomaliesNatures = (auditNatures.comptesAudit || []).filter(c => c.verification?.statut === 'ANOMALIE' || c.verification?.statut === 'ATYPIQUE');
   if (anomaliesNatures.length === 0) {

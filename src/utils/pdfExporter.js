@@ -29,12 +29,8 @@ const T = {
 };
 
 // ── Fonctions Utilitaires de Formatage ─────────────────────────────────
-const fmtDZD = (v) => {
-  if (v === null || v === undefined || isNaN(v)) return '—';
-  const num = Math.round(Number(v));
-  const sign = num < 0 ? '-' : '';
-  return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
-};
+// Note : fmtDZD (devise/arrondi du dossier) est défini localement dans generateFullPDF,
+// seule fonction qui l'utilise — cf. plus bas.
 
 const fmtPct = (v, d = 1) => {
   if (v === null || v === undefined || isNaN(v)) return '—';
@@ -305,13 +301,26 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
 // ══════════════════════════════════════════════════════════════════════
 //  FONCTION PRINCIPALE D'EXPORTATION PDF STYLE LATEX
 // ══════════════════════════════════════════════════════════════════════
-export async function generateFullPDF(data, _unused, isSimulated = false) {
+export async function generateFullPDF(data, cur, isSimulated = false) {
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 } = data || {};
   const r = ratios;
   const s = sig;
   const b = bilan;
   const b1 = dataN1?.bilan || null;
   const s1 = dataN1?.sig || null;
+
+  // Devise et arrondi déclarés par l'utilisateur (fenêtre de finalisation post-import /
+  // Paramètres) — remplace le fmtDZD générique par défaut pour ce document précis.
+  const docCurrency = cur || profil?.currency || 'DZD';
+  const docRounding = profil?.rounding ?? 0;
+  const fmtDZD = (v) => {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    const num = Number(v);
+    const sign = num < 0 ? '-' : '';
+    const [intPart, decPart] = Math.abs(num).toFixed(docRounding).split('.');
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${sign}${formattedInt}${decPart ? ',' + decPart : ''} ${docCurrency}`;
+  };
 
   const dossierName   = profil?.nomEntreprise || 'Entité Anonyme';
   const secteurLabel  = profil?.secteurId ? profil.secteurId.replace(/_/g, ' ').toUpperCase() : 'INDUSTRIE / NON SPÉCIFIÉ';

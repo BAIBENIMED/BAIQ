@@ -164,7 +164,7 @@ function MarkdownReportViewer({ content }) {
   return <div style={{ wordBreak: 'break-word', overflowWrap: 'break-word', maxWidth: '100%', boxSizing: 'border-box' }}>{elements}</div>;
 }
 
-export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = '', isSimulationActive = false }) {
+export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey = '', isSimulationActive = false }) {
   const fmt = typeof propFmt === 'function' ? propFmt : typeof formatCurrency === 'function' ? formatCurrency : ((v) => {
     if (v === null || v === undefined || isNaN(v)) return '0 DZD';
     const num = Math.round(Number(v));
@@ -185,7 +185,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
     if (!data) return;
     setIsPdfGenerating(true);
     try {
-      await generateFullPDF(data, undefined, isSimulationActive);
+      await generateFullPDF(data, cur, isSimulationActive);
     } catch (e) {
       console.error('Erreur export PDF:', e);
       alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));
@@ -483,7 +483,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
 
   /* ── Export Multi-Feuilles Excel via excelExporter ── */
   const handleExportExcel = () => {
-    exportFinancialWorkbook(data, `Rapport_Financier_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportFinancialWorkbook(data, `Rapport_Financier_${new Date().toISOString().slice(0, 10)}.xlsx`, cur);
   };
 
   /* ── Couleurs par type ── */
@@ -551,7 +551,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, geminiKey = ''
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
-            onClick={() => exportFinancialWorkbook(data)}
+            onClick={() => exportFinancialWorkbook(data, undefined, cur)}
             disabled={!data}
             style={{
               padding: '10px 18px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.35)',

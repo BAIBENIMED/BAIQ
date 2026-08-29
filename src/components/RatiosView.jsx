@@ -142,7 +142,7 @@ const DaysCard = ({ title, description, value, extraRate, extraLabel, thresholdG
   );
 };
 
-export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
+export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil, cur }) {
   if (!data) return (
     <div className="card" style={{ maxWidth: 480, margin: '60px auto', textAlign: 'center', padding: '48px 32px' }}>
       <span className="material-symbols-outlined" style={{ fontSize: 52, color: 'var(--text-sub)', display: 'block', marginBottom: 16 }}>query_stats</span>
@@ -159,7 +159,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil }) {
   const solv = calculateAltmanZScore(bilan || {}, sig || {}, rows || []);
 
   const handleExportExcel = () => {
-    exportFinancialWorkbook({ bilan, sig, ratios: data, rows, profil });
+    exportFinancialWorkbook({ bilan, sig, ratios: data, rows, profil }, undefined, cur);
   };
 
   const ca  = sig?.chiffreAffaires || data?.chiffreAffaires || 1;

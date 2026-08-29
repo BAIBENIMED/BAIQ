@@ -1,7 +1,7 @@
 import { calculateBilanFonctionnel, calculateSIG, calculateRatios } from './financeCalculations';
 
 /* ═══════════════════════════════════════════════════════════
-   FINANALYZE — Moteur de Simulation Comptable en Partie Double
+   BAIQ — Moteur de Simulation Comptable en Partie Double
    Support complet des écritures multilignes & modèles SCF
    ═══════════════════════════════════════════════════════════ */
 
