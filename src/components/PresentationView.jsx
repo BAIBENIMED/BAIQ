@@ -106,7 +106,7 @@ export function PresentationView({ data, onClose, formatCurrency }) {
               {profil.nomEntreprise || 'Entité Anonyme'} — Synthèse Direction Financière
             </div>
             <div style={{ fontSize: '0.74rem', color: '#9ca3af' }}>
-              Référentiel SCF Algérie · Secteur : {secteur.label}
+              Référentiel SCF · Secteur : {secteur.label}
             </div>
           </div>
         </div>

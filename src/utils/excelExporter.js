@@ -4,6 +4,7 @@
    Feuilles :
    1. Synthèse, Rating & Capacité d'Emprunt
    2. Bilan Fonctionnel SCF (Actif & Passif)
+   2bis. Bilan Officiel SCF (Actif / Passif détaillé par rubrique)
    3. Compte de Résultat (TCR & SIG par Nature)
    4. Ratios & Benchmarks Sectoriels
    5. Audit de Conformité SCF & Flux Croisés
@@ -18,7 +19,7 @@ import { auditBalanceAccounts, auditCrossAccountMovements } from './financeCalcu
 export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx', cur) {
   if (!data) return false;
 
-  const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 = null } = data;
+  const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 = null, bilanSCF = {} } = data;
   // Devise déclarée par l'utilisateur (fenêtre de finalisation post-import / Paramètres) —
   // remplace le "DZD" générique par défaut dans les en-têtes de ce classeur.
   const currency = cur || profil?.currency || 'DZD';
@@ -34,7 +35,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
      FEUILLE 1 : SYNTHÈSE, RATING CRÉDIT & CAPACITÉ D'EMPRUNT
      ────────────────────────────────────────────────────────── */
   const ws1Data = [
-    ['BAIQ — BALANCE AND FINANCIAL ANALYTICS — CLASSEUR FINANCIER OFFICIEL SCF (ALGÉRIE)'],
+    ['BAIQ — BALANCE AND FINANCIAL ANALYTICS — CLASSEUR FINANCIER OFFICIEL SCF'],
     ['Date d\'exportation', new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR')],
     [],
     ['1. PROFIL DE L\'ENTREPRISE'],
@@ -82,7 +83,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
   const totPassifN1 = (dataN1?.bilan?.ressourcesStables || 0) + (dataN1?.bilan?.passifCirculant || 0) + (dataN1?.bilan?.tresoreriePassive || 0);
 
   const ws2Data = [
-    ['BILAN FONCTIONNEL CONDENSÉ (SCF ALGÉRIE)'],
+    ['BILAN FONCTIONNEL CONDENSÉ (SCF)'],
     [`Devise : ${currency}`],
     [],
     ['I. ACTIF DU BILAN (EMPLOIS)', `Exercice N (${currency})`, `Exercice N-1 (${currency})`, 'Part Actif N (%)'],
@@ -107,11 +108,89 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
   XLSX.utils.book_append_sheet(wb, ws2, 'Bilan Fonctionnel');
 
   /* ──────────────────────────────────────────────────────────
+     FEUILLE 2 BIS : BILAN OFFICIEL SCF (ACTIF / PASSIF DÉTAILLÉ)
+     ────────────────────────────────────────────────────────── */
+  const an  = bilanSCF.actifNonCourant || {};
+  const acr = bilanSCF.actifCourant || {};
+  const cp  = bilanSCF.capitauxPropres || {};
+  const pnc = bilanSCF.passifNonCourant || {};
+  const pcr = bilanSCF.passifCourant || {};
+  const n1SCF = dataN1?.bilanSCF || {};
+  const an1  = n1SCF?.actifNonCourant || {};
+  const acr1 = n1SCF?.actifCourant || {};
+
+  const zeroLine = { brut: 0, amortProv: 0, net: 0 };
+  // Ligne ACTIF officielle SCF : Rubrique | Brut N | Amort./Prov. N | Net N | Net N-1
+  const actifRow = (label, line, lineN1) => {
+    const l = line || zeroLine;
+    return [label, l.brut || 0, l.amortProv || 0, l.net || 0, lineN1?.net ?? ''];
+  };
+  const sumActifLines = (obj) => Object.keys(obj || {}).filter(k => k !== 'total')
+    .reduce((s, k) => ({ brut: s.brut + (obj[k].brut || 0), amortProv: s.amortProv + (obj[k].amortProv || 0), net: s.net + (obj[k].net || 0) }), { brut: 0, amortProv: 0, net: 0 });
+
+  const wsBilanSCFData = [
+    ['BILAN OFFICIEL — ACTIF / PASSIF (Arrêté du 26/07/2008 — SCF, Loi 07-11, Décret 08-156)'],
+    [`Devise : ${currency}`],
+    [],
+    ['ACTIF NON COURANT', `Brut N (${currency})`, `Amort./Prov. N (${currency})`, `Net N (${currency})`, `Net N-1 (${currency})`],
+    actifRow('Écart d\'acquisition (goodwill)', an.ecartAcquisition, an1.ecartAcquisition),
+    actifRow('Immobilisations incorporelles', an.immobilisationsIncorporelles, an1.immobilisationsIncorporelles),
+    actifRow('Terrains', an.terrains, an1.terrains),
+    actifRow('Bâtiments', an.batiments, an1.batiments),
+    actifRow('Autres immobilisations corporelles', an.autresImmoCorp, an1.autresImmoCorp),
+    actifRow('Immobilisations en concession', an.immobilisationsEnConcession, an1.immobilisationsEnConcession),
+    actifRow('Immobilisations en cours', an.immobilisationsEnCours, an1.immobilisationsEnCours),
+    actifRow('Immobilisations financières', an.immobilisationsFinancieres, an1.immobilisationsFinancieres),
+    actifRow('Impôts différés actif', an.impotsDifferesActif, an1.impotsDifferesActif),
+    actifRow('TOTAL ACTIF NON COURANT', sumActifLines(an), sumActifLines(an1)),
+    [],
+    ['ACTIF COURANT', `Brut N (${currency})`, `Amort./Prov. N (${currency})`, `Net N (${currency})`, `Net N-1 (${currency})`],
+    actifRow('Stocks et en-cours', acr.stocks, acr1.stocks),
+    actifRow('Clients', acr.clients, acr1.clients),
+    actifRow('Autres débiteurs', acr.autresDebiteurs, acr1.autresDebiteurs),
+    actifRow('Impôts et assimilés', acr.impotsEtAssimilesActif, acr1.impotsEtAssimilesActif),
+    actifRow('Autres créances et emplois assimilés', acr.autresCreancesEmploisAssimiles, acr1.autresCreancesEmploisAssimiles),
+    actifRow('Placements et autres actifs financiers courants', acr.placements, acr1.placements),
+    actifRow('Trésorerie', acr.tresorerie, acr1.tresorerie),
+    actifRow('TOTAL ACTIF COURANT', sumActifLines(acr), sumActifLines(acr1)),
+    [],
+    ['TOTAL GÉNÉRAL DE L\'ACTIF', '', '', bilanSCF.totalActif || 0, n1SCF?.totalActif || ''],
+    [],
+    ['CAPITAUX PROPRES', `Exercice N (${currency})`, `Exercice N-1 (${currency})`],
+    ['Capital émis', cp.capitalEmis || 0, n1SCF?.capitauxPropres?.capitalEmis || ''],
+    ['Capital non appelé (-)', cp.capitalNonAppele || 0, n1SCF?.capitauxPropres?.capitalNonAppele || ''],
+    ['Primes et réserves', cp.primesEtReserves || 0, n1SCF?.capitauxPropres?.primesEtReserves || ''],
+    ['Écarts de réévaluation', cp.ecartsReevaluation || 0, n1SCF?.capitauxPropres?.ecartsReevaluation || ''],
+    ['Résultat net', cp.resultatNet || 0, n1SCF?.capitauxPropres?.resultatNet || ''],
+    ['Autres capitaux propres — Report à nouveau', cp.autresCapitauxPropres || 0, n1SCF?.capitauxPropres?.autresCapitauxPropres || ''],
+    ['TOTAL I — CAPITAUX PROPRES', cp.total || 0, n1SCF?.capitauxPropres?.total || ''],
+    [],
+    ['PASSIFS NON COURANTS', `Exercice N (${currency})`, `Exercice N-1 (${currency})`],
+    ['Emprunts et dettes financières', pnc.empruntsDettesFinancieres || 0, n1SCF?.passifNonCourant?.empruntsDettesFinancieres || ''],
+    ['Impôts (différés et provisionnés)', pnc.impotsDifferesPassif || 0, n1SCF?.passifNonCourant?.impotsDifferesPassif || ''],
+    ['Autres dettes non courantes', pnc.autresDettesNonCourantes || 0, n1SCF?.passifNonCourant?.autresDettesNonCourantes || ''],
+    ['Provisions et produits constatés d\'avance', pnc.provisionsEtProduitsConstatesAvance || 0, n1SCF?.passifNonCourant?.provisionsEtProduitsConstatesAvance || ''],
+    ['TOTAL II — PASSIFS NON COURANTS', pnc.total || 0, n1SCF?.passifNonCourant?.total || ''],
+    [],
+    ['PASSIFS COURANTS', `Exercice N (${currency})`, `Exercice N-1 (${currency})`],
+    ['Fournisseurs et comptes rattachés', pcr.fournisseurs || 0, n1SCF?.passifCourant?.fournisseurs || ''],
+    ['Impôts', pcr.impotsEtAssimilesPassif || 0, n1SCF?.passifCourant?.impotsEtAssimilesPassif || ''],
+    ['Autres dettes', pcr.autresDettes || 0, n1SCF?.passifCourant?.autresDettes || ''],
+    ['Trésorerie passif', pcr.tresoreriePassif || 0, n1SCF?.passifCourant?.tresoreriePassif || ''],
+    ['TOTAL III — PASSIFS COURANTS', pcr.total || 0, n1SCF?.passifCourant?.total || ''],
+    [],
+    ['TOTAL GÉNÉRAL DU PASSIF (I + II + III)', bilanSCF.totalPassif || 0, n1SCF?.totalPassif || ''],
+  ];
+  const wsBilanSCF = XLSX.utils.aoa_to_sheet(wsBilanSCFData);
+  wsBilanSCF['!cols'] = [{ wch: 48 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsBilanSCF, 'Bilan Officiel SCF');
+
+  /* ──────────────────────────────────────────────────────────
      FEUILLE 3 : COMPTE DE RÉSULTAT (TCR / SIG)
      ────────────────────────────────────────────────────────── */
   const ws3Data = [
     ['TABLEAU DES COMPTES DE RÉSULTATS — TCR PAR NATURE (SCF)'],
-    ['Nomenclature officielle Système Comptable Financier Algérie'],
+    ['Nomenclature officielle Système Comptable Financier'],
     [],
     ['Code', 'Rubrique du Compte de Résultat', `Montant N (${currency})`, '% du CA', 'Observations'],
     ['70', 'Ventes et produits annexes (Chiffre d\'affaires)', sig.c70 || sig.chiffreAffaires || 0, '100.0%', 'Base d\'activité'],
@@ -135,10 +214,12 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['66/686', 'Charges financières', -(sig.chargesFinancieres || 0), '', 'Intérêts d\'emprunts'],
     ['VI', 'RÉSULTAT FINANCIER', sig.resultatFinancier || 0, '', 'Coût net de l\'endettement'],
     ['VII', 'RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', sig.rcai || 0, `${(((sig.rcai || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Résultat courant'],
-    ['69', 'Impôts exigibles et différés (IBS)', -(sig.c69 || sig.impotsBenefices || 0), '', `Taux légal: ${secteur.tauxIBS}`],
+    ['692/693/695/698', 'Impôts exigibles et différés sur résultats ordinaires (IBS)', -(sig.c69 || sig.impotsBenefices || 0), '', `Taux légal: ${secteur.tauxIBS}`],
     ['VIII', 'RÉSULTAT NET DES ACTIVITÉS ORDINAIRES', sig.resultatNetOrdinaire || 0, '', 'Bénéfice ordinaire'],
-    ['77/67', 'Éléments extraordinaires', sig.resultatExtraordinaire || 0, '', 'Événements exceptionnels'],
-    ['IX', 'RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', sig.resultatNet || 0, `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Bénéfice net distribuable'],
+    ['77', 'Éléments extraordinaires (produits)', sig.c77 || 0, '', 'Événements exceptionnels'],
+    ['67', 'Éléments extraordinaires (charges)', -(sig.c67 || 0), '', 'Événements exceptionnels'],
+    ['IX', 'RÉSULTAT EXTRAORDINAIRE', sig.resultatExtraordinaire || 0, '', 'Solde des éléments extraordinaires'],
+    ['X', 'RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', sig.resultatNet || 0, `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Bénéfice net distribuable'],
   ];
   const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
   ws3['!cols'] = [{ wch: 10 }, { wch: 48 }, { wch: 22 }, { wch: 15 }, { wch: 35 }];

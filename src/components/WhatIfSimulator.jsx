@@ -1,17 +1,29 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { MODEL_TEMPLATES, createSimulationEntryFromLines, recalculateSimulatedDataset } from '../utils/simulationEngine';
+import { MODEL_TEMPLATES, MAX_SCENARIOS, createScenario, createSimulationEntryFromLines, recalculateSimulatedDataset } from '../utils/simulationEngine';
+import { generateFullPDF } from '../utils/pdfExporter';
 import { useEscapeKey } from '../utils/useEscapeKey';
 
-export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEntries, isSimulationActive, setIsSimulationActive, formatCurrency }) {
-  // Mode Modèles Repliable
-  const [showTemplates, setShowTemplates]   = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Tous');
+const SCENARIO_COLORS = ['#1b6e8c', '#c08a2e', '#7c3aed'];
 
-  // Saisie Rapide 1-Clic
-  const [quickOpType, setQuickOpType]       = useState('vente');
-  const [quickAmount, setQuickAmount]       = useState(5000000); // 5 Millions DA par défaut
-  const [quickCounterpart, setQuickCounterpart] = useState('512');
+const INDICATORS = [
+  { key: 'ca',   label: "Chiffre d'Affaires",     get: (d) => d.sig?.chiffreAffaires || 0, up: true },
+  { key: 'ebe',  label: 'EBE',                     get: (d) => d.sig?.ebe || 0,             up: true },
+  { key: 'net',  label: 'Résultat Net',            get: (d) => d.sig?.resultatNet || 0,     up: true },
+  { key: 'frng', label: 'FRNG',                    get: (d) => d.bilan?.frng || 0,          up: true },
+  { key: 'bfr',  label: 'BFR',                     get: (d) => d.bilan?.bfr || 0,           up: false },
+  { key: 'tn',   label: 'Trésorerie Nette',        get: (d) => d.bilan?.tn || 0,            up: true },
+];
+
+export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScenarioId, setActiveScenarioId, formatCurrency, cur }) {
+  const [selectedScenarioId, setSelectedScenarioId] = useState(activeScenarioId || scenarios[0]?.id || null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [printingId, setPrintingId] = useState(null);
+
+  // Modèles d'écritures — point d'entrée unique de saisie
+  const [selectedCategory, setSelectedCategory] = useState('Tous');
+  const [showAdvancedMode, setShowAdvancedMode] = useState(false);
 
   // Éditeur Multiligne Avancé
   const [editingId, setEditingId]           = useState(null);
@@ -19,8 +31,6 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
   const [isEditorOpen, setIsEditorOpen]     = useState(false);
   useEscapeKey(isEditorOpen, () => setIsEditorOpen(false));
   const [opLabel, setOpLabel]               = useState('Nouvelle opération');
-
-  // Lignes Débit/Crédit de l'écriture en cours dans l'éditeur
   const [editorLines, setEditorLines]       = useState([
     { compte: '411', libelle: 'Clients & comptes rattachés', debit: 5000000, credit: 0 },
     { compte: '700', libelle: 'Ventes de marchandises', debit: 0, credit: 5000000 },
@@ -39,76 +49,51 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
     );
   }
 
-  // --- SAISIE RAPIDE EN 1 CLIC ---
-  const handleQuickAdd = () => {
-    const amt = Number(quickAmount) || 0;
-    if (amt <= 0) return;
+  const effectiveSelected = scenarios.find(s => s.id === selectedScenarioId) || scenarios[0] || null;
 
-    let label = '';
-    let lines = [];
+  // --- GESTION DES SCÉNARIOS (max 3) ---
+  const handleCreateScenario = () => {
+    if (scenarios.length >= MAX_SCENARIOS) return;
+    const s = createScenario(`Scénario ${scenarios.length + 1}`);
+    setScenarios(prev => [...prev, s]);
+    setSelectedScenarioId(s.id);
+  };
 
-    switch (quickOpType) {
-      case 'vente':
-        label = `Augmentation du CA (+${fmt(amt)})`;
-        lines = [
-          { compte: quickCounterpart, libelle: quickCounterpart === '411' ? 'Clients (Créance)' : quickCounterpart === '530' ? 'Caisse (Espèces)' : 'Banque (Trésorerie)', debit: amt, credit: 0 },
-          { compte: '700', libelle: 'Ventes de marchandises (CA)', debit: 0, credit: amt },
-        ];
-        break;
-      case 'achat':
-        label = `Augmentation des Achats (+${fmt(amt)})`;
-        lines = [
-          { compte: '600', libelle: 'Achats consommés (Charges)', debit: amt, credit: 0 },
-          { compte: quickCounterpart, libelle: quickCounterpart === '401' ? 'Fournisseurs (Dette)' : quickCounterpart === '300' ? 'Stock' : 'Banque', debit: 0, credit: amt },
-        ];
-        break;
-      case 'salaires':
-        label = `Augmentation des Salaires (+${fmt(amt)})`;
-        lines = [
-          { compte: '630', libelle: 'Charges de personnel (Salaires)', debit: amt, credit: 0 },
-          { compte: quickCounterpart, libelle: quickCounterpart === '421' ? 'Personnel - Rémunérations dues' : 'Banque (Virement direct)', debit: 0, credit: amt },
-        ];
-        break;
-      case 'immo':
-        label = `Acquisition d'Immobilisation (+${fmt(amt)})`;
-        lines = [
-          { compte: '210', libelle: 'Immobilisations corporelles', debit: amt, credit: 0 },
-          { compte: quickCounterpart, libelle: quickCounterpart === '404' ? 'Fournisseurs d\'Immo' : quickCounterpart === '164' ? 'Emprunt bancaire' : 'Banque', debit: 0, credit: amt },
-        ];
-        break;
-      case 'emprunt':
-        label = `Souscription Emprunt Bancaire (+${fmt(amt)})`;
-        lines = [
-          { compte: '512', libelle: 'Banque (Trésorerie active)', debit: amt, credit: 0 },
-          { compte: '164', libelle: 'Emprunts auprès des établissements de crédit', debit: 0, credit: amt },
-        ];
-        break;
-      case 'recouvrement':
-        label = `Encaissement Client (-DSO / +Trésorerie ${fmt(amt)})`;
-        lines = [
-          { compte: '512', libelle: 'Banque (Encaissement reçu)', debit: amt, credit: 0 },
-          { compte: '411', libelle: 'Clients & comptes rattachés', debit: 0, credit: amt },
-        ];
-        break;
-      case 'reglement':
-        label = `Règlement Fournisseur (-DPO / -Trésorerie ${fmt(amt)})`;
-        lines = [
-          { compte: '401', libelle: 'Fournisseurs & comptes rattachés', debit: amt, credit: 0 },
-          { compte: '512', libelle: 'Banque (Décaissement)', debit: 0, credit: amt },
-        ];
-        break;
-      default:
-        break;
+  const handleDeleteScenario = (id) => {
+    const remaining = scenarios.filter(s => s.id !== id);
+    setScenarios(remaining);
+    if (activeScenarioId === id) setActiveScenarioId(null);
+    if (selectedScenarioId === id) setSelectedScenarioId(remaining[0]?.id || null);
+  };
+
+  const handleStartRename = (s) => { setRenamingId(s.id); setRenameDraft(s.name); };
+  const handleCommitRename = () => {
+    if (renamingId) {
+      setScenarios(prev => prev.map(s => s.id === renamingId ? { ...s, name: renameDraft.trim() || s.name } : s));
     }
+    setRenamingId(null);
+  };
 
-    if (lines.length > 0) {
-      const newEntry = createSimulationEntryFromLines({ label, lines });
-      setSimulationEntries(prev => [...prev, newEntry]);
-      if (setIsSimulationActive) setIsSimulationActive(true);
+  const handlePrintScenario = async (scenario) => {
+    setPrintingId(scenario.id);
+    try {
+      const scenarioResult = recalculateSimulatedDataset(data, scenario.entries);
+      await generateFullPDF(scenarioResult, cur, true, scenario.name);
+    } catch (e) {
+      console.error('Erreur export PDF du scénario:', e);
+      alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));
+    } finally {
+      setPrintingId(null);
     }
   };
 
-  // --- OUVRIER / FERMER L'ÉDITEUR ---
+  // Applique une transformation aux écritures du scénario actuellement consulté
+  const updateSelectedEntries = (updater) => {
+    if (!effectiveSelected) return;
+    setScenarios(prev => prev.map(s => s.id === effectiveSelected.id ? { ...s, entries: updater(s.entries) } : s));
+  };
+
+  // --- OUVRIR / FERMER L'ÉDITEUR AVANCÉ ---
   const handleOpenNewEditor = () => {
     setEditingId(null);
     setOpLabel('Nouvelle opération comptable');
@@ -144,9 +129,7 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
       return;
     }
     setTemplateError(null);
-    setSimulationEntries(prev => [...prev, newEntry]);
-    if (setIsSimulationActive) setIsSimulationActive(true);
-    setShowTemplates(false);
+    updateSelectedEntries(entries => [...entries, newEntry]);
   };
 
   // --- HANDLERS ÉDITEUR LIGNES ---
@@ -178,12 +161,12 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
   const diffDC     = Math.abs(sumDebit - sumCredit);
   const isBalanced = diffDC < 0.01;
 
-  // --- SAUVEGARDER L'ÉCRITURE DANS LE JOURNAL ---
+  // --- SAUVEGARDER L'ÉCRITURE DANS LE JOURNAL DU SCÉNARIO CONSULTÉ ---
   const handleSaveEntry = () => {
     if (!isBalanced) return;
 
     if (editingId) {
-      setSimulationEntries(prev => prev.map(e => {
+      updateSelectedEntries(entries => entries.map(e => {
         if (e.id === editingId) {
           const cleanLines = editorLines.map(l => ({
             compte: String(l.compte).trim(),
@@ -207,249 +190,192 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
         label: opLabel.trim() || 'Nouvelle opération',
         lines: editorLines,
       });
-      setSimulationEntries(prev => [...prev, newEntry]);
+      updateSelectedEntries(entries => [...entries, newEntry]);
     }
 
-    if (setIsSimulationActive) setIsSimulationActive(true);
     setIsEditorOpen(false);
   };
 
   // --- SUPPRIMER UNE ÉCRITURE ---
   const handleRemoveEntry = (id) => {
-    setSimulationEntries(prev => prev.filter(e => e.id !== id));
+    updateSelectedEntries(entries => entries.filter(e => e.id !== id));
   };
 
-  // Recalcul du dataset simulé
-  const simulatedData = recalculateSimulatedDataset(data, simulationEntries);
+  // Résultat recalculé de CHAQUE scénario existant (pour le tableau comparatif & le graphique)
+  const scenarioResults = scenarios.map((s, idx) => ({
+    scenario: s,
+    color: SCENARIO_COLORS[idx % SCENARIO_COLORS.length],
+    result: s.entries.length > 0 ? recalculateSimulatedDataset(data, s.entries) : data,
+  }));
 
-  // Indicateurs financiers
+  // Données du scénario actuellement consulté (cartes KPI + journal)
+  const consultedResult = effectiveSelected
+    ? (scenarioResults.find(sr => sr.scenario.id === effectiveSelected.id)?.result || data)
+    : data;
+
   const baseCA  = data.sig.chiffreAffaires || 1;
   const baseEBE = data.sig.ebe || 0;
   const baseNet = data.sig.resultatNet || 0;
   const baseBFR = data.bilan.bfr || 0;
   const baseTN  = data.bilan.tn || 0;
 
-  const simCA  = simulatedData.sig.chiffreAffaires || 0;
-  const simEBE = simulatedData.sig.ebe || 0;
-  const simNet = simulatedData.sig.resultatNet || 0;
-  const simBFR = simulatedData.bilan.bfr || 0;
-  const simTN  = simulatedData.bilan.tn || 0;
+  const simCA  = consultedResult.sig.chiffreAffaires || 0;
+  const simEBE = consultedResult.sig.ebe || 0;
+  const simNet = consultedResult.sig.resultatNet || 0;
+  const simBFR = consultedResult.bilan.bfr || 0;
+  const simTN  = consultedResult.bilan.tn || 0;
 
-  const totalSimulatedDebit = simulationEntries.reduce((sum, e) => sum + (Number(e.montant) || 0), 0);
+  const totalSimulatedDebit = (effectiveSelected?.entries || []).reduce((sum, e) => sum + (Number(e.montant) || 0), 0);
 
-  const categories = ['Tous', 'Ventes', 'Achats', 'Personnel', 'Investissement', 'Financement', 'Trésorerie'];
+  const categories = ['Tous', 'Ventes', 'Achats', 'Personnel', 'Investissement', 'Financement', 'Trésorerie', 'Provisions', 'Clôture'];
   const filteredTemplates = selectedCategory === 'Tous'
     ? MODEL_TEMPLATES
     : MODEL_TEMPLATES.filter(t => t.category === selectedCategory);
 
+  // Graphique : une série par scénario existant
   const chartData = [
-    { name: "Chiffre d'Affaires", Actuel: Math.round(baseCA), Simulé: Math.round(simCA) },
-    { name: 'EBE', Actuel: Math.round(baseEBE), Simulé: Math.round(simEBE) },
-    { name: 'Résultat Net', Actuel: Math.round(baseNet), Simulé: Math.round(simNet) },
-    { name: 'BFR', Actuel: Math.round(baseBFR), Simulé: Math.round(simBFR) },
-    { name: 'Trésorerie Nette', Actuel: Math.round(baseTN), Simulé: Math.round(simTN) },
-  ];
+    { name: "Chiffre d'Affaires", key: 'ca' },
+    { name: 'EBE', key: 'ebe' },
+    { name: 'Résultat Net', key: 'net' },
+    { name: 'BFR', key: 'bfr' },
+    { name: 'Trésorerie Nette', key: 'tn' },
+  ].map(({ name, key }) => {
+    const ind = INDICATORS.find(i => i.key === key);
+    const row = { name, Actuel: Math.round(ind.get(data)) };
+    scenarioResults.forEach(({ scenario, result }) => { row[scenario.name] = Math.round(ind.get(result)); });
+    return row;
+  });
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 40 }}>
 
-      {/* Header & Interrupteur Principal */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
-        <div>
-          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ background: 'linear-gradient(135deg, #059669, #047857)', borderRadius: 8, padding: '3px 9px', color: '#fff', fontSize: '0.70rem', fontWeight: 800 }}>
-              MOTEUR EN PARTIE DOUBLE
-            </span>
-            Simulateur Comptable Multilignes (SCF Algérie)
-          </div>
-          <div className="section-sub" style={{ marginBottom: 0 }}>
-            Simulez des opérations en partie double avec contrepartie au choix. L'impact s'applique en temps réel sur la Balance, le Bilan et le SIG.
-          </div>
+      {/* Header */}
+      <div>
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ background: 'linear-gradient(135deg, #059669, #047857)', borderRadius: 8, padding: '3px 9px', color: '#fff', fontSize: '0.70rem', fontWeight: 800 }}>
+            MOTEUR EN PARTIE DOUBLE
+          </span>
+          Simulateur What-If — Scénarios
         </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setShowTemplates(!showTemplates)}
-            style={{
-              padding: '8px 14px', background: showTemplates ? '#f3e8ff' : 'var(--surface-alt)',
-              color: showTemplates ? '#6b21a8' : 'var(--text)', border: `1px solid ${showTemplates ? '#c084fc' : 'var(--border)'}`,
-              borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.80rem',
-              display: 'flex', alignItems: 'center', gap: 6
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>auto_fix_high</span>
-            {showTemplates ? 'Masquer Modèles ✕' : '💡 Modèles d\'Écritures (1-Clic)'}
-          </button>
-
-          <button
-            onClick={handleOpenNewEditor}
-            style={{
-              padding: '8px 16px', background: 'var(--surface-alt)', color: 'var(--text)',
-              border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
-              display: 'flex', alignItems: 'center', gap: 6
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)' }}>edit_note</span>
-            Saisie Multiligne Avancée
-          </button>
-
-          <button
-            onClick={() => setIsSimulationActive(!isSimulationActive)}
-            style={{
-              padding: '8px 18px', borderRadius: 10, cursor: 'pointer',
-              background: isSimulationActive ? 'linear-gradient(135deg, #059669, #047857)' : 'var(--surface-alt)',
-              color: isSimulationActive ? '#fff' : 'var(--text)',
-              border: `1px solid ${isSimulationActive ? '#059669' : 'var(--border)'}`,
-              fontWeight: 900, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: isSimulationActive ? '0 4px 12px rgba(5,150,105,0.25)' : 'none'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-              {isSimulationActive ? 'check_circle' : 'do_not_disturb_on'}
-            </span>
-            {isSimulationActive ? `Mode Simulé (${simulationEntries.length}) 📝` : 'Mode Réel 🔵'}
-          </button>
+        <div className="section-sub" style={{ marginBottom: 0 }}>
+          Créez jusqu'à {MAX_SCENARIOS} scénarios, comparez-les à la situation actuelle, activez celui qui doit s'appliquer à toute la plateforme, consultez ou imprimez n'importe lequel.
         </div>
       </div>
 
-      {/* ⚡ PANNEAU DE SIMULATION RAPIDE EN 1 CLIC (CONTRAT SIMPLE & PUISSANT) */}
-      <div className="card" style={{ padding: 20, border: '2px solid #059669', background: '#f0fdf4' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#166534', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#059669' }}>flash_on</span>
-            Créateur Rapide d'Opération Simulée (Partie Double SCF)
-          </h3>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '3px 10px', borderRadius: 20 }}>
-            Application immédiate sur toute la plateforme 🚀
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, alignItems: 'end' }}>
-          {/* 1. Type d'opération */}
-          <div>
-            <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
-              1. Type d'Opération Simulée
-            </label>
-            <select
-              value={quickOpType}
-              onChange={e => {
-                const type = e.target.value;
-                setQuickOpType(type);
-                if (type === 'vente') setQuickCounterpart('512');
-                else if (type === 'achat') setQuickCounterpart('401');
-                else if (type === 'salaires') setQuickCounterpart('421');
-                else if (type === 'immo') setQuickCounterpart('512');
+      {/* ── BARRE D'ONGLETS DE SCÉNARIOS ── */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {scenarios.map((s, idx) => {
+          const isSelected = s.id === effectiveSelected?.id;
+          const isActive = s.id === activeScenarioId;
+          const color = SCENARIO_COLORS[idx % SCENARIO_COLORS.length];
+          return (
+            <div
+              key={s.id}
+              onClick={() => setSelectedScenarioId(s.id)}
+              role="tab"
+              aria-selected={isSelected}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, cursor: 'pointer',
+                border: `2px solid ${isSelected ? color : 'var(--border)'}`,
+                background: isSelected ? `color-mix(in srgb, ${color} 12%, var(--surface))` : 'var(--surface)',
+                transition: 'all 0.15s'
               }}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: 'var(--surface)', outline: 'none' }}
             >
-              <option value="vente">🛒 Vente / Chiffre d'Affaires (+CA / Compte 700)</option>
-              <option value="achat">📦 Achat de Marchandises (+Charges / Compte 600)</option>
-              <option value="salaires">👥 Charges de Personnel (+Salaires / Compte 630)</option>
-              <option value="immo">🏗️ Acquisition d'Immobilisation (+Investissement / Compte 210)</option>
-              <option value="emprunt">🏦 Souscription Emprunt Bancaire (+Trésorerie / Compte 164)</option>
-              <option value="recouvrement">📥 Recouvrement Créance Client (-DSO / Banque 512)</option>
-              <option value="reglement">📤 Règlement Dette Fournisseur (-DPO / Banque 512)</option>
-            </select>
-          </div>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+              {renamingId === s.id ? (
+                <input
+                  autoFocus
+                  value={renameDraft}
+                  onChange={e => setRenameDraft(e.target.value)}
+                  onBlur={handleCommitRename}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCommitRename(); if (e.key === 'Escape') setRenamingId(null); }}
+                  onClick={e => e.stopPropagation()}
+                  style={{ fontSize: '0.85rem', fontWeight: 800, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', width: 120, outline: 'none' }}
+                />
+              ) : (
+                <span
+                  onDoubleClick={(e) => { e.stopPropagation(); handleStartRename(s); }}
+                  title="Double-cliquer pour renommer"
+                  style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text)' }}
+                >
+                  {s.name}
+                </span>
+              )}
+              {isActive && <span className="badge badge-green" style={{ fontSize: '0.58rem', padding: '1px 6px' }}>ACTIF</span>}
 
-          {/* 2. Contrepartie */}
-          <div>
-            <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
-              2. Compte de Contrepartie (Partie Double)
-            </label>
-            <select
-              value={quickCounterpart}
-              onChange={e => setQuickCounterpart(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontSize: '0.85rem', fontWeight: 800, color: '#14532d', background: 'var(--surface)', outline: 'none' }}
-            >
-              {quickOpType === 'vente' && (
-                <>
-                  <option value="512">512 — Banque / Trésorerie (Comptant)</option>
-                  <option value="411">411 — Créances Clients (Terme / Crédit)</option>
-                  <option value="530">530 — Caisse (Comptant Espèces)</option>
-                </>
-              )}
-              {quickOpType === 'achat' && (
-                <>
-                  <option value="401">401 — Dettes Fournisseurs (Terme / Crédit)</option>
-                  <option value="512">512 — Banque (Paiement Comptant)</option>
-                  <option value="300">300 — Stock de marchandises (Direct)</option>
-                </>
-              )}
-              {quickOpType === 'salaires' && (
-                <>
-                  <option value="421">421 — Personnel (Rémunérations dues)</option>
-                  <option value="512">512 — Banque (Virement direct)</option>
-                </>
-              )}
-              {quickOpType === 'immo' && (
-                <>
-                  <option value="512">512 — Banque (Comptant)</option>
-                  <option value="404">404 — Fournisseurs d'immobilisations</option>
-                  <option value="164">164 — Emprunt financier long terme</option>
-                </>
-              )}
-              {(quickOpType === 'emprunt' || quickOpType === 'recouvrement' || quickOpType === 'reglement') && (
-                <option value="512">512 — Banque / Trésorerie</option>
-              )}
-            </select>
-          </div>
-
-          {/* 3. Montant */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>
-                3. Montant (DA)
-              </label>
-              {/* Raccourcis de montants */}
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[1000000, 5000000, 10000000, 50000000].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setQuickAmount(m)}
-                    style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: 4, border: '1px solid #86efac', background: '#dcfce7', color: '#166534', fontWeight: 800, cursor: 'pointer' }}
-                  >
-                    +{m / 1000000}M
-                  </button>
-                ))}
+              <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); isActive ? setActiveScenarioId(null) : setActiveScenarioId(s.id); }}
+                  aria-label={isActive ? `Désactiver ${s.name} (revenir au Mode Réel)` : `Activer ${s.name} sur toute l'application`}
+                  title={isActive ? 'Désactiver (Mode Réel)' : "Activer ce scénario sur toute l'appli"}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: isActive ? 'var(--green)' : 'var(--text-muted)', display: 'flex', padding: 2 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 17 }}>{isActive ? 'toggle_on' : 'toggle_off'}</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePrintScenario(s); }}
+                  disabled={printingId === s.id}
+                  aria-label={`Imprimer le scénario ${s.name}`}
+                  title="Imprimer ce scénario (PDF)"
+                  style={{ border: 'none', background: 'none', cursor: printingId === s.id ? 'wait' : 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{printingId === s.id ? 'hourglass_empty' : 'print'}</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteScenario(s.id); }}
+                  aria-label={`Supprimer le scénario ${s.name}`}
+                  title="Supprimer ce scénario"
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--red)', display: 'flex', padding: 2 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                </button>
               </div>
             </div>
-            <input
-              type="number"
-              value={quickAmount}
-              onChange={e => setQuickAmount(Number(e.target.value))}
-              placeholder="Ex: 5000000"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #86efac', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.95rem', fontWeight: 900, color: '#166534', outline: 'none', background: 'var(--surface)' }}
-            />
-          </div>
+          );
+        })}
 
-          {/* Bouton d'ajout */}
-          <div>
-            <button
-              onClick={handleQuickAdd}
-              style={{
-                width: '100%', padding: '12px 18px', background: 'linear-gradient(135deg, #059669, #047857)',
-                color: '#ffffff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 900, fontSize: '0.92rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(5,150,105,0.3)'
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_task</span>
-              + Appliquer l'Écriture Simulée
-            </button>
-          </div>
-        </div>
+        {scenarios.length < MAX_SCENARIOS ? (
+          <button
+            onClick={handleCreateScenario}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px dashed var(--border)', background: 'var(--surface-alt)', color: 'var(--primary)', fontWeight: 800, fontSize: '0.80rem', cursor: 'pointer' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+            Nouveau Scénario
+          </button>
+        ) : (
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0 4px' }}>
+            Maximum {MAX_SCENARIOS} scénarios — supprimez-en un pour en créer un nouveau
+          </span>
+        )}
       </div>
 
-      {/* 💡 ÉCRITURES MODÈLES COMPACTES & REPLIABLES */}
-      {showTemplates && (
-        <div className="card fade-in" style={{ padding: 16, border: '1px solid #c084fc', background: '#faf5ff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-            <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#581c87', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#7c3aed' }}>auto_fix_high</span>
-              Choisissez un Modèle d'Écriture Prédéfini
-            </h4>
+      {scenarios.length === 0 ? (
+        <div className="card" style={{ maxWidth: 520, margin: '30px auto', textAlign: 'center', padding: 40 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 44, color: 'var(--primary)', marginBottom: 12, display: 'block' }}>science</span>
+          <h3 style={{ fontWeight: 900, fontSize: '1.1rem', marginBottom: 8 }}>Créez votre premier scénario</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.90rem', marginBottom: 20 }}>
+            Testez l'impact d'une vente, d'un emprunt ou d'une charge sur votre Bilan, votre SIG et vos Ratios — sans jamais toucher à vos données réelles.
+          </p>
+          <button onClick={handleCreateScenario} className="btn btn-primary" style={{ margin: '0 auto' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
+            Créer mon premier scénario
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* 💡 MODÈLES D'ÉCRITURES — point d'entrée unique de saisie */}
+          <div className="card" style={{ padding: 20, border: '1px solid #c084fc', background: '#faf5ff' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 4 }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#581c87', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#7c3aed' }}>auto_fix_high</span>
+                Ajouter une opération à « {effectiveSelected?.name} »
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: '#6b21a8', margin: '0 0 14px', opacity: 0.85 }}>
+              Choisissez un modèle d'écriture prédéfini — l'écriture en partie double est générée et équilibrée automatiquement.
+            </p>
 
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 14 }}>
               {categories.map(cat => (
                 <button
                   key={cat}
@@ -466,381 +392,477 @@ export function WhatIfSimulator({ data, simulationEntries = [], setSimulationEnt
                 </button>
               ))}
             </div>
+
+            {templateError && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', borderRadius: 8,
+                background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.74rem', marginBottom: 12
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0 }}>error</span>
+                <span style={{ flex: 1 }}>{templateError}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8 }}>
+              {filteredTemplates.map(tpl => (
+                <div
+                  key={tpl.id}
+                  onClick={() => handleApplyTemplate(tpl)}
+                  title={tpl.description}
+                  style={{
+                    background: 'var(--surface)', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
+                    cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
+                  }}
+                  className="card-hover-effect"
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#4c1d95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {tpl.name}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: '#7c3aed', opacity: 0.8 }}>
+                      Comptes {tpl.lines[0].compte} / {tpl.lines[1].compte}
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#7c3aed', flexShrink: 0 }}>arrow_forward</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+              style={{ marginTop: 16, border: 'none', background: 'none', color: '#6b21a8', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
+            >
+              {showAdvancedMode ? 'Masquer le mode avancé' : 'Mode avancé (saisie comptable détaillée) ▾'}
+            </button>
+            {showAdvancedMode && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={handleOpenNewEditor}
+                  style={{
+                    padding: '8px 16px', background: 'var(--surface)', color: 'var(--text)',
+                    border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.80rem',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--primary)' }}>edit_note</span>
+                  Nouvelle écriture multiligne (débit/crédit par compte)
+                </button>
+              </div>
+            )}
           </div>
 
-          {templateError && (
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', borderRadius: 8,
-              background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.74rem', marginBottom: 12
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0 }}>error</span>
-              <span style={{ flex: 1 }}>{templateError}</span>
+          {/* 📝 ÉDITEUR MULTILIGNE (MODE AVANCÉ) */}
+          {isEditorOpen && (
+            <div className="card fade-in" style={{ padding: 20, border: '2px solid var(--primary)', background: 'var(--surface)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                  <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>edit_note</span>
+                  {editingId ? "Modification de l'Écriture Simulée" : "Saisie d'une Nouvelle Écriture Multiligne"}
+                </h3>
+                <button onClick={() => setIsEditorOpen(false)} aria-label="Fermer l'éditeur d'écriture" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                </button>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
+                  Libellé / Motif de l'Écriture
+                </label>
+                <input
+                  type="text"
+                  value={opLabel}
+                  onChange={e => setOpLabel(e.target.value)}
+                  placeholder="Ex: Vente de marchandises au comptant"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.85rem', fontWeight: 700, outline: 'none', background: 'var(--surface)' }}
+                />
+              </div>
+
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+                <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '22%' }}>COMPTE (3 CH.)</th>
+                      <th style={{ width: '38%' }}>INTITULÉ COMPTE</th>
+                      <th className="right" style={{ width: '17%', color: 'var(--green)' }}>DÉBIT</th>
+                      <th className="right" style={{ width: '17%', color: 'var(--primary-dk)' }}>CRÉDIT</th>
+                      <th style={{ width: '6%', textAlign: 'center' }}>✕</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editorLines.map((line, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <input
+                            type="text"
+                            value={line.compte}
+                            onChange={e => handleLineChange(idx, 'compte', e.target.value)}
+                            placeholder="700"
+                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, outline: 'none' }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={line.libelle}
+                            onChange={e => handleLineChange(idx, 'libelle', e.target.value)}
+                            placeholder="Intitulé"
+                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.80rem', outline: 'none' }}
+                          />
+                        </td>
+                        <td className="right">
+                          <input
+                            type="number"
+                            value={line.debit || ''}
+                            onChange={e => handleLineChange(idx, 'debit', Number(e.target.value))}
+                            placeholder="0"
+                            style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--green)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--green)', outline: 'none' }}
+                          />
+                        </td>
+                        <td className="right">
+                          <input
+                            type="number"
+                            value={line.credit || ''}
+                            onChange={e => handleLineChange(idx, 'credit', Number(e.target.value))}
+                            placeholder="0"
+                            style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--primary)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--primary-dk)', outline: 'none' }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleRemoveLine(idx)}
+                            disabled={editorLines.length <= 2}
+                            aria-label="Supprimer cette ligne"
+                            style={{ border: 'none', background: 'none', cursor: editorLines.length <= 2 ? 'not-allowed' : 'pointer', color: editorLines.length <= 2 ? 'var(--border-mid)' : 'var(--red)' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="2" style={{ fontWeight: 800, fontSize: '0.74rem' }}>TOTAL ÉCRITURE SIMULÉE</td>
+                      <td className="right mono" style={{ fontWeight: 900, color: 'var(--green)', fontSize: '0.85rem' }}>{fmt(sumDebit)}</td>
+                      <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem' }}>{fmt(sumCredit)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => handleAddLine('debit')}
+                    style={{ padding: '5px 10px', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    + Ligne Débit
+                  </button>
+                  <button
+                    onClick={() => handleAddLine('credit')}
+                    style={{ padding: '5px 10px', background: '#f0f8fa', color: '#124f66', border: '1px solid #b7dce6', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    + Ligne Crédit
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {isBalanced ? (
+                    <span className="badge badge-green" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
+                      ✓ Équilibrée (D = C)
+                    </span>
+                  ) : (
+                    <span className="badge badge-red" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
+                      ⚠ Écart: {fmt(diffDC)}
+                    </span>
+                  )}
+
+                  <button
+                    onClick={handleSaveEntry}
+                    disabled={!isBalanced}
+                    style={{
+                      padding: '8px 18px', background: isBalanced ? 'linear-gradient(135deg, #059669, #047857)' : 'var(--border-mid)',
+                      color: '#fff', border: 'none', borderRadius: 8, cursor: isBalanced ? 'pointer' : 'not-allowed',
+                      fontWeight: 800, fontSize: '0.85rem'
+                    }}
+                  >
+                    {editingId ? 'Enregistrer' : 'Valider'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
-            {filteredTemplates.map(tpl => (
-              <div
-                key={tpl.id}
-                onClick={() => handleApplyTemplate(tpl)}
-                style={{
-                  background: 'var(--surface)', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
-                  cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
-                }}
-                className="card-hover-effect"
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#4c1d95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {tpl.name}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: '#7c3aed', opacity: 0.8 }}>
-                    Comptes {tpl.lines[0].compte} / {tpl.lines[1].compte}
-                  </div>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#7c3aed', flexShrink: 0 }}>arrow_forward</span>
+          {/* 📚 JOURNAL DES ÉCRITURES DU SCÉNARIO CONSULTÉ */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, margin: 0 }}>Journal — {effectiveSelected?.name}</h3>
+                <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>{(effectiveSelected?.entries || []).length} écriture(s)</span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* 📝 ÉDITEUR MULTILIGNE (MODAL / INLINE) */}
-      {isEditorOpen && (
-        <div className="card fade-in" style={{ padding: 20, border: '2px solid var(--primary)', background: 'var(--surface)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-              <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>edit_note</span>
-              {editingId ? "Modification de l'Écriture Simulée" : "Saisie d'une Nouvelle Écriture Multiligne"}
-            </h3>
-            <button onClick={() => setIsEditorOpen(false)} aria-label="Fermer l'éditeur d'écriture" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
-            </button>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
-              Libellé / Motif de l'Écriture
-            </label>
-            <input
-              type="text"
-              value={opLabel}
-              onChange={e => setOpLabel(e.target.value)}
-              placeholder="Ex: Vente de marchandises au comptant"
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.85rem', fontWeight: 700, outline: 'none', background: 'var(--surface)' }}
-            />
-          </div>
-
-          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
-            <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: '22%' }}>COMPTE (3 CH.)</th>
-                  <th style={{ width: '38%' }}>INTITULÉ COMPTE</th>
-                  <th className="right" style={{ width: '17%', color: 'var(--green)' }}>DÉBIT (DA)</th>
-                  <th className="right" style={{ width: '17%', color: 'var(--primary-dk)' }}>CRÉDIT (DA)</th>
-                  <th style={{ width: '6%', textAlign: 'center' }}>✕</th>
-                </tr>
-              </thead>
-              <tbody>
-                {editorLines.map((line, idx) => (
-                  <tr key={idx}>
-                    <td>
-                      <input
-                        type="text"
-                        value={line.compte}
-                        onChange={e => handleLineChange(idx, 'compte', e.target.value)}
-                        placeholder="700"
-                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, outline: 'none' }}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={line.libelle}
-                        onChange={e => handleLineChange(idx, 'libelle', e.target.value)}
-                        placeholder="Intitulé"
-                        style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.80rem', outline: 'none' }}
-                      />
-                    </td>
-                    <td className="right">
-                      <input
-                        type="number"
-                        value={line.debit || ''}
-                        onChange={e => handleLineChange(idx, 'debit', Number(e.target.value))}
-                        placeholder="0"
-                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--green)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--green)', outline: 'none' }}
-                      />
-                    </td>
-                    <td className="right">
-                      <input
-                        type="number"
-                        value={line.credit || ''}
-                        onChange={e => handleLineChange(idx, 'credit', Number(e.target.value))}
-                        placeholder="0"
-                        style={{ width: '100%', textAlign: 'right', padding: '4px 6px', border: '1px solid var(--primary)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, color: 'var(--primary-dk)', outline: 'none' }}
-                      />
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleRemoveLine(idx)}
-                        disabled={editorLines.length <= 2}
-                        style={{ border: 'none', background: 'none', cursor: editorLines.length <= 2 ? 'not-allowed' : 'pointer', color: editorLines.length <= 2 ? 'var(--border-mid)' : 'var(--red)' }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="2" style={{ fontWeight: 800, fontSize: '0.74rem' }}>TOTAL ÉCRITURE SIMULÉE</td>
-                  <td className="right mono" style={{ fontWeight: 900, color: 'var(--green)', fontSize: '0.85rem' }}>{fmt(sumDebit)}</td>
-                  <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem' }}>{fmt(sumCredit)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={() => handleAddLine('debit')}
-                style={{ padding: '5px 10px', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-              >
-                + Ligne Débit
-              </button>
-              <button
-                onClick={() => handleAddLine('credit')}
-                style={{ padding: '5px 10px', background: '#f0f8fa', color: '#124f66', border: '1px solid #b7dce6', borderRadius: 6, fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-              >
-                + Ligne Crédit
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {isBalanced ? (
-                <span className="badge badge-green" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
-                  ✓ Équilibrée (D = C)
-                </span>
-              ) : (
-                <span className="badge badge-red" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
-                  ⚠ Écart: {fmt(diffDC)}
-                </span>
+              {(effectiveSelected?.entries || []).length > 0 && (
+                <button
+                  onClick={() => updateSelectedEntries(() => [])}
+                  style={{ border: 'none', background: 'none', color: 'var(--red)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  × Vider ce scénario
+                </button>
               )}
-
-              <button
-                onClick={handleSaveEntry}
-                disabled={!isBalanced}
-                style={{
-                  padding: '8px 18px', background: isBalanced ? 'linear-gradient(135deg, #059669, #047857)' : '#cbd5e1',
-                  color: '#fff', border: 'none', borderRadius: 8, cursor: isBalanced ? 'pointer' : 'not-allowed',
-                  fontWeight: 800, fontSize: '0.85rem'
-                }}
-              >
-                {editingId ? 'Enregistrer' : 'Valider'}
-              </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* 📚 JOURNAL DES ÉCRITURES SIMULÉES */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h3 style={{ fontSize: '0.92rem', fontWeight: 800, margin: 0 }}>Journal des Écritures Simulées</h3>
-            <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>{simulationEntries.length} écriture(s)</span>
-          </div>
+            <div style={{ width: '100%', overflow: 'hidden' }}>
+              <table className="data-table compact-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '12%', padding: '8px 8px' }}>DATE</th>
+                    <th style={{ width: '44%', padding: '8px 8px' }}>LIBELLÉ &amp; LIGNES COMPTABLES</th>
+                    <th style={{ width: '16%', padding: '8px 8px' }}>COMPTES</th>
+                    <th className="right" style={{ width: '16%', padding: '8px 8px' }}>MONTANT</th>
+                    <th style={{ width: '12%', textAlign: 'center', padding: '8px 8px' }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(effectiveSelected?.entries || []).length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
+                        Aucune écriture dans ce scénario. Utilisez le <strong>panneau ci-dessus</strong> pour ajouter une opération.
+                      </td>
+                    </tr>
+                  ) : (
+                    effectiveSelected.entries.map((e) => (
+                      <tr key={e.id}>
+                        <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)', verticalAlign: 'top', padding: '8px 8px' }}>
+                          {e.date}
+                        </td>
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={handleOpenNewEditor}
-              className="btn btn-primary"
-              style={{ fontSize: '0.74rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add</span>
-              + Saisie Avancée
-            </button>
+                        <td style={{ verticalAlign: 'top', padding: '8px 8px', wordBreak: 'break-word' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', marginBottom: 4 }}>{e.label}</div>
 
-            {simulationEntries.length > 0 && (
-              <button
-                onClick={() => setSimulationEntries([])}
-                style={{ border: 'none', background: 'none', color: 'var(--red)', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer' }}
-              >
-                × Vider Tout
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ width: '100%', overflow: 'hidden' }}>
-          <table className="data-table compact-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '12%', padding: '8px 8px' }}>DATE</th>
-                <th style={{ width: '44%', padding: '8px 8px' }}>LIBELLÉ &amp; LIGNES COMPTABLES</th>
-                <th style={{ width: '16%', padding: '8px 8px' }}>COMPTES</th>
-                <th className="right" style={{ width: '16%', padding: '8px 8px' }}>MONTANT (DA)</th>
-                <th style={{ width: '12%', textAlign: 'center', padding: '8px 8px' }}>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {simulationEntries.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Aucune écriture simulée dans le journal. Utilisez le <strong>Créateur Rapide</strong> ci-dessus pour simuler une opération.
-                  </td>
-                </tr>
-              ) : (
-                simulationEntries.map((e) => (
-                  <tr key={e.id}>
-                    <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)', verticalAlign: 'top', padding: '8px 8px' }}>
-                      {e.date}
-                    </td>
-
-                    <td style={{ verticalAlign: 'top', padding: '8px 8px', wordBreak: 'break-word' }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text)', marginBottom: 4 }}>{e.label}</div>
-                      
-                      {e.lines && e.lines.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.7rem' }}>
-                          {e.lines.map((l, li) => (
-                            <div key={li} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)', borderBottom: li < e.lines.length - 1 ? '1px dashed var(--border)' : 'none', paddingBottom: 1 }}>
-                              <span>
-                                <strong className="mono" style={{ color: l.debit > 0 ? 'var(--green)' : 'var(--primary-dk)' }}>{l.compte}</strong> — {l.libelle}
-                              </span>
-                              <span className="mono" style={{ fontWeight: 700, paddingLeft: 8 }}>
-                                {l.debit > 0 ? `D: ${fmt(l.debit)}` : `C: ${fmt(l.credit)}`}
-                              </span>
+                          {e.lines && e.lines.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.7rem' }}>
+                              {e.lines.map((l, li) => (
+                                <div key={li} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-sub)', borderBottom: li < e.lines.length - 1 ? '1px dashed var(--border)' : 'none', paddingBottom: 1 }}>
+                                  <span>
+                                    <strong className="mono" style={{ color: l.debit > 0 ? 'var(--green)' : 'var(--primary-dk)' }}>{l.compte}</strong> — {l.libelle}
+                                  </span>
+                                  <span className="mono" style={{ fontWeight: 700, paddingLeft: 8 }}>
+                                    {l.debit > 0 ? `D: ${fmt(l.debit)}` : `C: ${fmt(l.credit)}`}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                          D: {e.debitCompte} | C: {e.creditCompte}
-                        </div>
-                      )}
-                    </td>
+                          ) : (
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                              D: {e.debitCompte} | C: {e.creditCompte}
+                            </div>
+                          )}
+                        </td>
 
-                    <td style={{ verticalAlign: 'top', padding: '8px 8px' }}>
-                      {e.lines && e.lines.length > 0 ? (
-                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                          {e.lines.map((l, li) => (
-                            <span key={li} className="mono" style={{ fontSize: '0.65rem', background: l.debit > 0 ? '#dcfce7' : '#f0f8fa', color: l.debit > 0 ? '#166534' : '#124f66', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
-                              {l.compte}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 800 }}>{e.debitCompte} / {e.creditCompte}</span>
-                      )}
-                    </td>
+                        <td style={{ verticalAlign: 'top', padding: '8px 8px' }}>
+                          {e.lines && e.lines.length > 0 ? (
+                            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                              {e.lines.map((l, li) => (
+                                <span key={li} className="mono" style={{ fontSize: '0.65rem', background: l.debit > 0 ? '#dcfce7' : '#f0f8fa', color: l.debit > 0 ? '#166534' : '#124f66', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
+                                  {l.compte}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 800 }}>{e.debitCompte} / {e.creditCompte}</span>
+                          )}
+                        </td>
 
-                    <td className="right mono" style={{ verticalAlign: 'top', padding: '8px 8px', fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem' }}>
-                      {fmt(e.montant)}
-                    </td>
+                        <td className="right mono" style={{ verticalAlign: 'top', padding: '8px 8px', fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem' }}>
+                          {fmt(e.montant)}
+                        </td>
 
-                    <td style={{ verticalAlign: 'top', textAlign: 'center', padding: '8px 8px' }}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <button
-                          onClick={() => handleOpenEditEditor(e)}
-                          title="Modifier cette écriture"
-                          style={{ border: '1px solid #b7dce6', background: '#f0f8fa', color: '#124f66', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
-                          Éditer
-                        </button>
+                        <td style={{ verticalAlign: 'top', textAlign: 'center', padding: '8px 8px' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleOpenEditEditor(e)}
+                              title="Modifier cette écriture"
+                              aria-label="Modifier cette écriture"
+                              style={{ border: '1px solid #b7dce6', background: '#f0f8fa', color: '#124f66', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
+                            </button>
 
-                        <button
-                          onClick={() => handleRemoveEntry(e.id)}
-                          title="Supprimer cette écriture"
-                          style={{ border: '1px solid #fecdd3', background: '#fff1f2', color: '#be123c', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
-                        </button>
-                      </div>
-                    </td>
+                            <button
+                              onClick={() => handleRemoveEntry(e.id)}
+                              title="Supprimer cette écriture"
+                              aria-label="Supprimer cette écriture"
+                              style={{ border: '1px solid #fecdd3', background: '#fff1f2', color: '#be123c', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 2 }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {(effectiveSelected?.entries || []).length > 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan="3" style={{ fontWeight: 800, fontSize: '0.74rem', padding: '8px 8px' }}>TOTAL GÉNÉRAL DU JOURNAL</td>
+                      <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem', padding: '8px 8px' }}>{fmt(totalSimulatedDebit)}</td>
+                      <td style={{ textAlign: 'center', padding: '8px 8px' }}>
+                        <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>✓ D = C</span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+
+          {/* 📊 RECAPITULATIF DES IMPACTS DU SCÉNARIO CONSULTÉ */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>CHIFFRE D'AFFAIRES (CA)</div>
+              <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simCA >= baseCA ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simCA)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseCA)} ({fmtPct(baseCA ? ((simCA - baseCA) / baseCA) * 100 : 0)})</div>
+            </div>
+
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXCÉDENT BRUT (EBE)</div>
+              <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simEBE >= baseEBE ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simEBE)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseEBE)}</div>
+            </div>
+
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>RÉSULTAT NET</div>
+              <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simNet >= baseNet ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simNet)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseNet)}</div>
+            </div>
+
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>BFR (BESOIN EN FONDS)</div>
+              <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simBFR <= baseBFR ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simBFR)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseBFR)}</div>
+            </div>
+
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>TRÉSORERIE NETTE (TN)</div>
+              <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simTN >= baseTN ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simTN)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseTN)}</div>
+            </div>
+          </div>
+
+          {/* 📋 TABLEAU COMPARATIF : SITUATION ACTUELLE VS TOUS LES SCÉNARIOS */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card-header">
+              <h3 style={{ fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 18 }}>table_rows</span>
+                Tableau Comparatif : Situation Actuelle vs Scénarios
+              </h3>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table compact-table" style={{ width: '100%', minWidth: 560 }}>
+                <thead>
+                  <tr>
+                    <th>Indicateur</th>
+                    <th className="right">Situation Actuelle</th>
+                    {scenarioResults.map(({ scenario, color }) => (
+                      <th key={scenario.id} className="right" style={{ color, borderBottom: `2px solid ${color}` }}>
+                        {scenario.name}{scenario.id === activeScenarioId ? ' ✓' : ''}
+                      </th>
+                    ))}
                   </tr>
-                ))
-              )}
-            </tbody>
-            {simulationEntries.length > 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan="3" style={{ fontWeight: 800, fontSize: '0.74rem', padding: '8px 8px' }}>TOTAL GENERAL DU JOURNAL SIMULÉ</td>
-                  <td className="right mono" style={{ fontWeight: 900, color: 'var(--primary-dk)', fontSize: '0.85rem', padding: '8px 8px' }}>{fmt(totalSimulatedDebit)}</td>
-                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>
-                    <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>✓ D = C</span>
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {INDICATORS.map(ind => {
+                    const baseVal = ind.get(data);
+                    return (
+                      <tr key={ind.key}>
+                        <td style={{ fontWeight: 700 }}>{ind.label}</td>
+                        <td className="right mono">{fmt(baseVal)}</td>
+                        {scenarioResults.map(({ scenario, result }) => {
+                          const val = ind.get(result);
+                          const isBetter = ind.up ? val >= baseVal : val <= baseVal;
+                          return (
+                            <td key={scenario.id} className="right mono" style={{ color: val === baseVal ? 'var(--text)' : (isBetter ? 'var(--green)' : 'var(--red)'), fontWeight: 800 }}>
+                              {fmt(val)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ fontWeight: 800, fontSize: '0.74rem' }}>ACTIONS</td>
+                    <td></td>
+                    {scenarioResults.map(({ scenario }) => (
+                      <td key={scenario.id} style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          <button
+                            onClick={() => setSelectedScenarioId(scenario.id)}
+                            title={`Consulter ${scenario.name}`}
+                            aria-label={`Consulter ${scenario.name}`}
+                            style={{ border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>visibility</span>
+                          </button>
+                          <button
+                            onClick={() => scenario.id === activeScenarioId ? setActiveScenarioId(null) : setActiveScenarioId(scenario.id)}
+                            title={scenario.id === activeScenarioId ? 'Désactiver' : 'Activer sur toute l\'appli'}
+                            aria-label={scenario.id === activeScenarioId ? `Désactiver ${scenario.name}` : `Activer ${scenario.name}`}
+                            style={{ border: '1px solid var(--green)', background: scenario.id === activeScenarioId ? 'var(--green)' : 'var(--surface-alt)', color: scenario.id === activeScenarioId ? '#fff' : 'var(--green)', borderRadius: 6, padding: '3px 6px', cursor: 'pointer', display: 'flex' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{scenario.id === activeScenarioId ? 'check' : 'play_arrow'}</span>
+                          </button>
+                          <button
+                            onClick={() => handlePrintScenario(scenario)}
+                            disabled={printingId === scenario.id}
+                            title={`Imprimer ${scenario.name}`}
+                            aria-label={`Imprimer ${scenario.name}`}
+                            style={{ border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text)', borderRadius: 6, padding: '3px 6px', cursor: printingId === scenario.id ? 'wait' : 'pointer', display: 'flex' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{printingId === scenario.id ? 'hourglass_empty' : 'print'}</span>
+                          </button>
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
 
-      {/* 📊 RECAPITULATIF DES IMPACTS SUR LES ÉTATS FINANCIERS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        
-        <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>CHIFFRE D'AFFAIRES (CA)</div>
-          <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simCA >= baseCA ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simCA)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseCA)} ({fmtPct(baseCA ? ((simCA - baseCA)/baseCA)*100 : 0)})</div>
-        </div>
+          {/* Comparison Chart */}
+          <div className="card" style={{ padding: 18 }}>
+            <div className="card-header" style={{ marginBottom: 14 }}>
+              <h3 style={{ fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 18 }}>bar_chart</span>
+                Comparatif Visuel : Situation Actuelle vs Scénarios
+              </h3>
+            </div>
 
-        <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXCÉDENT BRUT (EBE)</div>
-          <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simEBE >= baseEBE ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simEBE)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseEBE)}</div>
-        </div>
-
-        <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>RÉSULTAT NET</div>
-          <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simNet >= baseNet ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simNet)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseNet)}</div>
-        </div>
-
-        <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>BFR (BESOIN EN FONDS)</div>
-          <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simBFR <= baseBFR ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simBFR)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseBFR)}</div>
-        </div>
-
-        <div className="card" style={{ padding: 14 }}>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 700 }}>TRÉSORERIE NETTE (TN)</div>
-          <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 900, color: simTN >= baseTN ? 'var(--green)' : 'var(--red)', margin: '2px 0' }}>{fmt(simTN)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-sub)' }}>Actuel: {fmt(baseTN)}</div>
-        </div>
-
-      </div>
-
-      {/* Comparison Chart */}
-      <div className="card" style={{ padding: 18 }}>
-        <div className="card-header" style={{ marginBottom: 14 }}>
-          <h3 style={{ fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-            <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 18 }}>bar_chart</span>
-            Comparatif Visuel : Situation Actuelle vs Scénario Simulé
-          </h3>
-        </div>
-
-        <div style={{ height: 260, width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-              <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} tickFormatter={v => `${Math.round(v / 1000)}k`} />
-              <Tooltip
-                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
-                formatter={(val) => [fmt(val)]}
-              />
-              <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
-              <Bar dataKey="Actuel" fill="var(--text-sub)" radius={[4, 4, 0, 0]} maxBarSize={32} />
-              <Bar dataKey="Simulé" fill="#1b6e8c" radius={[4, 4, 0, 0]} maxBarSize={32} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+            <div style={{ height: 280, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} tickFormatter={v => `${Math.round(v / 1000)}k`} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
+                    formatter={(val) => [fmt(val)]}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
+                  <Bar dataKey="Actuel" fill="var(--text-sub)" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  {scenarioResults.map(({ scenario, color }) => (
+                    <Bar key={scenario.id} dataKey={scenario.name} fill={color} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

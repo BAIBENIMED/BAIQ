@@ -5,6 +5,7 @@ import {
 import { ImportData } from './components/ImportData';
 import { BilanView } from './components/BilanView';
 import { SIGView } from './components/SIGView';
+import { EtatsFinanciersView } from './components/EtatsFinanciersView';
 import { CapitauxPropresView } from './components/CapitauxPropresView';
 import { RatiosView } from './components/RatiosView';
 import { BalanceView } from './components/BalanceView';
@@ -32,6 +33,7 @@ const NAV = [
   { id: 'audit',       label: 'Audit Balance (SCF)',    icon: 'fact_check'    },
   { id: 'bilan',       label: 'Bilan Fonctionnel',      icon: 'account_tree'  },
   { id: 'sig',         label: 'SIG & TCR (SCF)',        icon: 'analytics'     },
+  { id: 'etats_financiers', label: 'États Financiers (SCF)', icon: 'summarize' },
   { id: 'capitaux',    label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
   { id: 'stocks',      label: 'Variation Stocks',       icon: 'warehouse'     },
   { id: 'ratios',      label: 'Ratios Financiers',      icon: 'query_stats'   },
@@ -48,6 +50,7 @@ export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
   const [showPostImportConfig, setShowPostImportConfig] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(() => parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10));
   
@@ -66,14 +69,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  /* ── Moteur de Simulation ── */
-  const [simulationEntries, setSimulationEntries] = useState([]);
-  const [isSimulationActive, setIsSimulationActive] = useState(false);
+  /* ── Moteur de Simulation — jusqu'à 3 scénarios en parallèle ── */
+  const [scenarios, setScenarios] = useState([]); // [{id, name, entries, createdAt}]
+  const [activeScenarioId, setActiveScenarioId] = useState(null); // scénario appliqué à toute l'appli, ou null = Mode Réel
+  const activeScenario = scenarios.find(s => s.id === activeScenarioId) || null;
+  const isSimulationActive = !!activeScenario;
 
-  // Active dataset (Real vs Simulated)
+  // Active dataset (Real vs Scénario Actif)
   const activeData = useMemo(() => {
-    const base = (isSimulationActive && simulationEntries.length > 0 && data)
-      ? recalculateSimulatedDataset(data, simulationEntries)
+    const base = (activeScenario && activeScenario.entries.length > 0 && data)
+      ? recalculateSimulatedDataset(data, activeScenario.entries)
       : data;
     if (!base) return base;
 
@@ -88,7 +93,15 @@ export default function App() {
         ratios: base.dataN1.ratios ? applyTvaRegimeToRatios(base.dataN1.ratios, tvaRegime) : base.dataN1.ratios
       } : base.dataN1
     };
-  }, [data, simulationEntries, isSimulationActive]);
+  }, [data, activeScenario]);
+
+  const onToggleSimulation = () => {
+    if (activeScenarioId) {
+      setActiveScenarioId(null);
+    } else {
+      setTab('whatif');
+    }
+  };
 
   // Appliquer le thème sur document.documentElement
   useState(() => {
@@ -527,10 +540,11 @@ export default function App() {
     if (tab === 'audit')    return <AuditBalanceView rows={activeData?.rows} formatCurrency={fmt} />;
     if (tab === 'bilan')    return <BilanView data={activeData?.bilan} dataN1={activeData?.dataN1} rows={activeData?.rows} formatCurrency={fmt} />;
     if (tab === 'sig')      return <SIGView data={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
+    if (tab === 'etats_financiers') return <EtatsFinanciersView data={activeData?.bilanSCF} sig={activeData?.sig} dataN1={activeData?.dataN1} profil={activeData?.profil} formatCurrency={fmt} />;
     if (tab === 'capitaux') return <CapitauxPropresView data={activeData} fmt={fmt} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} cur={cur} />;
-    if (tab === 'whatif')      return <WhatIfSimulator data={data} simulationEntries={simulationEntries} setSimulationEntries={setSimulationEntries} isSimulationActive={isSimulationActive} setIsSimulationActive={setIsSimulationActive} formatCurrency={fmt} />;
+    if (tab === 'whatif')      return <WhatIfSimulator data={data} scenarios={scenarios} setScenarios={setScenarios} activeScenarioId={activeScenarioId} setActiveScenarioId={setActiveScenarioId} formatCurrency={fmt} cur={cur} />;
     if (tab === 'methodology') return <CalculationsIndexView />;
     if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} cur={cur} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
     if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
@@ -1000,7 +1014,7 @@ export default function App() {
               <div style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)', marginTop: 2, lineHeight: 1 }}>Balance and Financial Analytics</div>
             </div>
           </div>
-          <div style={{ marginTop: 6, fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-sub)', letterSpacing: '0.06em', opacity: 0.7 }}>Comptabilité · Finance · IA — SCF Algérie</div>
+          <div style={{ marginTop: 6, fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-sub)', letterSpacing: '0.06em', opacity: 0.7 }}>Comptabilité · Finance · IA — SCF</div>
         </div>
         <nav className="sidebar-nav">
           {NAV.map(n => {
@@ -1066,14 +1080,8 @@ export default function App() {
           <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Interrupteur Mode Simulation Global (Visible sur tous les écrans) */}
             <button
-              onClick={() => {
-                if (simulationEntries.length === 0 && !isSimulationActive) {
-                  setTab('whatif');
-                } else {
-                  setIsSimulationActive(!isSimulationActive);
-                }
-              }}
-              title="Activer/Désactiver le Mode Simulation ou Gérer les Écritures"
+              onClick={onToggleSimulation}
+              title="Activer/Désactiver le Scénario ou Gérer les Simulations"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
@@ -1087,11 +1095,11 @@ export default function App() {
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                 {isSimulationActive ? 'edit_note' : 'do_not_disturb_on'}
               </span>
-              {isSimulationActive ? `Mode Simulé (${simulationEntries.length}) 📝` : 'Mode Réel 🔵'}
+              {isSimulationActive ? `Scénario : ${activeScenario.name} (${activeScenario.entries.length}) 📝` : 'Mode Réel 🔵'}
             </button>
 
             {data && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20, padding: '4px 12px' }}>
+              <div className="header-secteur" style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20, padding: '4px 12px' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#1b6e8c' }}>domain</span>
                 <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>Secteur :</span>
                 <select
@@ -1125,19 +1133,19 @@ export default function App() {
         </header>
 
         <main className="canvas">
-          {isSimulationActive && simulationEntries.length > 0 && tab !== 'whatif' && (
+          {isSimulationActive && activeScenario.entries.length > 0 && tab !== 'whatif' && (
             <div style={{ background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff', padding: '10px 18px', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16, boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>edit_note</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
-                  MODE SIMULATION ACTIF 📝 : {simulationEntries.length} écriture(s) en partie double appliquée(s) à toute l'application.
+                  SCÉNARIO ACTIF 📝 « {activeScenario.name} » : {activeScenario.entries.length} écriture(s) en partie double appliquée(s) à toute l'application.
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <button onClick={() => setTab('whatif')} style={{ background: '#fff', color: '#047857', border: 'none', padding: '4px 12px', borderRadius: 8, fontSize: '0.80rem', fontWeight: 800, cursor: 'pointer' }}>
-                  Gérer la Simulation ⚙️
+                  Gérer les Scénarios ⚙️
                 </button>
-                <button onClick={() => setIsSimulationActive(false)} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 8, fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setActiveScenarioId(null)} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 8, fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}>
                   Désactiver ✕
                 </button>
               </div>
@@ -1147,15 +1155,81 @@ export default function App() {
         </main>
       </div>
 
-      {/* ── MOBILE NAV ── */}
+      {/* ── MOBILE NAV : 4 raccourcis + "Plus" pour accéder à tous les écrans ── */}
       <nav className="mobile-nav">
-        {NAV.slice(0,5).map(n => (
+        {NAV.slice(0,4).map(n => (
           <button key={n.id} className={`mobile-nav-item ${tab===n.id?'active':''}`} onClick={() => setTab(n.id)}>
             <span className="material-symbols-outlined">{n.icon}</span>
             <span>{n.label.split(' ')[0]}</span>
           </button>
         ))}
+        <button
+          className={`mobile-nav-item ${showMobileMore ? 'active' : ''}`}
+          onClick={() => setShowMobileMore(true)}
+          aria-haspopup="true"
+          aria-expanded={showMobileMore}
+        >
+          <span className="material-symbols-outlined">apps</span>
+          <span>Plus</span>
+        </button>
       </nav>
+
+      {/* ── MENU MOBILE "PLUS" : accès à tous les écrans non présents dans la barre ── */}
+      {showMobileMore && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tous les écrans"
+          onClick={() => setShowMobileMore(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex', alignItems: 'flex-end'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxHeight: '75vh', overflowY: 'auto',
+              background: 'var(--surface)', borderRadius: '18px 18px 0 0',
+              padding: '10px 10px calc(env(safe-area-inset-bottom, 0px) + 14px)',
+              boxShadow: '0 -8px 30px rgba(0,0,0,0.25)'
+            }}
+          >
+            <div style={{ width: 40, height: 4, borderRadius: 4, background: 'var(--border-mid)', margin: '4px auto 12px' }} />
+            <div style={{ padding: '0 10px 10px', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              Tous les écrans
+            </div>
+            {NAV.slice(4).map(n => (
+              <button
+                key={n.id}
+                className={`nav-item ${tab === n.id ? 'active' : ''}`}
+                onClick={() => { setTab(n.id); setShowMobileMore(false); }}
+                style={{ width: '100%' }}
+              >
+                <span className="material-symbols-outlined">{n.icon}</span>
+                {n.label}
+              </button>
+            ))}
+            <button
+              className={`nav-item ${tab === 'settings' ? 'active' : ''}`}
+              onClick={() => { setTab('settings'); setShowMobileMore(false); }}
+              style={{ width: '100%' }}
+            >
+              <span className="material-symbols-outlined">settings</span>
+              Paramètres
+            </button>
+            <button
+              className="nav-item"
+              onClick={() => { setShowContactModal(true); setShowMobileMore(false); }}
+              style={{ width: '100%', color: 'var(--primary)' }}
+            >
+              <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>support_agent</span>
+              Contact
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── MODALE DE CONTACT & ASSISTANCE ── */}
       {showContactModal && (
@@ -1225,7 +1299,7 @@ export default function App() {
                   <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 22 }}>verified</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>EXPÉRIENCE &amp; R&amp;D</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Moteur d'Audit &amp; IA SCF Algérie</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Moteur d'Audit &amp; IA SCF</div>
                   </div>
                   <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: '#ecfdf5', color: '#059669' }}>v2.5</span>
                 </div>
@@ -1265,10 +1339,10 @@ export default function App() {
         rows={activeData?.rows}
         data={activeData}
         onExportExcel={() => exportFinancialWorkbook(activeData, undefined, cur)}
-        onExportPDF={() => generateFullPDF(activeData, cur, isSimulationActive)}
+        onExportPDF={() => generateFullPDF(activeData, cur, isSimulationActive, activeScenario?.name)}
         onTogglePresentation={() => setIsPresentationOpen(true)}
         isSimulationActive={isSimulationActive}
-        setIsSimulationActive={setIsSimulationActive}
+        onToggleSimulation={onToggleSimulation}
       />
 
       {/* ── MODE PRÉSENTATION DAF (Plein Écran) ── */}

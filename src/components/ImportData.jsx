@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react';
-import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios } from '../utils/financeCalculations';
+import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
 import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
 import { useEscapeKey } from '../utils/useEscapeKey';
@@ -122,23 +122,26 @@ export function ImportData({ onDataImported }) {
       effectif: String(sample.effectif || ''),
     };
     const payloadN = { isBalance: true, rows: sample.rowsN };
-    const bilanN   = calculateBilanFonctionnel(payloadN);
-    const sigN     = calculateSIG(payloadN);
-    const ratiosN  = calculateRatios(bilanN, sigN, sample.rowsN);
+    const bilanN    = calculateBilanFonctionnel(payloadN);
+    const sigN      = calculateSIG(payloadN);
+    const ratiosN   = calculateRatios(bilanN, sigN, sample.rowsN);
+    const bilanSCFN = calculateBilanSCF(payloadN, sigN);
 
     let dataN1 = null;
     if (sample.rowsN1 && sample.rowsN1.length > 0) {
       const payloadN1 = { isBalance: true, rows: sample.rowsN1 };
-      const bilanN1   = calculateBilanFonctionnel(payloadN1);
-      const sigN1     = calculateSIG(payloadN1);
-      const ratiosN1  = calculateRatios(bilanN1, sigN1, sample.rowsN1);
-      dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, rows: sample.rowsN1 };
+      const bilanN1    = calculateBilanFonctionnel(payloadN1);
+      const sigN1      = calculateSIG(payloadN1);
+      const ratiosN1   = calculateRatios(bilanN1, sigN1, sample.rowsN1);
+      const bilanSCFN1 = calculateBilanSCF(payloadN1, sigN1);
+      dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, bilanSCF: bilanSCFN1, rows: sample.rowsN1 };
     }
 
     const fullPayload = {
       bilan: bilanN,
       sig: sigN,
       ratios: ratiosN,
+      bilanSCF: bilanSCFN,
       rows: sample.rowsN,
       profil: prof,
       dataN1,
@@ -205,24 +208,27 @@ export function ImportData({ onDataImported }) {
     setTimeout(() => {
       // 1. Calcul Exercice N
       const payloadN = { isBalance: true, rows: parsedN };
-      const bilanN   = calculateBilanFonctionnel(payloadN);
-      const sigN     = calculateSIG(payloadN);
-      const ratiosN  = calculateRatios(bilanN, sigN, parsedN);
+      const bilanN    = calculateBilanFonctionnel(payloadN);
+      const sigN      = calculateSIG(payloadN);
+      const ratiosN   = calculateRatios(bilanN, sigN, parsedN);
+      const bilanSCFN = calculateBilanSCF(payloadN, sigN);
 
       // 2. Calcul Exercice N-1 (si fourni)
       let dataN1 = null;
       if (parsedN1) {
         const payloadN1 = { isBalance: true, rows: parsedN1 };
-        const bilanN1   = calculateBilanFonctionnel(payloadN1);
-        const sigN1     = calculateSIG(payloadN1);
-        const ratiosN1  = calculateRatios(bilanN1, sigN1, parsedN1);
-        dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, rows: parsedN1 };
+        const bilanN1    = calculateBilanFonctionnel(payloadN1);
+        const sigN1      = calculateSIG(payloadN1);
+        const ratiosN1   = calculateRatios(bilanN1, sigN1, parsedN1);
+        const bilanSCFN1 = calculateBilanSCF(payloadN1, sigN1);
+        dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, bilanSCF: bilanSCFN1, rows: parsedN1 };
       }
 
       const fullPayload = {
         bilan: bilanN,
         sig: sigN,
         ratios: ratiosN,
+        bilanSCF: bilanSCFN,
         rows: parsedN,
         profil,
         dataN1,

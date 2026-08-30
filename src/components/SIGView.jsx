@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { AccountDetailDrawer } from './AccountDetailDrawer';
 import { EmptyState } from './EmptyState';
+import { buildTCRRows } from '../utils/financeCalculations';
 
 export function SIGView({ data, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
@@ -48,33 +49,7 @@ export function SIGView({ data, rows, formatCurrency }) {
   ];
 
   /* ── TCR officiel ── */
-  const tcrRows = [
-    { code: '70',    label: "Ventes et produits annexes (Chiffre d'affaires)", val: data.c70 || data.chiffreAffaires, type: 'compte' },
-    { code: '72',    label: 'Variation des stocks de produits finis et en-cours', val: data.c72 || 0, type: 'compte' },
-    { code: '73',    label: 'Production immobilisée', val: data.c73 || 0, type: 'compte' },
-    { code: '74',    label: "Subventions d'exploitation", val: data.c74 || 0, type: 'compte' },
-    { code: 'I',     label: "PRODUCTION DE L'EXERCICE (70 + 72 + 73 + 74)", val: data.productionExercice, type: 'subtotal' },
-    { code: '60',    label: 'Achats consommés', val: data.c60 || 0, type: 'compte', isCharge: true },
-    { code: '61/62', label: 'Services extérieurs et autres consommations', val: (data.c61 || 0) + (data.c62 || 0), type: 'compte', isCharge: true },
-    { code: 'II',    label: "CONSOMMATION DE L'EXERCICE (60 + 61 + 62)", val: data.consommationExercice, type: 'subtotal', isCharge: true },
-    { code: 'III',   label: 'VALEUR AJOUTÉE (I - II)', val: data.valeurAjoutee, type: 'total' },
-    { code: '63',    label: 'Charges de personnel', val: data.c63 || data.chargesPersonnel || 0, type: 'compte', isCharge: true },
-    { code: '64',    label: 'Impôts, taxes et versements assimilés', val: data.c64 || data.impotsTaxes || 0, type: 'compte', isCharge: true },
-    { code: 'IV',    label: "EXCÉDENT BRUT D'EXPLOITATION (EBE)", val: data.ebe, type: 'total' },
-    { code: '75',    label: 'Autres produits opérationnels', val: data.c75 || 0, type: 'compte' },
-    { code: '65',    label: 'Autres charges opérationnelles', val: data.c65 || 0, type: 'compte', isCharge: true },
-    { code: '68',    label: 'Dotations aux amortissements, provisions et pertes de valeur', val: data.c68_expl || data.dotationsExploitation || 0, type: 'compte', isCharge: true },
-    { code: '78',    label: 'Reprises sur pertes de valeur et provisions', val: data.c78_expl || data.reprisesExploitation || 0, type: 'compte' },
-    { code: 'V',     label: 'RÉSULTAT OPÉRATIONNEL', val: data.resultatExploitation, type: 'total' },
-    { code: '76/786',label: 'Produits financiers', val: data.produitsFinanciers || 0, type: 'compte' },
-    { code: '66/686',label: 'Charges financières', val: data.chargesFinancieres || 0, type: 'compte', isCharge: true },
-    { code: 'VI',    label: 'RÉSULTAT FINANCIER', val: data.resultatFinancier, type: 'subtotal' },
-    { code: 'VII',   label: "RÉSULTAT ORDINAIRE AVANT IMPÔTS (V + VI)", val: data.rcai, type: 'total' },
-    { code: '69',    label: 'Impôts exigibles & différés sur résultats ordinaires', val: data.c69 || data.impotsBenefices || 0, type: 'compte', isCharge: true },
-    { code: 'VIII',  label: "RÉSULTAT NET DES ACTIVITÉS ORDINAIRES (VII - 69)", val: data.resultatNetOrdinaire, type: 'subtotal' },
-    { code: '77/67', label: 'Éléments extraordinaires (Produits - Charges)', val: data.resultatExtraordinaire || 0, type: 'compte' },
-    { code: 'IX',    label: "RÉSULTAT NET DE L'EXERCICE", val: data.resultatNet, type: 'grand-total' },
-  ];
+  const tcrRows = buildTCRRows(data);
 
   /* ── Cascade chart ── */
   const chartData = [

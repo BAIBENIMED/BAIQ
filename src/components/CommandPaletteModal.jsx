@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 
-export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], data = {}, onExportExcel, onExportPDF, onTogglePresentation, isSimulationActive, setIsSimulationActive }) {
+export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], data = {}, onExportExcel, onExportPDF, onTogglePresentation, isSimulationActive, onToggleSimulation }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
@@ -59,7 +59,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
       { id: 'act_presentation', label: 'Lancer le Mode Présentation DAF (Plein Écran)', icon: 'slideshow', category: 'Actions Rapides', action: () => { onTogglePresentation(); onClose(); } },
       { id: 'act_excel',        label: 'Télécharger le Classeur Excel (.xlsx — 6 Feuilles)', icon: 'table_view', category: 'Actions Rapides', action: () => { onExportExcel?.(); onClose(); } },
       { id: 'act_pdf',          label: 'Générer le Rapport PDF Officiel (7 sections)', icon: 'picture_as_pdf', category: 'Actions Rapides', action: () => { onExportPDF?.(); onClose(); } },
-      { id: 'act_simul',        label: isSimulationActive ? 'Désactiver le Mode Simulation What-If' : 'Activer le Mode Simulation What-If', icon: 'edit_note', category: 'Actions Rapides', action: () => { setIsSimulationActive?.(!isSimulationActive); onClose(); } },
+      { id: 'act_simul',        label: isSimulationActive ? 'Désactiver le Scénario Actif (Mode Réel)' : 'Gérer les Scénarios What-If', icon: 'edit_note', category: 'Actions Rapides', action: () => { onToggleSimulation?.(); onClose(); } },
     ];
 
     actions.forEach(a => {
@@ -111,7 +111,7 @@ export function CommandPaletteModal({ isOpen, onClose, onNavigate, rows = [], da
     }
 
     return results;
-  }, [query, rows, data, isSimulationActive, onNavigate, onClose, onExportExcel, onExportPDF, onTogglePresentation, setIsSimulationActive]);
+  }, [query, rows, data, isSimulationActive, onNavigate, onClose, onExportExcel, onExportPDF, onTogglePresentation, onToggleSimulation]);
 
   // Keyboard navigation inside the palette
   useEffect(() => {

@@ -819,4 +819,47 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
   .main-zone     { height: 100vh; }
   .mobile-nav    { display: flex; justify-content: space-around; }
   .canvas        { padding: 16px; padding-bottom: 80px; }
+  .top-header    { padding: 0 12px; gap: 8px; }
+  .header-title  { display: none; }
+  .header-secteur { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   IMPRESSION — masque le chrome applicatif (barre latérale, en-tête,
+   navigation mobile) pour ne laisser que le document imprimé
+   (états financiers, bilan, etc.), au format d'une pièce officielle.
+   ═══════════════════════════════════════════════════════════════ */
+@media print {
+  .sidebar, .top-header, .mobile-nav, .no-print {
+    display: none !important;
+  }
+  .app-shell, .main-zone, .canvas {
+    display: block !important;
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body, .canvas, .card {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    break-inside: avoid;
+  }
+  .data-table th, .data-table td {
+    color: #000 !important;
+  }
+  .print-only, .print-title {
+    display: block !important;
+  }
+  .print-title {
+    margin-top: 18px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+  }
 }

@@ -1497,6 +1497,212 @@ export const calculateBilanFonctionnel = (data) => {
   return { emploisStables: 0, ressourcesStables: 0, actifCirculant: 0, passifCirculant: 0, tresorerieActive: 0, tresoreriePassive: 0, frng: 0, bfr: 0, tn: 0 };
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * BILAN OFFICIEL SCF (Actif / Passif) — Loi 07-11, Décret 08-156
+ * Rubriques détaillées selon le manuel SCF, à la différence du
+ * Bilan Fonctionnel (FRNG/BFR/TN) qui reste un outil d'analyse.
+ * Le classement par préfixe de compte reprend exactement la
+ * taxonomie déjà établie et auditée dans verifyAccountNature().
+ * ═══════════════════════════════════════════════════════════════
+ */
+// Ligne d'actif au format officiel SCF : Brut / Amortissements-Provisions / Net (voir "BILAN ACTIF
+// (présentation)" du manuel — colonnes Note, N Brut, N Amort-Prov, N Net, N-1 Net).
+const actifLine = (brut, amortProv) => ({ brut, amortProv, net: brut - amortProv });
+
+const emptyActifLine = () => actifLine(0, 0);
+
+const emptyBilanSCF = () => ({
+  actifNonCourant: { ecartAcquisition: emptyActifLine(), immobilisationsIncorporelles: emptyActifLine(), terrains: emptyActifLine(), batiments: emptyActifLine(), autresImmoCorp: emptyActifLine(), immobilisationsEnConcession: emptyActifLine(), immobilisationsEnCours: emptyActifLine(), immobilisationsFinancieres: emptyActifLine(), impotsDifferesActif: emptyActifLine(), total: 0 },
+  actifCourant: { stocks: emptyActifLine(), clients: emptyActifLine(), autresDebiteurs: emptyActifLine(), impotsEtAssimilesActif: emptyActifLine(), autresCreancesEmploisAssimiles: emptyActifLine(), placements: emptyActifLine(), tresorerie: emptyActifLine(), total: 0 },
+  totalActif: 0,
+  capitauxPropres: { capitalEmis: 0, capitalNonAppele: 0, primesEtReserves: 0, ecartsReevaluation: 0, resultatNet: 0, autresCapitauxPropres: 0, total: 0 },
+  passifNonCourant: { empruntsDettesFinancieres: 0, impotsDifferesPassif: 0, autresDettesNonCourantes: 0, provisionsEtProduitsConstatesAvance: 0, total: 0 },
+  passifCourant: { fournisseurs: 0, impotsEtAssimilesPassif: 0, autresDettes: 0, tresoreriePassif: 0, total: 0 },
+  totalPassif: 0,
+});
+
+export const calculateBilanSCF = (data, sig) => {
+  const rows = Array.isArray(data) ? data : (data?.rows || null);
+  if (!rows || rows.length === 0) return emptyBilanSCF();
+
+  let ecartAcquisitionBrut = 0;
+  let incorpBrut = 0, amortIncorp = 0, deprecIncorp = 0, deprecFin = 0;
+  let terrainsBrut = 0, batimentsBrut = 0, autresImmoCorpBrut = 0, concessionBrut = 0, encoursBrut = 0;
+  let amortTerrains = 0, amortBatiments = 0, amortConcession = 0, amortAutresCorp = 0;
+  let deprecTerrains = 0, deprecBatiments = 0, deprecConcession = 0, deprecEnCours = 0, deprecAutresCorp = 0;
+  let immobilisationsFinancieresBrut = 0;
+  let impotsDifferesActif = 0, impotsDifferesPassif = 0;
+
+  let stocksBrut = 0, deprecStocks = 0;
+  let clientsBrut = 0, deprecCreances = 0, autresDebiteurs = 0, impotsEtAssimilesActif = 0, autresCreancesEmploisAssimiles = 0;
+  let placementsBrut = 0, deprecPlacements = 0, tresorerie = 0;
+
+  let capitalEmis = 0, capitalNonAppele = 0, primesEtReserves = 0, ecartsReevaluation = 0, reportANouveau = 0;
+
+  let empruntsDettesFinancieres = 0, autresDettesNonCourantes = 0, provisionsEtProduitsConstatesAvance = 0;
+  let fournisseurs = 0, impotsEtAssimilesPassif = 0, autresDettes = 0, tresoreriePassif = 0;
+
+  rows.forEach(row => {
+    if (row.ignore || !row.compte) return;
+    const c = row.compte.toString().trim();
+    const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+    const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+    const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
+
+    // ── CLASSE 1 : Capitaux Propres & Dettes Financières ──
+    if (c.startsWith('1')) {
+      if (c.startsWith('109')) { capitalNonAppele += solde; }
+      else if (c.startsWith('104') || c.startsWith('106') || c.startsWith('14')) { primesEtReserves += -solde; }
+      else if (c.startsWith('105')) { ecartsReevaluation += -solde; }
+      else if (c.startsWith('131') || c.startsWith('132')) { provisionsEtProduitsConstatesAvance += -solde; }
+      else if (c.startsWith('133')) { if (solde >= 0) impotsDifferesActif += solde; else impotsDifferesPassif += -solde; }
+      else if (c.startsWith('11')) { reportANouveau += -solde; }
+      else if (c.startsWith('12')) { /* Résultat de l'exercice : repris via sig.resultatNet, non recompté ici */ }
+      else if (c.startsWith('15')) { provisionsEtProduitsConstatesAvance += -solde; }
+      else if (c.startsWith('16')) { empruntsDettesFinancieres += -solde; }
+      else if (c.startsWith('17')) { autresDettesNonCourantes += -solde; } // Dettes rattachées à des participations
+      else if (c.startsWith('18')) { if (solde >= 0) autresDebiteurs += solde; else autresDettes += -solde; }
+      else { capitalEmis += -solde; }
+      return;
+    }
+
+    // ── CLASSE 2 : Immobilisations ──
+    // Amortissements (28) et dépréciations (29) sont ventilés par sous-compte quand la nomenclature
+    // le permet (2811/2911=terrains, 2813/2913=bâtiments, 282/292=concession, 293=en cours), avec
+    // repli sur "Autres immobilisations corporelles" pour les sous-comptes non identifiables — même
+    // logique de reconnaissance de suffixe déjà utilisée par autoMatchAccounts() dans ce fichier.
+    if (c.startsWith('2')) {
+      if (c.startsWith('280')) { amortIncorp += -solde; }
+      else if (c.startsWith('2811')) { amortTerrains += -solde; }
+      else if (c.startsWith('2813')) { amortBatiments += -solde; }
+      else if (c.startsWith('282')) { amortConcession += -solde; }
+      else if (c.startsWith('28')) { amortAutresCorp += -solde; }
+      else if (c.startsWith('290')) { deprecIncorp += -solde; }
+      else if (c.startsWith('2911')) { deprecTerrains += -solde; }
+      else if (c.startsWith('2913')) { deprecBatiments += -solde; }
+      else if (c.startsWith('292')) { deprecConcession += -solde; }
+      else if (c.startsWith('293')) { deprecEnCours += -solde; }
+      else if (c.startsWith('296') || c.startsWith('297')) { deprecFin += -solde; }
+      else if (c.startsWith('29')) { deprecAutresCorp += -solde; }
+      else if (c.startsWith('207')) { ecartAcquisitionBrut += solde; }
+      else if (c.startsWith('211')) { terrainsBrut += solde; }
+      else if (c.startsWith('213')) { batimentsBrut += solde; }
+      else if (c.startsWith('22')) { concessionBrut += solde; }
+      else if (c.startsWith('21')) { autresImmoCorpBrut += solde; }
+      else if (c.startsWith('23')) { encoursBrut += solde; }
+      else if (c.startsWith('26') || c.startsWith('27')) { immobilisationsFinancieresBrut += solde; }
+      else { incorpBrut += solde; } // 20 (hors 207) et assimilés
+      return;
+    }
+
+    // ── CLASSE 3 : Stocks ──
+    if (c.startsWith('3')) {
+      if (c.startsWith('39')) { deprecStocks += -solde; }
+      else { stocksBrut += solde; }
+      return;
+    }
+
+    // ── CLASSE 4 : Tiers ──
+    if (c.startsWith('4')) {
+      if (c.startsWith('49')) { deprecCreances += -solde; return; }
+      if (c.startsWith('40')) {
+        if (c.startsWith('409')) { if (solde >= 0) autresDebiteurs += solde; else fournisseurs += -solde; }
+        else { const net = -solde; if (net >= 0) fournisseurs += net; else autresDebiteurs += -net; }
+        return;
+      }
+      if (c.startsWith('41')) {
+        if (c.startsWith('419')) { const net = -solde; if (net >= 0) autresDettes += net; else clientsBrut += -net; }
+        else { if (solde >= 0) clientsBrut += solde; else autresDettes += -solde; }
+        return;
+      }
+      if (c.startsWith('44')) { if (solde >= 0) impotsEtAssimilesActif += solde; else impotsEtAssimilesPassif += -solde; return; }
+      // Charges constatées d'avance (486) & comptes d'attente débiteurs (47) : "Autres créances et
+      // emplois assimilés" au sens du manuel SCF, distincts des débiteurs classiques (42/43/45/46).
+      if (c.startsWith('486')) { autresCreancesEmploisAssimiles += solde; return; }
+      if (c.startsWith('487')) { autresDettes += -solde; return; }
+      if (c.startsWith('47')) { if (solde >= 0) autresCreancesEmploisAssimiles += solde; else autresDettes += -solde; return; }
+      // 42, 43, 45, 46, 48 (hors 486/487)
+      if (solde >= 0) autresDebiteurs += solde; else autresDettes += -solde;
+      return;
+    }
+
+    // ── CLASSE 5 : Trésorerie ──
+    if (c.startsWith('5')) {
+      if (c.startsWith('59')) { deprecPlacements += -solde; return; }
+      if (c.startsWith('50')) { if (solde >= 0) placementsBrut += solde; else tresoreriePassif += -solde; return; }
+      if (c.startsWith('519')) { tresoreriePassif += -solde; return; }
+      if (solde >= 0) tresorerie += solde; else tresoreriePassif += -solde;
+      return;
+    }
+    // Classes 6/7/8/9 : ignorées ici (le résultat net provient de sig.resultatNet)
+  });
+
+  const actifNonCourant = {
+    ecartAcquisition: actifLine(ecartAcquisitionBrut, 0),
+    immobilisationsIncorporelles: actifLine(incorpBrut, amortIncorp + deprecIncorp),
+    terrains: actifLine(terrainsBrut, amortTerrains + deprecTerrains),
+    batiments: actifLine(batimentsBrut, amortBatiments + deprecBatiments),
+    autresImmoCorp: actifLine(autresImmoCorpBrut, amortAutresCorp + deprecAutresCorp),
+    immobilisationsEnConcession: actifLine(concessionBrut, amortConcession + deprecConcession),
+    immobilisationsEnCours: actifLine(encoursBrut, deprecEnCours),
+    immobilisationsFinancieres: actifLine(immobilisationsFinancieresBrut, deprecFin),
+    impotsDifferesActif: actifLine(impotsDifferesActif, 0),
+    total: 0,
+  };
+  actifNonCourant.total = Object.keys(actifNonCourant).filter(k => k !== 'total').reduce((s, k) => s + actifNonCourant[k].net, 0);
+
+  const actifCourant = {
+    stocks: actifLine(stocksBrut, deprecStocks),
+    clients: actifLine(clientsBrut, deprecCreances),
+    autresDebiteurs: actifLine(autresDebiteurs, 0),
+    impotsEtAssimilesActif: actifLine(impotsEtAssimilesActif, 0),
+    autresCreancesEmploisAssimiles: actifLine(autresCreancesEmploisAssimiles, 0),
+    placements: actifLine(placementsBrut, deprecPlacements),
+    tresorerie: actifLine(tresorerie, 0),
+    total: 0,
+  };
+  actifCourant.total = Object.keys(actifCourant).filter(k => k !== 'total').reduce((s, k) => s + actifCourant[k].net, 0);
+
+  const totalActif = actifNonCourant.total + actifCourant.total;
+
+  const resultatNet = sig?.resultatNet || 0;
+  const capitauxPropres = {
+    capitalEmis,
+    capitalNonAppele: -capitalNonAppele,
+    primesEtReserves,
+    ecartsReevaluation,
+    resultatNet,
+    autresCapitauxPropres: reportANouveau,
+    total: 0,
+  };
+  capitauxPropres.total = capitauxPropres.capitalEmis + capitauxPropres.capitalNonAppele + capitauxPropres.primesEtReserves
+    + capitauxPropres.ecartsReevaluation + capitauxPropres.resultatNet + capitauxPropres.autresCapitauxPropres;
+
+  const passifNonCourant = {
+    empruntsDettesFinancieres,
+    impotsDifferesPassif,
+    autresDettesNonCourantes,
+    provisionsEtProduitsConstatesAvance,
+    total: 0,
+  };
+  passifNonCourant.total = passifNonCourant.empruntsDettesFinancieres + passifNonCourant.impotsDifferesPassif
+    + passifNonCourant.autresDettesNonCourantes + passifNonCourant.provisionsEtProduitsConstatesAvance;
+
+  const passifCourant = {
+    fournisseurs,
+    impotsEtAssimilesPassif,
+    autresDettes,
+    tresoreriePassif,
+    total: 0,
+  };
+  passifCourant.total = passifCourant.fournisseurs + passifCourant.impotsEtAssimilesPassif + passifCourant.autresDettes + passifCourant.tresoreriePassif;
+
+  const totalPassif = capitauxPropres.total + passifNonCourant.total + passifCourant.total;
+
+  return { actifNonCourant, actifCourant, totalActif, capitauxPropres, passifNonCourant, passifCourant, totalPassif };
+};
+
 export const calculateSIG = (data) => {
   const rows = Array.isArray(data) ? data : (data?.rows || (data?.isBalance ? data.rows : null));
   if (rows && rows.length > 0) {
@@ -1645,6 +1851,45 @@ export const calculateSIG = (data) => {
     resultatNetOrdinaire: 0, resultatExtraordinaire: 0, resultatNet: 0, caf: 0, achats: 0
   };
 };
+
+/**
+ * Construit les lignes officielles du Tableau des Comptes de Résultats (TCR) par Nature,
+ * avec la numérotation romaine officielle SCF (I à IX). Source unique de vérité réutilisée
+ * par SIGView (analyse) et EtatsFinanciersView (état financier officiel), pour éviter toute
+ * divergence entre les deux présentations.
+ */
+export function buildTCRRows(sig) {
+  const data = sig || {};
+  return [
+    { code: '70',      label: "Chiffre d'affaires", val: data.c70 || data.chiffreAffaires, type: 'compte' },
+    { code: '72',      label: 'Variation stocks produits finis et en-cours', val: data.c72 || 0, type: 'compte' },
+    { code: '73',      label: 'Production immobilisée', val: data.c73 || 0, type: 'compte' },
+    { code: '74',      label: "Subventions d'exploitation", val: data.c74 || 0, type: 'compte' },
+    { code: 'I',       label: "PRODUCTION DE L'EXERCICE", val: data.productionExercice, type: 'subtotal' },
+    { code: '60',      label: 'Achats consommés', val: data.c60 || 0, type: 'compte', isCharge: true },
+    { code: '61/62',   label: 'Services extérieurs et autres consommations', val: (data.c61 || 0) + (data.c62 || 0), type: 'compte', isCharge: true },
+    { code: 'II',      label: "CONSOMMATION DE L'EXERCICE", val: data.consommationExercice, type: 'subtotal', isCharge: true },
+    { code: 'III',     label: "VALEUR AJOUTÉE D'EXPLOITATION (I - II)", val: data.valeurAjoutee, type: 'total' },
+    { code: '63',      label: 'Charges de personnel', val: data.c63 || data.chargesPersonnel || 0, type: 'compte', isCharge: true },
+    { code: '64',      label: 'Impôts, taxes et versements assimilés', val: data.c64 || data.impotsTaxes || 0, type: 'compte', isCharge: true },
+    { code: 'IV',      label: "EXCÉDENT BRUT D'EXPLOITATION", val: data.ebe, type: 'total' },
+    { code: '75',      label: 'Autres produits opérationnels', val: data.c75 || 0, type: 'compte' },
+    { code: '65',      label: 'Autres charges opérationnelles', val: data.c65 || 0, type: 'compte', isCharge: true },
+    { code: '68',      label: 'Dotations aux amortissements et aux provisions et pertes de valeur', val: data.c68_expl || data.dotationsExploitation || 0, type: 'compte', isCharge: true },
+    { code: '78',      label: 'Reprise sur pertes de valeur et provisions', val: data.c78_expl || data.reprisesExploitation || 0, type: 'compte' },
+    { code: 'V',       label: 'RÉSULTAT OPÉRATIONNEL', val: data.resultatExploitation, type: 'total' },
+    { code: '76',      label: 'Produits financiers', val: data.produitsFinanciers || 0, type: 'compte' },
+    { code: '66',      label: 'Charges financières', val: data.chargesFinancieres || 0, type: 'compte', isCharge: true },
+    { code: 'VI',      label: 'RÉSULTAT FINANCIER', val: data.resultatFinancier, type: 'subtotal' },
+    { code: 'VII',     label: "RÉSULTAT ORDINAIRE AVANT IMPÔTS (V + VI)", val: data.rcai, type: 'total' },
+    { code: '692/693/695/698', label: 'Impôts exigibles et différés sur résultats ordinaires', val: data.c69 || data.impotsBenefices || 0, type: 'compte', isCharge: true },
+    { code: 'VIII',    label: 'RÉSULTAT NET DES ACTIVITÉS ORDINAIRES', val: data.resultatNetOrdinaire, type: 'subtotal' },
+    { code: '77',      label: 'Éléments extraordinaires (produits)', val: data.c77 || 0, type: 'compte' },
+    { code: '67',      label: 'Éléments extraordinaires (charges)', val: data.c67 || 0, type: 'compte', isCharge: true },
+    { code: 'IX',      label: 'RÉSULTAT EXTRAORDINAIRE', val: data.resultatExtraordinaire || 0, type: 'subtotal' },
+    { code: 'X',       label: "RÉSULTAT NET DE L'EXERCICE", val: data.resultatNet, type: 'grand-total' },
+  ];
+}
 
 /**
  * Corrige le biais TVA (TTC/HT) sur les délais clients & fournisseurs.

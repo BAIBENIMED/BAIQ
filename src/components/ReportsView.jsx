@@ -255,7 +255,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, paddingBottom: 40 }}>
       <div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Rapport Financier Complet</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse détaillée avec diagnostic, forces &amp; faiblesses (SCF Algérie).</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse détaillée avec diagnostic, forces &amp; faiblesses (SCF).</p>
       </div>
       <div className="card" style={{ maxWidth: 480, margin: '20px auto', textAlign: 'center', padding: '48px 32px' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 52, color: 'var(--text-sub)', display: 'block', marginBottom: 16 }}>description</span>
@@ -500,7 +500,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Rapport Financier Complet</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Diagnostic complet avec analyse des forces, faiblesses, solvabilité &amp; recommandations — référentiel SCF Algérie</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Diagnostic complet avec analyse des forces, faiblesses, solvabilité &amp; recommandations — référentiel SCF</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
@@ -1187,7 +1187,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
 
       {/* ── Pied de rapport ── */}
       <div style={{ padding: '14px 20px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-        <span>📋 Rapport généré par <strong>BAIQ — Balance and Financial Analytics</strong> — Référentiel SCF Algérie (Système Comptable Financier)</span>
+        <span>📋 Rapport généré par <strong>BAIQ — Balance and Financial Analytics</strong> — Référentiel SCF (Système Comptable Financier)</span>
         <span className="mono" style={{ color: 'var(--text-sub)' }}>{new Date().toLocaleDateString('fr-DZ', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </div>
 

@@ -1,9 +1,20 @@
-import { calculateBilanFonctionnel, calculateSIG, calculateRatios } from './financeCalculations';
+import { calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF } from './financeCalculations';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Simulation Comptable en Partie Double
    Support complet des écritures multilignes & modèles SCF
    ═══════════════════════════════════════════════════════════ */
+
+export const MAX_SCENARIOS = 3;
+
+export function createScenario(name) {
+  return {
+    id: 'scn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    name: name || 'Scénario',
+    entries: [],
+    createdAt: Date.now(),
+  };
+}
 
 export const MODEL_TEMPLATES = [
   {
@@ -116,6 +127,120 @@ export const MODEL_TEMPLATES = [
     lines: [
       { compte: '512', libelle: 'Banque (Encaissement reçu)', debit: 400000, credit: 0 },
       { compte: '411', libelle: 'Clients & comptes rattachés', debit: 0, credit: 400000 },
+    ]
+  },
+
+  // ── PROVISIONS (dotations & reprises — Comptes 15, 29, 39, 49, 68, 78) ──
+  {
+    id: 'tpl_provision_depreciation_stocks',
+    category: 'Provisions',
+    name: 'Provision pour Dépréciation des Stocks',
+    icon: 'inventory_2',
+    description: 'Stock obsolète, invendable ou à rotation lente — constatation d\'une perte de valeur prudente',
+    lines: [
+      { compte: '6816', libelle: 'Dotations aux provisions pour dépréciation des actifs circulants', debit: 300000, credit: 0 },
+      { compte: '39', libelle: 'Pertes de valeur sur stocks', debit: 0, credit: 300000 },
+    ]
+  },
+  {
+    id: 'tpl_provision_depreciation_creances',
+    category: 'Provisions',
+    name: 'Provision pour Créances Clients Douteuses',
+    icon: 'money_off',
+    description: 'Client en risque d\'impayé — dépréciation prudente de la créance client',
+    lines: [
+      { compte: '6817', libelle: 'Dotations aux provisions pour dépréciation des créances', debit: 200000, credit: 0 },
+      { compte: '49', libelle: 'Pertes de valeur sur comptes clients', debit: 0, credit: 200000 },
+    ]
+  },
+  {
+    id: 'tpl_provision_risques_charges',
+    category: 'Provisions',
+    name: 'Provision pour Risques et Charges (Litige)',
+    icon: 'gpp_maybe',
+    description: 'Litige en cours, garantie donnée à un client ou risque probable identifié à la clôture',
+    lines: [
+      { compte: '6815', libelle: 'Dotations aux provisions pour risques et charges', debit: 400000, credit: 0 },
+      { compte: '15', libelle: 'Provisions pour risques et charges', debit: 0, credit: 400000 },
+    ]
+  },
+  {
+    id: 'tpl_reprise_provision_risques',
+    category: 'Provisions',
+    name: 'Reprise de Provision pour Risques',
+    icon: 'undo',
+    description: 'Risque disparu ou litige résolu — annulation de la provision devenue sans objet',
+    lines: [
+      { compte: '15', libelle: 'Provisions pour risques et charges', debit: 400000, credit: 0 },
+      { compte: '7815', libelle: 'Reprises sur provisions pour risques et charges', debit: 0, credit: 400000 },
+    ]
+  },
+  {
+    id: 'tpl_reprise_provision_stocks',
+    category: 'Provisions',
+    name: 'Reprise de Provision sur Stocks',
+    icon: 'restart_alt',
+    description: 'Stock finalement écoulé ou revalorisé — reprise de la dépréciation constatée antérieurement',
+    lines: [
+      { compte: '39', libelle: 'Pertes de valeur sur stocks', debit: 300000, credit: 0 },
+      { compte: '7816', libelle: 'Reprises sur provisions pour dépréciation des actifs circulants', debit: 0, credit: 300000 },
+    ]
+  },
+
+  // ── TRAITEMENTS DE CLÔTURE (rattachement à l'exercice — Comptes 28, 408, 418, 486, 487) ──
+  {
+    id: 'tpl_dotation_amortissements',
+    category: 'Clôture',
+    name: 'Dotation aux Amortissements de l\'Exercice',
+    icon: 'schedule',
+    description: 'Constatation de l\'usure annuelle des immobilisations — écriture classique de fin d\'exercice',
+    lines: [
+      { compte: '681', libelle: 'Dotations aux amortissements des immobilisations', debit: 500000, credit: 0 },
+      { compte: '28', libelle: 'Amortissements des immobilisations', debit: 0, credit: 500000 },
+    ]
+  },
+  {
+    id: 'tpl_charges_constatees_avance',
+    category: 'Clôture',
+    name: 'Charges Constatées d\'Avance',
+    icon: 'event_repeat',
+    description: 'Charge déjà payée mais qui concerne l\'exercice suivant (assurance, loyer, abonnement...)',
+    lines: [
+      { compte: '486', libelle: 'Charges constatées d\'avance', debit: 150000, credit: 0 },
+      { compte: '61', libelle: 'Services extérieurs', debit: 0, credit: 150000 },
+    ]
+  },
+  {
+    id: 'tpl_produits_constates_avance',
+    category: 'Clôture',
+    name: 'Produits Constatés d\'Avance',
+    icon: 'calendar_month',
+    description: 'Vente déjà facturée mais dont la prestation concerne l\'exercice suivant',
+    lines: [
+      { compte: '70', libelle: 'Ventes de marchandises / prestations', debit: 200000, credit: 0 },
+      { compte: '487', libelle: 'Produits constatés d\'avance', debit: 0, credit: 200000 },
+    ]
+  },
+  {
+    id: 'tpl_charges_a_payer',
+    category: 'Clôture',
+    name: 'Charges à Payer (Factures Non Parvenues)',
+    icon: 'receipt_long',
+    description: 'Marchandise ou service déjà reçu mais dont la facture fournisseur n\'est pas encore arrivée',
+    lines: [
+      { compte: '600', libelle: 'Achats consommés de marchandises', debit: 250000, credit: 0 },
+      { compte: '408', libelle: 'Fournisseurs, factures non parvenues', debit: 0, credit: 250000 },
+    ]
+  },
+  {
+    id: 'tpl_produits_a_recevoir',
+    category: 'Clôture',
+    name: 'Produits à Recevoir',
+    icon: 'task_alt',
+    description: 'Prestation déjà réalisée pour un client mais non encore facturée à la date de clôture',
+    lines: [
+      { compte: '418', libelle: 'Clients, produits à recevoir', debit: 220000, credit: 0 },
+      { compte: '700', libelle: 'Ventes de marchandises / prestations', debit: 0, credit: 220000 },
     ]
   }
 ];
@@ -248,15 +373,17 @@ export function recalculateSimulatedDataset(originalData, simulationEntries = []
   const simRows = applySimulationToRows(originalData.rows, simulationEntries);
   const payload = { isBalance: true, rows: simRows };
 
-  const simBilan  = calculateBilanFonctionnel(payload);
-  const simSIG    = calculateSIG(payload);
-  const simRatios = calculateRatios(simBilan, simSIG, simRows);
+  const simBilan    = calculateBilanFonctionnel(payload);
+  const simSIG      = calculateSIG(payload);
+  const simRatios   = calculateRatios(simBilan, simSIG, simRows);
+  const simBilanSCF = calculateBilanSCF(payload, simSIG);
 
   return {
     rows: simRows,
     bilan: simBilan,
     sig: simSIG,
     ratios: simRatios,
+    bilanSCF: simBilanSCF,
     profil: originalData.profil,
     dataN1: originalData.dataN1,
     isSimulationMode: true,

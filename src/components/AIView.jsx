@@ -202,7 +202,7 @@ export function AIView({ data, geminiKey }) {
   };
 
   const exportAISynthesis = () => {
-    let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nRAPPORT DE DIAGNOSTIC FINANCIER APPROFONDI (SCF ALGÉRIE)\n`;
+    let content = `BAIQ — BALANCE AND FINANCIAL ANALYTICS\nRAPPORT DE DIAGNOSTIC FINANCIER APPROFONDI (SCF)\n`;
     content += `Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
     content += `Entité: ${data?.profil?.nomEntreprise || 'Dossier Anonyme'}\n`;
     content += `Secteur: ${sec?.label || 'Général'} (IBS: ${sec?.tauxIBS || '19%'})\n`;
@@ -273,7 +273,7 @@ export function AIView({ data, geminiKey }) {
           <span style={{ background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 10, padding: '4px 10px', fontSize: '0.74rem', color: '#fff', fontWeight: 700 }}>IA</span>
           Diagnostic Financier Approfondi
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse multicritères de haute précision selon les normes SCF Algérie.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse multicritères de haute précision selon les normes SCF.</p>
       </div>
       <div className="card" style={{ maxWidth: 480, margin: '20px auto', textAlign: 'center', padding: '48px 32px' }}>
         <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #1b6e8c, #7c3aed)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>

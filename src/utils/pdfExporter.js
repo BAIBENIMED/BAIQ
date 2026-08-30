@@ -79,7 +79,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
     doc.setTextColor(...T.inkSecondary);
     
     // Titre courant gauche
-    doc.text('BAIQ Finance · Système Comptable Financier (SCF Algérie)', margin, 12);
+    doc.text('BAIQ Finance · Système Comptable Financier (SCF)', margin, 12);
     
     // Dossier et exercice à droite
     doc.setFont('times', 'normal');
@@ -301,7 +301,7 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
 // ══════════════════════════════════════════════════════════════════════
 //  FONCTION PRINCIPALE D'EXPORTATION PDF STYLE LATEX
 // ══════════════════════════════════════════════════════════════════════
-export async function generateFullPDF(data, cur, isSimulated = false) {
+export async function generateFullPDF(data, cur, isSimulated = false, scenarioLabel = null) {
   const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 } = data || {};
   const r = ratios;
   const s = sig;
@@ -367,8 +367,6 @@ export async function generateFullPDF(data, cur, isSimulated = false) {
   doc.setFont('times', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...T.inkMuted);
-  doc.text('RÉPUBLIQUE ALGÉRIENNE DÉMOCRATIQUE ET POPULAIRE', W / 2, y, { align: 'center' });
-  y += 4.5;
   doc.text('RÉFÉRENTIEL COMPTABLE ET FINANCIER SCF — LOI N° 07-11 / DÉCRET 08-156', W / 2, y, { align: 'center' });
   y += 6;
 
@@ -426,7 +424,7 @@ export async function generateFullPDF(data, cur, isSimulated = false) {
   doc.text('RÉSUMÉ EXÉCUTIF (ABSTRACT)', margin, y);
   y += 4.5;
 
-  const abstractText = `Le présent document constitue une analyse financière intégrale de l'entité ${dossierName} établie selon les prescriptions du Système Comptable Financier (SCF) algérien. L'évaluation porte sur la structure du bilan fonctionnel (FRNG : ${fmtDZD(frng)}, BFR : ${fmtDZD(bfr)}), la performance économique (EBE : ${fmtDZD(ebe)}, RN : ${fmtDZD(rn)}) et la conformité des soldes de balance avec les règles légales d'imputation. Les flux et ratios ont été vérifiés selon les normes sectorielles de la Banque d'Algérie.`;
+  const abstractText = `Le présent document constitue une analyse financière intégrale de l'entité ${dossierName} établie selon les prescriptions du Système Comptable Financier (SCF). L'évaluation porte sur la structure du bilan fonctionnel (FRNG : ${fmtDZD(frng)}, BFR : ${fmtDZD(bfr)}), la performance économique (EBE : ${fmtDZD(ebe)}, RN : ${fmtDZD(rn)}) et la conformité des soldes de balance avec les règles légales d'imputation. Les flux et ratios ont été vérifiés selon les normes sectorielles de la Banque d'Algérie.`;
 
   doc.setFont('times', 'italic');
   doc.setFontSize(8);
@@ -487,7 +485,10 @@ export async function generateFullPDF(data, cur, isSimulated = false) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(154, 52, 18);
-    doc.text('ATTENTION : DONNEES SIMULEES (MODE WHAT-IF ACTIF) — NE PAS UTILISER POUR UN DEPOT OFFICIEL', W / 2, y + 7, { align: 'center' });
+    doc.text(
+      `ATTENTION : DONNEES SIMULEES${scenarioLabel ? ` — SCENARIO : ${scenarioLabel.toUpperCase()}` : ' (MODE WHAT-IF ACTIF)'} — NE PAS UTILISER POUR UN DEPOT OFFICIEL`,
+      W / 2, y + 7, { align: 'center' }
+    );
     doc.setTextColor(0, 0, 0);
     y += 15;
   }

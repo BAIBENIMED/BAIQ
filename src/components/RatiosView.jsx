@@ -219,7 +219,7 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil, cur
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Ratios Financiers, Solvabilité &amp; Benchmarks</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse comparative recalibrée sur les normes du secteur d'activité (SCF Algérie).</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>Analyse comparative recalibrée sur les normes du secteur d'activité (SCF).</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
