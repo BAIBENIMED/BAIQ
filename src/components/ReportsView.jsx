@@ -526,7 +526,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
               {isPdfGenerating ? 'hourglass_empty' : 'picture_as_pdf'}
             </span>
-            {isPdfGenerating ? 'Génération en cours…' : '📄 Exporter PDF Structuré (7 sections)'}
+            {isPdfGenerating ? 'Génération en cours…' : '📄 Exporter PDF Structuré (8 sections)'}
           </button>
         </div>
       </div>

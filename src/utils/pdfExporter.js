@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   BAIQ — Exporteur PDF Style LaTeX / Monographie Académique & Audit
-   Formatage professionnel inspiré de LaTeX (Booktabs, Fancyhdr, Serif Typography)
-   Conforme au Système Comptable Financier (SCF Algérie — Loi 07-11)
+   BAIQ — Exporteur PDF, Rapport Financier Professionnel
+   Identité visuelle alignée sur la charte BAIQ (teinte sarcelle + accent or)
+   Conforme au Système Comptable Financier (SCF Algérie)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import jsPDF from 'jspdf';
@@ -9,24 +9,28 @@ import autoTable from 'jspdf-autotable';
 import { calculateAltmanZScore } from './solvabiliteEngine';
 import { buildTCRRows } from './financeCalculations';
 
-// ── Palette Typographique & Teintes LaTeX ──────────────────────────────
+// ── Palette BAIQ — reprend exactement les jetons de couleur de l'application
+// (src/index.css :root, mode clair) pour que le document imprimé soit
+// visuellement cohérent avec l'écran, plutôt qu'une charte générique.
 const T = {
   inkPrimary:   [17, 24, 39],       // Noir d'encre profond (#111827)
   inkSecondary: [55, 65, 81],       // Gris foncé texte (#374151)
   inkMuted:     [107, 114, 128],    // Gris moyen (#6b7280)
   inkLight:     [156, 163, 175],    // Gris clair légendes (#9ca3af)
 
-  navy:         [15, 32, 67],       // Bleu institutionnel Oxford (#0f2043)
-  darkRed:      [153, 27, 27],      // Rouge bordeaux LaTeX (#991b1b)
-  darkGreen:    [22, 101, 52],      // Vert forêt LaTeX (#166534)
-  darkAmber:    [146, 64, 14],      // Ocre sombre (#92400e)
+  navy:         [18, 79, 102],      // --primary-dk BAIQ (#124f66)
+  darkRed:      [220, 38, 38],      // --red BAIQ (#dc2626)
+  darkGreen:    [5, 150, 105],      // --green BAIQ (#059669)
+  darkAmber:    [156, 110, 30],     // --accent-dk BAIQ, or institutionnel (#9c6e1e)
 
-  ruleHeavy:    [17, 24, 39],       // Ligne principale 1.0pt
-  ruleMedium:   [75, 85, 99],       // Ligne médiane 0.6pt
+  ruleHeavy:    [18, 79, 102],      // Ligne principale 1.0pt — teinte sarcelle BAIQ
+  ruleMedium:   [107, 114, 128],    // Ligne médiane 0.6pt
   ruleLight:    [209, 213, 219],    // Filet léger 0.3pt (#d1d5db)
-  boxBg:        [248, 249, 250],    // Fond grisé style tcolorbox (#f8f9fa)
-  boxBorder:    [229, 231, 235],    // Bordure boîte (#e5e7eb)
-  accentBg:     [241, 245, 249],    // Fond bleu grisé discret
+  boxBg:        [240, 248, 250],    // --primary-lt2 BAIQ (#f0f8fa) — même fond que les cartes à l'écran
+  boxBorder:    [220, 238, 242],    // --primary-lt BAIQ (#dceef2)
+  accentBg:     [246, 232, 204],    // --accent-lt BAIQ, or discret (#f6e8cc)
+
+  gold:         [192, 138, 46],     // --accent BAIQ (#c08a2e) — touche de couleur signature
 };
 
 // ── Fonctions Utilitaires de Formatage ─────────────────────────────────
@@ -51,7 +55,53 @@ const fmtDays = (v) => {
 
 const safeDiv = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 
-// ── En-tête et Pied de Page style LaTeX (fancyhdr) ────────────────────
+// Reproduit fidèlement, en vectoriel, le badge BAIQ affiché dans la barre latérale de
+// l'application (voir App.jsx : carré noir arrondi, lettre "B" blanche, point rouge et
+// barre blanche) — plutôt que le fichier public/baiq_logo.jpg (logo bleu générique, non
+// utilisé à l'écran). Dessin natif jsPDF : net à toute échelle, aucune image à charger.
+function drawBaiqBadge(doc, x, y, size) {
+  doc.setFillColor(10, 10, 10);
+  doc.roundedRect(x, y, size, size, size * 0.28, size * 0.28, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(size * 0.62);
+  doc.setTextColor(255, 255, 255);
+  doc.text('B', x + size * 0.32, y + size * 0.68, { align: 'center' });
+
+  const barX = x + size * 0.72;
+  doc.setFillColor(229, 72, 77);
+  doc.circle(barX, y + size * 0.32, size * 0.045, 'F');
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(barX - size * 0.035, y + size * 0.42, size * 0.07, size * 0.32, size * 0.02, size * 0.02, 'F');
+}
+
+// Lockup complet (badge + wordmark "BAIQ" + ligne de signature), pour la page de garde.
+// `align` : 'center' centre l'ensemble sur x ; 'left' démarre le badge à x.
+function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left') {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(badgeSize * 1.05);
+  const wordmarkW = doc.getTextWidth('BAIQ');
+  const gap = badgeSize * 0.28;
+  const totalW = badgeSize + gap + wordmarkW;
+  const startX = align === 'center' ? x - totalW / 2 : x;
+
+  drawBaiqBadge(doc, startX, y, badgeSize);
+
+  const textX = startX + badgeSize + gap;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(badgeSize * 1.05);
+  doc.setTextColor(...T.inkPrimary);
+  doc.text('BAIQ', textX, y + badgeSize * 0.56);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(badgeSize * 0.24);
+  doc.setTextColor(27, 110, 140); // --primary BAIQ (#1b6e8c)
+  doc.text('BALANCE AND FINANCIAL ANALYTICS', textX, y + badgeSize * 0.88);
+
+  return { width: totalW, startX };
+}
+
+// ── En-tête et Pied de Page — bandeau institutionnel BAIQ ──────────────
 function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N') {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -66,7 +116,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
       doc.setLineWidth(0.3);
       doc.line(margin, H - 15, W - margin, H - 15);
 
-      doc.setFont('times', 'italic');
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(...T.inkMuted);
       doc.text('BAIQ Platform — Rapport financier confidentiel à usage de gestion et d\'audit.', margin, H - 10);
@@ -74,81 +124,96 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
       continue;
     }
 
-    // ── En-tête de page (fancyhdr running header) ──
-    doc.setFont('times', 'italic');
+    // ── En-tête de page ──
+    const badgeSize = 6.5;
+    drawBaiqBadge(doc, margin, 7, badgeSize);
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(...T.inkSecondary);
-
-    // Titre courant gauche
-    doc.text('BAIQ Finance · Système Comptable Financier (SCF)', margin, 12);
+    doc.setTextColor(...T.navy);
+    doc.text('BAIQ', margin + badgeSize + 2.5, 12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...T.inkMuted);
+    doc.text(' · Système Comptable Financier (SCF)', margin + badgeSize + 2.5 + doc.getTextWidth('BAIQ'), 12);
 
     // Dossier et exercice à droite
-    doc.setFont('times', 'normal');
+    doc.setTextColor(...T.inkSecondary);
     doc.text(`${dossierName} · Exercice ${exerciceYear}`, W - margin, 12, { align: 'right' });
 
-    // Filet d'en-tête (thin rule)
-    doc.setDrawColor(...T.ruleMedium);
-    doc.setLineWidth(0.4);
+    // Filet d'en-tête — teinte de marque BAIQ
+    doc.setDrawColor(...T.navy);
+    doc.setLineWidth(0.5);
     doc.line(margin, 14.5, W - margin, 14.5);
 
-    // ── Pied de page (fancyhdr running footer) ──
+    // ── Pied de page ──
     doc.setDrawColor(...T.ruleLight);
     doc.setLineWidth(0.3);
     doc.line(margin, H - 14, W - margin, H - 14);
 
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkMuted);
 
     const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
     doc.text(`Document généré le ${printDate} · Traitement local sécurisé`, margin, H - 9);
 
-    // Folio centré style LaTeX : — [Page X / Y] —
-    doc.setFont('times', 'bold');
+    // Folio centré
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(...T.inkPrimary);
     doc.text(`— ${p} / ${totalPages} —`, W / 2, H - 9, { align: 'center' });
 
-    doc.setFont('times', 'italic');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
-    doc.setTextColor(...T.inkMuted);
-    doc.text('Loi n° 07-11 / Décret 08-156', W - margin, H - 9, { align: 'right' });
+    doc.setTextColor(...T.gold);
+    doc.text('BAIQ', W - margin, H - 9, { align: 'right' });
   }
 }
 
-// ── Titre de Chapitre LaTeX (\section{...}) ────────────────────────────
+// ── Titre de Section — bandeau coloré avec pastille numérotée BAIQ ─────
 function latexSection(doc, number, title, y) {
   const W = doc.internal.pageSize.getWidth();
   const margin = 18;
+  const bandH = 9;
 
-  // Ligne de rappel supérieure fine
-  doc.setDrawColor(...T.navy);
-  doc.setLineWidth(0.8);
-  doc.line(margin, y, W - margin, y);
+  // Bandeau de fond teinté (identique aux cartes de section à l'écran)
+  doc.setFillColor(...T.boxBg);
+  doc.rect(margin, y, W - margin * 2, bandH, 'F');
 
-  // Titre en capitales avec Serif
-  doc.setFont('times', 'bold');
-  doc.setFontSize(11);
+  // Pastille numérotée — accent or, signature BAIQ
+  doc.setFillColor(...T.gold);
+  doc.rect(margin, y, bandH, bandH, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(String(number), margin + bandH / 2, y + bandH / 2 + 3.2, { align: 'center' });
+
+  // Titre en capitales
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
   doc.setTextColor(...T.navy);
-  doc.text(`SECTION ${number}.  ${title.toUpperCase()}`, margin, y + 5.5);
+  doc.text(title.toUpperCase(), margin + bandH + 4, y + bandH / 2 + 1.6);
 
-  doc.setDrawColor(...T.ruleLight);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y + 7.5, W - margin, y + 7.5);
+  // Filet de rappel — teinte de marque
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.6);
+  doc.line(margin, y + bandH + 1.5, W - margin, y + bandH + 1.5);
 
-  return y + 13;
+  return y + bandH + 7;
 }
 
-// ── Sous-titre (\subsection{...}) ──────────────────────────────────────
+// ── Sous-titre ───────────────────────────────────────────────────────
 function latexSubSection(doc, title, y) {
   const margin = 18;
-  doc.setFont('times', 'bolditalic');
+  // Petit repère vertical or — cohérent avec la pastille de section
+  doc.setFillColor(...T.gold);
+  doc.rect(margin, y - 3, 1.4, 4, 'F');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(...T.inkPrimary);
-  doc.text(title, margin, y);
+  doc.setTextColor(...T.navy);
+  doc.text(title, margin + 4, y);
   return y + 5;
 }
 
-// ── Boîte de Définition / Formule Mathématique (LaTeX tcolorbox) ────────
+// ── Boîte de Définition / Formule Mathématique ────────
 function latexMathBox(doc, formulaText, subtitle, y, height = 18) {
   const W = doc.internal.pageSize.getWidth();
   const margin = 18;
@@ -164,13 +229,13 @@ function latexMathBox(doc, formulaText, subtitle, y, height = 18) {
   doc.rect(margin, y, 1.8, height, 'F');
 
   // Formule centrée en style mathématique
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...T.navy);
   doc.text(formulaText, margin + 8, y + 7);
 
   if (subtitle) {
-    doc.setFont('times', 'italic');
+    doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
     doc.setTextColor(...T.inkMuted);
     doc.text(subtitle, margin + 8, y + 13);
@@ -200,20 +265,20 @@ function latexKpiRow(doc, items, y) {
     doc.rect(x, y, colW, 1.2, 'F');
 
     // Label en Small Caps / Italic
-    doc.setFont('times', 'italic');
+    doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
     doc.setTextColor(...T.inkMuted);
     doc.text(item.label, x + 4, y + 6);
 
     // Valeur principale en chiffres gras
-    doc.setFont('times', 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
     doc.setTextColor(...barColor);
     doc.text(item.val, x + 4, y + 13);
 
     // Note de bas
     if (item.sub) {
-      doc.setFont('times', 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(...T.inkSecondary);
       doc.text(item.sub, x + 4, y + 18);
@@ -223,7 +288,7 @@ function latexKpiRow(doc, items, y) {
   return y + h + 6;
 }
 
-// ── Table Booktabs LaTeX Standard ─────────────────────────────────────
+// ── Table Booktabs Standard ─────────────────────────────────────
 function drawBooktabsTable(doc, head, body, startY, opts = {}) {
   const margin = 18;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -233,9 +298,9 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
     body,
     startY,
     margin: { left: margin, right: margin },
-    theme: 'plain', // LaTeX Booktabs : pas de fond zébré criard, lignes pures
+    theme: 'plain', // Filets sobres façon booktabs, sans zébrage
     styles: {
-      font: 'times',
+      font: 'helvetica',
       fontSize: 8,
       textColor: T.inkPrimary,
       cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
@@ -243,11 +308,11 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
       lineColor: T.ruleLight,
     },
     headStyles: {
-      font: 'times',
+      font: 'helvetica',
       fontStyle: 'bold',
       fontSize: 8,
       textColor: T.navy,
-      fillColor: false,
+      fillColor: T.boxBg, // Léger fond teinté — cohérent avec les cartes de l'écran
       lineWidth: 0,
     },
     columnStyles: opts.columnStyles || {},
@@ -361,27 +426,25 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const margin = 18;
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 1 — PAGE DE TITRE / MONOGRAPHIE ACADÉMIQUE LATEX
+  // PAGE 1 — PAGE DE TITRE
   // ──────────────────────────────────────────────────────────────────
-  let y = 28;
+  let y = 30;
 
-  // En-tête Institutionnel
-  doc.setFont('times', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...T.inkMuted);
-  doc.text('RÉFÉRENTIEL COMPTABLE ET FINANCIER SCF — LOI N° 07-11 / DÉCRET 08-156', W / 2, y, { align: 'center' });
-  y += 6;
+  // Logo BAIQ centré — identique au mark de l'interface (badge "B" + wordmark + signature)
+  drawBaiqMark(doc, W / 2, y, 16, 'center');
+  y += 20;
 
-  // Double filet décoratif LaTeX
+  // Filet d'accent — teinte de marque
   doc.setDrawColor(...T.navy);
-  doc.setLineWidth(1.2);
+  doc.setLineWidth(1.0);
   doc.line(margin + 20, y, W - margin - 20, y);
-  doc.setLineWidth(0.4);
-  doc.line(margin + 20, y + 1.8, W - margin - 20, y + 1.8);
-  y += 18;
+  doc.setDrawColor(...T.gold);
+  doc.setLineWidth(0.6);
+  doc.line(margin + 20, y + 1.6, W - margin - 20, y + 1.6);
+  y += 16;
 
   // Titre Principal
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(...T.navy);
   doc.text('RAPPORT D\'ANALYSE FINANCIÈRE', W / 2, y, { align: 'center' });
@@ -391,13 +454,13 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   y += 6;
 
   // Sous-titre descriptif
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'italic');
   doc.setFontSize(9.5);
   doc.setTextColor(...T.inkSecondary);
   doc.text('Diagnostic structurel de liquidité, rentabilité, équilibre fonctionnel et solvabilité', W / 2, y, { align: 'center' });
   y += 14;
 
-  // Bloc Métadonnées du Dossier (LaTeX Description Table)
+  // Bloc Métadonnées du Dossier
   const metaHead = [['PARAMÈTRE DU DOSSIER', 'VALEUR DÉCLARÉE & CONTRÔLÉE']];
   const metaBody = [
     ['Entité / Raison Sociale', dossierName],
@@ -419,24 +482,24 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y += 2;
 
-  // Résumé Exécutif (Abstract LaTeX)
-  doc.setFont('times', 'bold');
+  // Résumé Exécutif
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...T.navy);
-  doc.text('RÉSUMÉ EXÉCUTIF (ABSTRACT)', margin, y);
+  doc.text('RÉSUMÉ EXÉCUTIF', margin, y);
   y += 4.5;
 
   const abstractText = `Le présent document constitue une analyse financière intégrale de l'entité ${dossierName} établie selon les prescriptions du Système Comptable Financier (SCF). L'évaluation porte sur la structure du bilan fonctionnel (FRNG : ${fmtDZD(frng)}, BFR : ${fmtDZD(bfr)}), la performance économique (EBE : ${fmtDZD(ebe)}, RN : ${fmtDZD(rn)}) et la conformité des soldes de balance avec les règles légales d'imputation. Les flux et ratios ont été vérifiés selon les normes sectorielles de la Banque d'Algérie.`;
 
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...T.inkSecondary);
   const splitAbstract = doc.splitTextToSize(abstractText, W - margin * 2);
   doc.text(splitAbstract, margin, y);
   y += splitAbstract.length * 4 + 8;
 
-  // Table des Matières (Table of Contents LaTeX avec points de conduite)
-  doc.setFont('times', 'bold');
+  // Table des Matières (avec points de conduite)
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(...T.navy);
   doc.text('TABLE DES MATIÈRES', margin, y);
@@ -454,7 +517,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   ];
 
   toc.forEach(([title, pageNum]) => {
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkPrimary);
     doc.text(title, margin + 4, y);
@@ -472,7 +535,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     }
     doc.setLineDash([]);
 
-    doc.setFont('times', 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(...T.navy);
     doc.text(pageNum, W - margin, y, { align: 'right' });
     y += 5;
@@ -505,11 +568,11 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y = latexSection(doc, '1', 'États Financiers Officiels SCF (Arrêté du 26/07/2008)', y);
 
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(...T.inkMuted);
   const scfIntro = doc.splitTextToSize(
-    'Présentation conforme aux modèles de Bilan et de Compte de Résultat fixés par l\'arrêté du 26 juillet 2008 du ministère des finances (Système Comptable Financier, Loi 07-11, Décret 08-156) — à la différence du Bilan Fonctionnel (Section 3), de nature analytique. Le détail Brut / Amortissements-Provisions par rubrique est disponible dans l\'application, onglet « États Financiers (SCF) ».',
+    'Présentation conforme aux modèles officiels de Bilan et de Compte de Résultat du Système Comptable Financier (SCF) — à la différence du Bilan Fonctionnel (Section 3), de nature analytique. Le détail Brut / Amortissements-Provisions par rubrique est disponible dans l\'application, onglet « États Financiers (SCF) ».',
     W - margin * 2
   );
   doc.text(scfIntro, margin, y);
@@ -604,7 +667,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   const ecartBilan = (bilanSCF.totalActif || 0) - (bilanSCF.totalPassif || 0);
-  doc.setFont('times', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...(Math.abs(ecartBilan) < 1 ? T.darkGreen : T.darkRed));
   doc.text(
@@ -637,7 +700,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y = latexSection(doc, '2', 'Ratios Financiers Simplifiés (Synthèse)', y);
 
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(...T.inkMuted);
   doc.text('Vue d\'ensemble condensée des indicateurs clés — le détail complet des formules et normes sectorielles figure en Section 5.', margin, y);
@@ -672,7 +735,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     17
   );
 
-  // Rangée KPI LaTeX
+  // Rangée KPI
   y = latexKpiRow(doc, [
     { label: 'FRNG (Ressources - Emplois)', val: fmtDZD(frng), sub: frng >= 0 ? 'Excédent structurel' : 'Déficit structurel', status: frng >= 0 ? 'ok' : 'danger' },
     { label: 'BFR (Besoin en Fonds de Roulement)', val: fmtDZD(bfr), sub: `${fmtDays(bfrJours)} de CA HT`, status: 'normal' },
@@ -704,7 +767,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // Note d'interprétation
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(...T.inkMuted);
   doc.text('Note technique : Conformément aux normes SCF, les amortissements et pertes de valeur sont reclassés en ressources stables pour apprécier la capacité totale de financement.', margin, y);
@@ -721,7 +784,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   y = latexMathBox(
     doc,
     'VA = Production - Consommations     |     EBE = VA - Personnel (63) - Impôts (64)',
-    'Décomposition en cascade des agrégats de rentabilité selon la nomenclature officielle Loi 07-11.',
+    'Décomposition en cascade des agrégats de rentabilité selon la nomenclature officielle SCF.',
     y,
     17
   );
@@ -897,7 +960,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     const caTrend = diffVal(ca, s1.chiffreAffaires) >= 0 ? 'croissance' : 'contraction';
     const frngTrend = diffVal(frng, b1.frng) >= 0 ? 'consolidation' : 'érosion';
 
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...T.inkSecondary);
     const synthText = `L'exercice N est marqué par une dynamique de ${caTrend} de l'activité commerciale (${fmtPct(diffPct(ca, s1.chiffreAffaires))} de CA). Sur le plan structurel, on observe une ${frngTrend} du fonds de roulement (${fmtDZD(diffVal(frng, b1.frng))}), tandis que la trésorerie nette varie de ${fmtDZD(diffVal(tn, b1.tn))}. L'ajustement des charges d'exploitation et la gestion du BFR constituent les axes prioritaires pour préserver l'autonomie financière.`;
@@ -986,7 +1049,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   ];
 
   actions.forEach(act => {
-    doc.setFont('times', 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkSecondary);
     doc.text(act, margin + 2, y);
@@ -1048,7 +1111,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // Avertissement méthodologique — précision du modèle & estimation éventuelle
-  doc.setFont('times', 'italic');
+  doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.2);
   doc.setTextColor(...T.inkMuted);
   const disclaimerLines = doc.splitTextToSize(
@@ -1065,7 +1128,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '8', 'Audit des Soldes & Conformité SCF (Loi 07-11)', y);
+  y = latexSection(doc, '8', 'Audit des Soldes & Conformité SCF', y);
 
   const anomaliesList = [];
 
@@ -1083,7 +1146,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
       // 1. Caisse créditrice
       if (['531','532','533','534'].includes(p3) && isC) {
-        anomaliesList.push([c, r.libelle || 'Caisse', 'CAISSE CRÉDITRICE', 'Impossibilité matérielle (Loi 07-11)', fmtDZD(sc)]);
+        anomaliesList.push([c, r.libelle || 'Caisse', 'CAISSE CRÉDITRICE', 'Impossibilité matérielle', fmtDZD(sc)]);
       }
       // 2. Fournisseurs débiteurs (hors 409)
       if (p2 === '40' && !['406','409'].includes(p3) && isD) {
@@ -1141,7 +1204,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     });
 
     if (anomaliesList.length > 30) {
-      doc.setFont('times', 'italic');
+      doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
       doc.setTextColor(...T.inkMuted);
       doc.text(`... et ${anomaliesList.length - 30} autres anomalies supplémentaires consultables dans l'onglet Audit Balance de la plateforme.`, margin, y);
@@ -1156,7 +1219,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   // Téléchargement du fichier
   const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-  const fileName = `BAIQ_Rapport_Financier_LaTeX_${cleanName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  const fileName = `BAIQ_Rapport_Financier_${cleanName}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(fileName);
   return fileName;
 }

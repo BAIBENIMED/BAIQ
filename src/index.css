@@ -507,6 +507,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
   border-right: 1px solid var(--border);
 }
 
+/* Colonne "Note" des tableaux officiels SCF (Bilan Actif/Passif, TCR) : reproduit la colonne
+   de renvoi aux notes annexes du modèle du manuel, masquée à l'écran (l'app ne produit pas
+   d'annexe numérotée) et révélée uniquement à l'impression — voir .note-col en @media print. */
+.note-col {
+  display: none;
+}
+
 .data-table.grid-lines th:last-child,
 .data-table.grid-lines td:last-child {
   border-right: none;
@@ -845,6 +852,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
     background: #fff !important;
     color: #000 !important;
   }
+  /* Le fond de l'entête de tableau (var(--surface-alt)) reste sombre en thème sombre — non couvert
+     par la règle .card ci-dessus (elle cible le wrapper, pas <thead>). Combiné au texte forcé en
+     noir juste en dessous, ça rendait l'entête illisible à l'impression depuis le mode sombre. */
+  .data-table thead tr {
+    background: #f1f5f9 !important;
+  }
   .card {
     box-shadow: none !important;
     border: 1px solid #cbd5e1 !important;
@@ -871,6 +884,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
   .etats-financiers-print .data-table tbody td {
     padding: 3px 8px;
     font-size: 0.68rem;
+  }
+  /* Reproduit le tableau grillagé du manuel SCF (BILAN ACTIF/PASSIF (présentation), COMPTE DE
+     RESULTATS par nature) : cadre chaque cellule, comme un formulaire officiel, au lieu du style
+     "liste" (bordure basse uniquement) utilisé à l'écran. Colonne Note révélée pour correspondre
+     exactement à la colonne de renvoi aux annexes du modèle imprimé. */
+  .etats-financiers-print .official-scf-table {
+    border-collapse: collapse;
+  }
+  .etats-financiers-print .official-scf-table th,
+  .etats-financiers-print .official-scf-table td {
+    border: 1px solid #000 !important;
+  }
+  .etats-financiers-print .note-col {
+    display: table-cell !important;
+    width: 40px;
   }
   .print-title {
     margin-top: 18px;

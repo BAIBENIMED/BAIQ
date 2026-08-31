@@ -15,11 +15,15 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
       <div className="card-header">
         <h3>{title}</h3>
       </div>
+      {/* Légende reprise du modèle officiel "BILAN ACTIF (présentation)" — visible uniquement à
+          l'impression, juste au-dessus du tableau (voir .etats-financiers-print .note-col en CSS). */}
+      <div className="print-only" style={{ display: 'none', padding: '4px 16px 0', fontSize: '0.7rem' }}>Exercice clos le ..........................</div>
       <div style={{ overflowX: 'auto' }}>
-        <table className="data-table">
+        <table className="data-table official-scf-table">
           <thead>
             <tr>
-              <th>RUBRIQUE</th>
+              <th>ACTIF</th>
+              <th className="note-col">Note</th>
               <th className="right">BRUT N</th>
               <th className="right">AMORT./PROV.</th>
               <th className="right">NET N</th>
@@ -31,7 +35,7 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
               if (r.group) {
                 return (
                   <tr key={i} style={{ background: bandBg }}>
-                    <td colSpan={hasN1 ? 5 : 4} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color }}>{r.group}</td>
+                    <td colSpan={hasN1 ? 6 : 5} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color }}>{r.group}</td>
                   </tr>
                 );
               }
@@ -41,7 +45,7 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
               if (r.subgroup) {
                 return (
                   <tr key={i}>
-                    <td colSpan={hasN1 ? 5 : 4} style={{ paddingLeft: 32, paddingTop: 8, paddingBottom: 2, fontWeight: 700, fontSize: '0.76rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{r.subgroup}</td>
+                    <td colSpan={hasN1 ? 6 : 5} style={{ paddingLeft: 32, paddingTop: 8, paddingBottom: 2, fontWeight: 700, fontSize: '0.76rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{r.subgroup}</td>
                   </tr>
                 );
               }
@@ -50,6 +54,7 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
               return (
                 <tr key={i} style={r.total ? { background: bandBg } : undefined}>
                   <td style={{ paddingLeft: r.total ? 16 : (r.sub ? 48 : 32), fontWeight: r.total ? 800 : 600, color: r.total ? color : undefined }}>{r.label}</td>
+                  <td className="note-col"></td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 500, color: r.total ? color : 'var(--text-muted)' }}>{fmt(l.brut)}</td>
                   <td className="right mono" style={{ color: r.total ? color : 'var(--text-muted)' }}>{l.amortProv ? `(${fmt(l.amortProv)})` : fmt(0)}</td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 600, color: r.total ? color : 'var(--text)' }}>{fmt(l.net)}</td>
@@ -72,11 +77,13 @@ function PassifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
       <div className="card-header">
         <h3>{title}</h3>
       </div>
+      <div className="print-only" style={{ display: 'none', padding: '4px 16px 0', fontSize: '0.7rem' }}>Exercice clos le ..........................</div>
       <div style={{ overflowX: 'auto' }}>
-        <table className="data-table">
+        <table className="data-table official-scf-table">
           <thead>
             <tr>
-              <th>RUBRIQUE</th>
+              <th>PASSIF</th>
+              <th className="note-col">Note</th>
               <th className="right">EXERCICE N</th>
               {hasN1 && <th className="right">EXERCICE N-1</th>}
             </tr>
@@ -86,13 +93,14 @@ function PassifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
               if (r.group) {
                 return (
                   <tr key={i} style={{ background: bandBg }}>
-                    <td colSpan={hasN1 ? 3 : 2} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color }}>{r.group}</td>
+                    <td colSpan={hasN1 ? 4 : 3} style={{ padding: '8px 16px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color }}>{r.group}</td>
                   </tr>
                 );
               }
               return (
                 <tr key={i} style={r.total ? { background: bandBg } : undefined}>
                   <td style={{ paddingLeft: r.total ? 16 : 32, fontWeight: r.total ? 800 : 600, color: r.total ? color : undefined }}>{r.label}</td>
+                  <td className="note-col"></td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 600, color: r.total ? color : 'var(--text)' }}>{fmt(r.val)}</td>
                   {hasN1 && <td className="right mono" style={{ color: r.total ? color : undefined }}>{fmt(r.valN1)}</td>}
                 </tr>
@@ -233,12 +241,14 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
         <div className="card-header">
           <h3>Compte de Résultat par Nature (TCR officiel)</h3>
         </div>
+        <div className="print-only" style={{ display: 'none', padding: '4px 16px 0', fontSize: '0.7rem' }}>Période du .......................... au ..........................</div>
         <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
+          <table className="data-table official-scf-table">
             <thead>
               <tr>
-                <th>CODE</th>
                 <th>RUBRIQUE</th>
+                <th>CODE</th>
+                <th className="note-col">Note</th>
                 <th className="right">MONTANT N</th>
               </tr>
             </thead>
@@ -247,8 +257,9 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
                 const isTotalRow = r.type !== 'compte';
                 return (
                   <tr key={i} style={isTotalRow ? { background: '#f0f8fa' } : undefined}>
-                    <td className="mono" style={{ fontWeight: isTotalRow ? 800 : 600, color: isTotalRow ? '#124f66' : 'var(--text)' }}>{r.code}</td>
                     <td style={{ fontWeight: isTotalRow ? 800 : 500, textTransform: isTotalRow ? 'uppercase' : 'none', fontSize: isTotalRow ? '0.78rem' : '0.85rem', color: isTotalRow ? '#124f66' : undefined }}>{r.label}</td>
+                    <td className="mono" style={{ fontWeight: isTotalRow ? 800 : 600, color: isTotalRow ? '#124f66' : 'var(--text)' }}>{r.code}</td>
+                    <td className="note-col"></td>
                     <td className="right mono" style={{ fontWeight: isTotalRow ? 800 : 600, color: isTotalRow ? '#124f66' : (r.isCharge ? 'var(--red)' : 'var(--text)') }}>
                       {r.isCharge && r.val > 0 ? `(${fmtNum(r.val)})` : fmtNum(r.val)}
                     </td>
