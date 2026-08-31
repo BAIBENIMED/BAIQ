@@ -246,9 +246,11 @@ export const MODEL_TEMPLATES = [
 ];
 
 export function createSimulationEntryFromLines({ label, lines = [] }) {
+  // Un compte vide n'est jamais deviné (une vente "700" fantôme serait pire qu'une ligne
+  // ignorée) : il reste vide et applySimulationToRows() l'ignorera explicitement.
   const cleanLines = lines.map(l => ({
-    compte: String(l.compte || '700').trim(),
-    libelle: String(l.libelle || `Compte ${l.compte}`),
+    compte: String(l.compte || '').trim(),
+    libelle: String(l.libelle || (l.compte ? `Compte ${l.compte}` : 'Compte')),
     debit: Number(l.debit) || 0,
     credit: Number(l.credit) || 0,
   }));
@@ -291,34 +293,44 @@ export function applySimulationToRows(originalRows = [], simulationEntries = [])
     if (!cCode || (deb === 0 && cred === 0)) return;
 
     let accIdx = accountMap.get(cCode);
-    
-    // Si le compte exact n'est pas trouvé, chercher un compte auxiliaire débutant par cCode (ex: 411000 pour 411)
+
+    // Si le compte exact n'est pas trouvé, chercher un compte auxiliaire débutant par cCode
+    // (ex: 411000 pour 411). Plusieurs sous-comptes peuvent correspondre (ex: 391/395 pour '39') :
+    // on retient celui au solde le plus significatif plutôt que le premier rencontré dans le
+    // fichier, pour un rattachement plus représentatif au niveau du détail par compte.
     if (accIdx === undefined && cCode.length <= 4) {
+      let bestAbsSolde = -1;
       for (const [code, idx] of accountMap.entries()) {
         if (code.startsWith(cCode)) {
-          accIdx = idx;
-          break;
+          const r = rowsCopy[idx];
+          const s = (r.solde !== undefined && r.solde !== null && !isNaN(r.solde)) ? r.solde : (r.soldeFinDebit || 0) - (r.soldeFinCredit || 0);
+          if (Math.abs(s) > bestAbsSolde) { bestAbsSolde = Math.abs(s); accIdx = idx; }
         }
       }
     }
 
     if (accIdx !== undefined) {
       const row = rowsCopy[accIdx];
+      // Le solde actuel s'appuie sur le solde final RÉEL de la ligne (déjà correct quel que
+      // soit le format de balance importé — 2, 4 ou 6 colonnes), jamais recalculé depuis
+      // soldeDébut+mouvement : sur une balance à 2 colonnes, ces deux champs valent 0 et
+      // recalculer ainsi effacerait silencieusement le solde réel du compte.
+      const soldeActuel = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde))
+        ? row.solde
+        : (row.soldeFinDebit || 0) - (row.soldeFinCredit || 0);
+      const netFin = soldeActuel + deb - cred;
+
       row.mouvementDebit  = (row.mouvementDebit || 0) + deb;
       row.mouvementCredit = (row.mouvementCredit || 0) + cred;
-
-      const sInit = (row.soldeDebutDebit || 0) - (row.soldeDebutCredit || 0);
-      const netFin = sInit + row.mouvementDebit - row.mouvementCredit;
 
       if (netFin >= 0) {
         row.soldeFinDebit  = netFin;
         row.soldeFinCredit = 0;
-        row.solde          = netFin;
       } else {
         row.soldeFinDebit  = 0;
         row.soldeFinCredit = -netFin;
-        row.solde          = netFin;
       }
+      row.solde = netFin;
       row.isSimulationImpacted = true;
     } else {
       const netFin = deb - cred;

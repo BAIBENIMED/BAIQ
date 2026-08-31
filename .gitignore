@@ -30,3 +30,6 @@ dist-ssr
 # Fichiers locaux
 stitch_response.json
 lancer.bat
+
+# État runtime du serveur (compteur global d'analyses) — pas du code source
+analysis-count.json

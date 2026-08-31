@@ -7,6 +7,7 @@ import { BilanView } from './components/BilanView';
 import { SIGView } from './components/SIGView';
 import { EtatsFinanciersView } from './components/EtatsFinanciersView';
 import { CapitauxPropresView } from './components/CapitauxPropresView';
+import { TableauFluxTresorerieView } from './components/TableauFluxTresorerieView';
 import { RatiosView } from './components/RatiosView';
 import { BalanceView } from './components/BalanceView';
 import { AuditBalanceView } from './components/AuditBalanceView';
@@ -35,6 +36,7 @@ const NAV = [
   { id: 'sig',         label: 'SIG & TCR (SCF)',        icon: 'analytics'     },
   { id: 'etats_financiers', label: 'États Financiers (SCF)', icon: 'summarize' },
   { id: 'capitaux',    label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
+  { id: 'tft',         label: 'Flux de Trésorerie (TFT)', icon: 'waterfall_chart' },
   { id: 'stocks',      label: 'Variation Stocks',       icon: 'warehouse'     },
   { id: 'ratios',      label: 'Ratios Financiers',      icon: 'query_stats'   },
   { id: 'whatif',      label: 'Simulateur What-If',     icon: 'tune'          },
@@ -47,7 +49,11 @@ export default function App() {
   const [tab, setTab]       = useState('import');
   const [data, setData]     = useState(null);
   const [cur, setCur]       = useState('DZD');
-  const [geminiKey, setGeminiKey] = useState(() => import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('finanalyze_gemini_key') || '');
+  // Clé Gemini locale de repli (mode sans relais serveur uniquement) — jamais lue depuis une
+  // variable d'environnement Vite (VITE_*) : une telle variable serait figée en clair dans le
+  // bundle JS public livré au navigateur au moment du build, un risque bien plus grave que le
+  // stockage localStorage ci-dessous (visible sans même ouvrir les DevTools).
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   const [showContactModal, setShowContactModal] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
@@ -67,6 +73,22 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Le compteur d'analyses reflète l'usage GLOBAL de l'application (tous visiteurs
+  // confondus), pas seulement ce navigateur — synchronisé depuis le serveur au chargement.
+  // Repli silencieux sur la valeur locale si le serveur est indisponible (mode développement
+  // client-only, hors-ligne).
+  useEffect(() => {
+    fetch('/api/analysis-count')
+      .then(res => (res.ok ? res.json() : Promise.reject()))
+      .then(json => {
+        if (Number.isFinite(json.count)) {
+          setAnalysisCount(json.count);
+          localStorage.setItem('baiq_analysis_count', String(json.count));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   /* ── Moteur de Simulation — jusqu'à 3 scénarios en parallèle ── */
@@ -135,9 +157,22 @@ export default function App() {
     setData(d);
     setTab('dashboard');
     setShowPostImportConfig(true);
-    const newCount = (parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10)) + 1;
-    localStorage.setItem('baiq_analysis_count', String(newCount));
-    setAnalysisCount(newCount);
+    // Incrémente le compteur GLOBAL côté serveur (partagé entre tous les visiteurs).
+    fetch('/api/analysis-count/increment', { method: 'POST' })
+      .then(res => (res.ok ? res.json() : Promise.reject()))
+      .then(json => {
+        if (Number.isFinite(json.count)) {
+          setAnalysisCount(json.count);
+          localStorage.setItem('baiq_analysis_count', String(json.count));
+        }
+      })
+      .catch(() => {
+        // Serveur indisponible : repli local (valeur propre à ce navigateur en attendant),
+        // resynchronisée avec le compteur global au prochain chargement réussi.
+        const newCount = (parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10)) + 1;
+        localStorage.setItem('baiq_analysis_count', String(newCount));
+        setAnalysisCount(newCount);
+      });
   };
 
   const updateSecteur = (secteurId) => {
@@ -542,6 +577,7 @@ export default function App() {
     if (tab === 'sig')      return <SIGView data={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'etats_financiers') return <EtatsFinanciersView data={activeData?.bilanSCF} sig={activeData?.sig} dataN1={activeData?.dataN1} profil={activeData?.profil} formatCurrency={fmt} />;
     if (tab === 'capitaux') return <CapitauxPropresView data={activeData} fmt={fmt} />;
+    if (tab === 'tft')      return <TableauFluxTresorerieView data={activeData} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} cur={cur} />;
     if (tab === 'whatif')      return <WhatIfSimulator data={data} scenarios={scenarios} setScenarios={setScenarios} activeScenarioId={activeScenarioId} setActiveScenarioId={setActiveScenarioId} formatCurrency={fmt} cur={cur} />;
@@ -1400,7 +1436,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           <input
             value={cur}
             onChange={e => setCur(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
+            style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 10, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#d97706', flexShrink: 0 }}>info</span>
@@ -1426,7 +1462,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
             <select
               value={data?.profil?.secteurId || 'commerce_gros'}
               onChange={e => onUpdateSecteur(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: '#fff' }}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
             >
               {SECTEURS.map(sec => (
                 <option key={sec.id} value={sec.id}>{sec.label}</option>
@@ -1478,7 +1514,7 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
             <select
               value={tvaRegime.tauxTva}
               onChange={e => onUpdateTvaRegime({ tauxTva: Number(e.target.value) })}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: '#fff' }}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
             >
               <option value={19}>19 % — Taux normal</option>
               <option value={9}>9 % — Taux réduit</option>

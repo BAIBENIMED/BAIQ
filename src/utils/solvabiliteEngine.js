@@ -134,8 +134,8 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     zone = 'distress';
     zoneLabel = 'Zone Critique — Insolvabilité Avérée';
     zoneColor = '#991b1b';
-    zoneBg = '#450a0a';
-    zoneBorder = '#7f1d1d';
+    zoneBg = '#fee2e2';
+    zoneBorder = '#fca5a5';
     risqueDefaillance = 'Critique';
   }
 

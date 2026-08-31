@@ -23,7 +23,11 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
 
   // Modèles d'écritures — point d'entrée unique de saisie
   const [selectedCategory, setSelectedCategory] = useState('Tous');
-  const [showAdvancedMode, setShowAdvancedMode] = useState(false);
+
+  // Fenêtre de saisie du montant avant application d'un modèle
+  const [pendingTemplate, setPendingTemplate] = useState(null);
+  const [templateAmount, setTemplateAmount] = useState('');
+  useEscapeKey(!!pendingTemplate, () => setPendingTemplate(null));
 
   // Éditeur Multiligne Avancé
   const [editingId, setEditingId]           = useState(null);
@@ -118,18 +122,49 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
     setIsEditorOpen(true);
   };
 
-  // --- CHARGER UN MODÈLE EN 1 CLIC ---
-  const handleApplyTemplate = (tpl) => {
+  // --- MODÈLES : le montant par défaut du modèle (avant ajustement utilisateur) ---
+  const templateDefaultAmount = (tpl) => Math.max(
+    tpl.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0),
+    tpl.lines.reduce((s, l) => s + (Number(l.credit) || 0), 0)
+  );
+
+  // --- OUVRIR LA FENÊTRE DE SAISIE DU MONTANT AVANT DE CRÉER LA PIÈCE ---
+  const handleOpenTemplateAmount = (tpl) => {
+    setTemplateError(null);
+    setPendingTemplate(tpl);
+    setTemplateAmount(String(templateDefaultAmount(tpl)));
+  };
+
+  // --- CRÉER LA PIÈCE À PARTIR DU MODÈLE, MISE À L'ÉCHELLE SUR LE MONTANT SAISI ---
+  // Les lignes du modèle sont mises à l'échelle proportionnellement (et non simplement
+  // remplacées) pour préserver les ratios internes des modèles multilignes (ex: TVA à 19%
+  // répartie entre Client TTC / Vente HT / TVA collectée).
+  const handleApplyTemplate = () => {
+    const tpl = pendingTemplate;
+    if (!tpl) return;
+    const amount = Number(templateAmount);
+    if (!(amount > 0)) return;
+
+    const original = templateDefaultAmount(tpl);
+    const factor = original > 0 ? amount / original : 1;
+    const scaledLines = tpl.lines.map(l => ({
+      ...l,
+      debit: Math.round((Number(l.debit) || 0) * factor),
+      credit: Math.round((Number(l.credit) || 0) * factor),
+    }));
+
     const newEntry = createSimulationEntryFromLines({
       label: tpl.name,
-      lines: tpl.lines,
+      lines: scaledLines,
     });
     if (!newEntry.isBalanced) {
       setTemplateError(`Le modèle "${tpl.name}" est déséquilibré (Débit ≠ Crédit) et n'a pas été appliqué. Merci de le corriger dans le code du modèle.`);
+      setPendingTemplate(null);
       return;
     }
     setTemplateError(null);
     updateSelectedEntries(entries => [...entries, newEntry]);
+    setPendingTemplate(null);
   };
 
   // --- HANDLERS ÉDITEUR LIGNES ---
@@ -160,10 +195,14 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
   const sumCredit = editorLines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
   const diffDC     = Math.abs(sumDebit - sumCredit);
   const isBalanced = diffDC < 0.01;
+  // Une ligne au compte vide est appliquée nulle part (silencieusement ignorée par le moteur de
+  // simulation) : l'écriture resterait déséquilibrée en pratique même si D = C sur le papier.
+  const hasEmptyAccount = editorLines.some(l => !String(l.compte || '').trim());
+  const canSave = isBalanced && !hasEmptyAccount;
 
   // --- SAUVEGARDER L'ÉCRITURE DANS LE JOURNAL DU SCÉNARIO CONSULTÉ ---
   const handleSaveEntry = () => {
-    if (!isBalanced) return;
+    if (!canSave) return;
 
     if (editingId) {
       updateSelectedEntries(entries => entries.map(e => {
@@ -370,6 +409,17 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#7c3aed' }}>auto_fix_high</span>
                 Ajouter une opération à « {effectiveSelected?.name} »
               </h3>
+              <button
+                onClick={handleOpenNewEditor}
+                style={{
+                  padding: '7px 14px', background: '#7c3aed', color: '#fff',
+                  border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem',
+                  display: 'flex', alignItems: 'center', gap: 6
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add_circle</span>
+                Nouvelle Pièce Simulation
+              </button>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#6b21a8', margin: '0 0 14px', opacity: 0.85 }}>
               Choisissez un modèle d'écriture prédéfini — l'écriture en partie double est générée et équilibrée automatiquement.
@@ -407,10 +457,10 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
               {filteredTemplates.map(tpl => (
                 <div
                   key={tpl.id}
-                  onClick={() => handleApplyTemplate(tpl)}
+                  onClick={() => handleOpenTemplateAmount(tpl)}
                   title={tpl.description}
                   style={{
-                    background: 'var(--surface)', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
+                    background: '#ffffff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px',
                     cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
                   }}
                   className="card-hover-effect"
@@ -427,31 +477,89 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                 </div>
               ))}
             </div>
-
-            <button
-              onClick={() => setShowAdvancedMode(!showAdvancedMode)}
-              style={{ marginTop: 16, border: 'none', background: 'none', color: '#6b21a8', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}
-            >
-              {showAdvancedMode ? 'Masquer le mode avancé' : 'Mode avancé (saisie comptable détaillée) ▾'}
-            </button>
-            {showAdvancedMode && (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  onClick={handleOpenNewEditor}
-                  style={{
-                    padding: '8px 16px', background: 'var(--surface)', color: 'var(--text)',
-                    border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.80rem',
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: 17, color: 'var(--primary)' }}>edit_note</span>
-                  Nouvelle écriture multiligne (débit/crédit par compte)
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* 📝 ÉDITEUR MULTILIGNE (MODE AVANCÉ) */}
+          {/* 💰 FENÊTRE DE SAISIE DU MONTANT AVANT CRÉATION DE LA PIÈCE MODÈLE */}
+          {pendingTemplate && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Montant de la pièce simulée"
+              style={{
+                position: 'fixed', inset: 0, zIndex: 99999,
+                background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+              }}
+              onClick={() => setPendingTemplate(null)}
+            >
+              <div
+                style={{
+                  width: '100%', maxWidth: 420,
+                  background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)',
+                  boxShadow: '0 25px 50px -12px rgba(0,0,0,0.45)'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#7c3aed', letterSpacing: '0.06em', marginBottom: 3 }}>
+                      Modèle sélectionné
+                    </div>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>{pendingTemplate.name}</h3>
+                  </div>
+                  <button onClick={() => setPendingTemplate(null)} aria-label="Fermer" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                  </button>
+                </div>
+
+                <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{pendingTemplate.description}</p>
+
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>
+                      Montant de la pièce
+                    </label>
+                    <input
+                      type="number"
+                      autoFocus
+                      value={templateAmount}
+                      onChange={e => setTemplateAmount(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && Number(templateAmount) > 0) handleApplyTemplate(); }}
+                      placeholder="Ex: 500000"
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '1rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
+                    />
+                    {pendingTemplate.lines.length > 2 && (
+                      <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: 'var(--text-sub)' }}>
+                        Modèle à plusieurs lignes : les montants de chaque ligne sont mis à l'échelle proportionnellement (ex: TVA recalculée automatiquement).
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button
+                    onClick={() => setPendingTemplate(null)}
+                    style={{ padding: '8px 16px', background: 'var(--surface-alt)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleApplyTemplate}
+                    disabled={!(Number(templateAmount) > 0)}
+                    style={{
+                      padding: '8px 18px', background: Number(templateAmount) > 0 ? '#7c3aed' : 'var(--border-mid)',
+                      color: '#fff', border: 'none', borderRadius: 8, cursor: Number(templateAmount) > 0 ? 'pointer' : 'not-allowed',
+                      fontWeight: 800, fontSize: '0.85rem'
+                    }}
+                  >
+                    Créer la pièce
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 📝 ÉDITEUR MULTILIGNE (Nouvelle Pièce Simulation / modification) */}
           {isEditorOpen && (
             <div className="card fade-in" style={{ padding: 20, border: '2px solid var(--primary)', background: 'var(--surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -478,7 +586,8 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
               </div>
 
               <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
-                <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', minWidth: 560, tableLayout: 'fixed' }}>
                   <thead>
                     <tr>
                       <th style={{ width: '22%' }}>COMPTE (3 CH.)</th>
@@ -497,7 +606,7 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                             value={line.compte}
                             onChange={e => handleLineChange(idx, 'compte', e.target.value)}
                             placeholder="700"
-                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, outline: 'none' }}
+                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: '0.80rem', fontWeight: 800, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
                           />
                         </td>
                         <td>
@@ -506,7 +615,7 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                             value={line.libelle}
                             onChange={e => handleLineChange(idx, 'libelle', e.target.value)}
                             placeholder="Intitulé"
-                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.80rem', outline: 'none' }}
+                            style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.80rem', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
                           />
                         </td>
                         <td className="right">
@@ -549,6 +658,7 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                     </tr>
                   </tfoot>
                 </table>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
@@ -568,22 +678,26 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {isBalanced ? (
-                    <span className="badge badge-green" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
-                      ✓ Équilibrée (D = C)
-                    </span>
-                  ) : (
+                  {!isBalanced ? (
                     <span className="badge badge-red" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
                       ⚠ Écart: {fmt(diffDC)}
+                    </span>
+                  ) : hasEmptyAccount ? (
+                    <span className="badge badge-red" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
+                      ⚠ Numéro de compte manquant
+                    </span>
+                  ) : (
+                    <span className="badge badge-green" style={{ fontSize: '0.74rem', padding: '4px 10px' }}>
+                      ✓ Équilibrée (D = C)
                     </span>
                   )}
 
                   <button
                     onClick={handleSaveEntry}
-                    disabled={!isBalanced}
+                    disabled={!canSave}
                     style={{
-                      padding: '8px 18px', background: isBalanced ? 'linear-gradient(135deg, #059669, #047857)' : 'var(--border-mid)',
-                      color: '#fff', border: 'none', borderRadius: 8, cursor: isBalanced ? 'pointer' : 'not-allowed',
+                      padding: '8px 18px', background: canSave ? 'linear-gradient(135deg, #059669, #047857)' : 'var(--border-mid)',
+                      color: '#fff', border: 'none', borderRadius: 8, cursor: canSave ? 'pointer' : 'not-allowed',
                       fontWeight: 800, fontSize: '0.85rem'
                     }}
                   >
@@ -612,8 +726,8 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
               )}
             </div>
 
-            <div style={{ width: '100%', overflow: 'hidden' }}>
-              <table className="data-table compact-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.74rem' }}>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <table className="data-table compact-table" style={{ width: '100%', minWidth: 600, tableLayout: 'fixed', fontSize: '0.74rem' }}>
                 <thead>
                   <tr>
                     <th style={{ width: '12%', padding: '8px 8px' }}>DATE</th>

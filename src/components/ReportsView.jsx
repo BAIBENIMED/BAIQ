@@ -120,7 +120,7 @@ function MarkdownReportViewer({ content }) {
 
     if (trimmed.startsWith('### ')) {
       elements.push(
-        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0b3446', margin: '16px 0 8px', borderLeft: '4px solid #1b6e8c', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', margin: '16px 0 8px', borderLeft: '4px solid #1b6e8c', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
           {trimmed.slice(4)}
         </h3>
       );
@@ -545,7 +545,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
           <div>
             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#fff' }}>Export PDF & Excel Professionnel — Rapport Annuel Complet</div>
             <div style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
-              Page de garde · Bilan fonctionnel · SIG/TCR · Ratios · Rating Bancaire · Audit SCF · 6 Feuilles Excel
+              Page de garde · Bilan fonctionnel · États Financiers Officiels SCF · SIG/TCR · TVCP · TFT · Ratios · Rating Bancaire · Audit SCF · 9 Feuilles Excel
             </div>
           </div>
         </div>
@@ -559,7 +559,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
               display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(4px)',
               transition: 'all 0.2s', flexShrink: 0
             }}
-            title="Télécharger le classeur Excel officiel SCF avec 6 feuilles de calcul"
+            title="Télécharger le classeur Excel officiel SCF avec 9 feuilles de calcul"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>table_view</span>
             Export Excel (.xlsx)
@@ -1060,7 +1060,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
             <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: 18 }}>thumb_up</span>
           </div>
           <div>
-            <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#166534' }}>Forces &amp; Atouts Financiers</h3>
+            <h3 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--green)' }}>Forces &amp; Atouts Financiers</h3>
             <span style={{ fontSize: '0.74rem', color: '#059669' }}>{nbForces} point{nbForces > 1 ? 's' : ''} fort{nbForces > 1 ? 's' : ''} identifié{nbForces > 1 ? 's' : ''}</span>
           </div>
         </div>
@@ -1094,7 +1094,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
               <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 18 }}>info</span>
             </div>
             <div>
-              <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#92400e' }}>Points à Surveiller</h3>
+              <h3 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--amber)' }}>Points à Surveiller</h3>
               <span style={{ fontSize: '0.74rem', color: '#d97706' }}>{nbNeutre} point{nbNeutre > 1 ? 's' : ''} à surveiller</span>
             </div>
           </div>
@@ -1127,7 +1127,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
             <span className="material-symbols-outlined" style={{ color: '#dc2626', fontSize: 18 }}>thumb_down</span>
           </div>
           <div>
-            <h3 style={{ fontWeight: 800, fontSize: '1rem', color: '#be123c' }}>Faiblesses &amp; Points de Vigilance</h3>
+            <h3 style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--red)' }}>Faiblesses &amp; Points de Vigilance</h3>
             <span style={{ fontSize: '0.74rem', color: '#dc2626' }}>{nbFaiblesses} risque{nbFaiblesses > 1 ? 's' : ''} identifié{nbFaiblesses > 1 ? 's' : ''}</span>
           </div>
         </div>

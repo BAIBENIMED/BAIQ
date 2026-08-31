@@ -1,20 +1,22 @@
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Générateur d'Export Excel Multi-Feuilles (.xlsx)
    Classeur financier complet structuré selon les normes SCF Algérie
-   Feuilles :
+   Feuilles (9) :
    1. Synthèse, Rating & Capacité d'Emprunt
    2. Bilan Fonctionnel SCF (Actif & Passif)
-   2bis. Bilan Officiel SCF (Actif / Passif détaillé par rubrique)
-   3. Compte de Résultat (TCR & SIG par Nature)
-   4. Ratios & Benchmarks Sectoriels
-   5. Audit de Conformité SCF & Flux Croisés
-   6. Balance Générale des Comptes (Grand Livre)
+   3. Bilan Officiel SCF (Actif / Passif détaillé par rubrique, arrêté du 26/07/2008)
+   4. Compte de Résultat (TCR & SIG par Nature, numérotation officielle I à X)
+   5. Tableau de Variation des Capitaux Propres (TVCP)
+   6. Tableau des Flux de Trésorerie (TFT, méthode indirecte)
+   7. Ratios & Benchmarks Sectoriels
+   8. Audit de Conformité SCF & Flux Croisés
+   9. Balance Générale des Comptes (Grand Livre)
    ═══════════════════════════════════════════════════════════ */
 
 import * as XLSX from 'xlsx';
 import { getSecteur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
-import { auditBalanceAccounts, auditCrossAccountMovements } from './financeCalculations';
+import { auditBalanceAccounts, auditCrossAccountMovements, calculateVariationCapitauxPropres, buildTCRRows, calculateTFT } from './financeCalculations';
 
 export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx', cur) {
   if (!data) return false;
@@ -28,6 +30,8 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
   const solv = calculateAltmanZScore(bilan, sig, rows);
   const auditNatures = auditBalanceAccounts(rows);
   const auditFlux = auditCrossAccountMovements(rows);
+  const tvcp = calculateVariationCapitauxPropres(rows, dataN1, sig);
+  const tft = calculateTFT(data);
 
   const wb = XLSX.utils.book_new();
 
@@ -135,23 +139,26 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['ACTIF NON COURANT', `Brut N (${currency})`, `Amort./Prov. N (${currency})`, `Net N (${currency})`, `Net N-1 (${currency})`],
     actifRow('Écart d\'acquisition (goodwill)', an.ecartAcquisition, an1.ecartAcquisition),
     actifRow('Immobilisations incorporelles', an.immobilisationsIncorporelles, an1.immobilisationsIncorporelles),
-    actifRow('Terrains', an.terrains, an1.terrains),
-    actifRow('Bâtiments', an.batiments, an1.batiments),
-    actifRow('Autres immobilisations corporelles', an.autresImmoCorp, an1.autresImmoCorp),
-    actifRow('Immobilisations en concession', an.immobilisationsEnConcession, an1.immobilisationsEnConcession),
+    ['  Immobilisations corporelles'],
+    actifRow('    Terrains', an.terrains, an1.terrains),
+    actifRow('    Bâtiments', an.batiments, an1.batiments),
+    actifRow('    Autres immobilisations corporelles', an.autresImmoCorp, an1.autresImmoCorp),
+    actifRow('    Immobilisations en concession', an.immobilisationsEnConcession, an1.immobilisationsEnConcession),
     actifRow('Immobilisations en cours', an.immobilisationsEnCours, an1.immobilisationsEnCours),
     actifRow('Immobilisations financières', an.immobilisationsFinancieres, an1.immobilisationsFinancieres),
     actifRow('Impôts différés actif', an.impotsDifferesActif, an1.impotsDifferesActif),
     actifRow('TOTAL ACTIF NON COURANT', sumActifLines(an), sumActifLines(an1)),
     [],
     ['ACTIF COURANT', `Brut N (${currency})`, `Amort./Prov. N (${currency})`, `Net N (${currency})`, `Net N-1 (${currency})`],
-    actifRow('Stocks et en-cours', acr.stocks, acr1.stocks),
-    actifRow('Clients', acr.clients, acr1.clients),
-    actifRow('Autres débiteurs', acr.autresDebiteurs, acr1.autresDebiteurs),
-    actifRow('Impôts et assimilés', acr.impotsEtAssimilesActif, acr1.impotsEtAssimilesActif),
-    actifRow('Autres créances et emplois assimilés', acr.autresCreancesEmploisAssimiles, acr1.autresCreancesEmploisAssimiles),
-    actifRow('Placements et autres actifs financiers courants', acr.placements, acr1.placements),
-    actifRow('Trésorerie', acr.tresorerie, acr1.tresorerie),
+    actifRow('Stocks et encours', acr.stocks, acr1.stocks),
+    ['  Créances et emplois assimilés'],
+    actifRow('    Clients', acr.clients, acr1.clients),
+    actifRow('    Autres débiteurs', acr.autresDebiteurs, acr1.autresDebiteurs),
+    actifRow('    Impôts et assimilés', acr.impotsEtAssimilesActif, acr1.impotsEtAssimilesActif),
+    actifRow('    Autres créances et emplois assimilés', acr.autresCreancesEmploisAssimiles, acr1.autresCreancesEmploisAssimiles),
+    ['  Disponibilités et assimilés'],
+    actifRow('    Placements et autres actifs financiers courants', acr.placements, acr1.placements),
+    actifRow('    Trésorerie', acr.tresorerie, acr1.tresorerie),
     actifRow('TOTAL ACTIF COURANT', sumActifLines(acr), sumActifLines(acr1)),
     [],
     ['TOTAL GÉNÉRAL DE L\'ACTIF', '', '', bilanSCF.totalActif || 0, n1SCF?.totalActif || ''],
@@ -188,42 +195,98 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
   /* ──────────────────────────────────────────────────────────
      FEUILLE 3 : COMPTE DE RÉSULTAT (TCR / SIG)
      ────────────────────────────────────────────────────────── */
+  // Source unique de vérité (partagée avec SIGView et EtatsFinanciersView) pour la numérotation
+  // officielle I à X — évite toute divergence entre l'écran et cette feuille.
+  const tcrObservations = {
+    '70': 'Base d\'activité', '72': 'Production stockée/déstockée (MIXTE)',
+    '73': 'Travaux faits par l\'entreprise pour elle-même', '74': 'Aides d\'exploitation',
+    'I': 'Activité brute globale', '60': 'Consommations directes',
+    '61/62': 'Prestations & sous-traitance', 'II': 'Charges consommées',
+    'III': 'Richesse nette créée', '63': 'Masse salariale',
+    '64': 'Taxes d\'exploitation', 'IV': 'Ressource brute d\'exploitation',
+    '75': 'Revenus divers', '65': 'Charges diverses',
+    '68': 'Dépréciation du capital', '78': 'Annulations de provisions',
+    'V': 'Performance pure d\'activité', '76': 'Placements & gains',
+    '66': 'Intérêts d\'emprunts', 'VI': 'Coût net de l\'endettement',
+    'VII': 'Résultat courant', '692/693/695/698': `Taux légal: ${secteur.tauxIBS}`,
+    'VIII': 'Bénéfice ordinaire', '77': 'Événements exceptionnels', '67': 'Événements exceptionnels',
+    'IX': 'Solde des éléments extraordinaires', 'X': 'Bénéfice net distribuable',
+  };
+  const ca = sig.chiffreAffaires || 1;
   const ws3Data = [
     ['TABLEAU DES COMPTES DE RÉSULTATS — TCR PAR NATURE (SCF)'],
-    ['Nomenclature officielle Système Comptable Financier'],
+    ['Nomenclature officielle Système Comptable Financier — Arrêté du 26/07/2008'],
     [],
     ['Code', 'Rubrique du Compte de Résultat', `Montant N (${currency})`, '% du CA', 'Observations'],
-    ['70', 'Ventes et produits annexes (Chiffre d\'affaires)', sig.c70 || sig.chiffreAffaires || 0, '100.0%', 'Base d\'activité'],
-    ['72', 'Variation des stocks de produits finis et en-cours', sig.c72 || 0, `${(((sig.c72 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Production stockée/déstockée (MIXTE)'],
-    ['73', 'Production immobilisée', sig.c73 || 0, `${(((sig.c73 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Travaux faits par l\'entreprise pour elle-même'],
-    ['74', 'Subventions d\'exploitation', sig.c74 || 0, `${(((sig.c74 || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Aides d\'exploitation'],
-    ['I', 'PRODUCTION DE L\'EXERCICE (70 + 72 + 73 + 74)', sig.productionExercice || 0, `${(((sig.productionExercice || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Activité brute globale'],
-    ['60', 'Achats consommés de matières et marchandises', -(sig.c60 || sig.achats || 0), `${(((sig.c60 || sig.achats || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Consommations directes'],
-    ['61/62', 'Services extérieurs et autres consommations', -((sig.c61 || 0) + (sig.c62 || 0)), `${((((sig.c61 || 0) + (sig.c62 || 0)) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Prestations & sous-traitance'],
-    ['II', 'CONSOMMATION DE L\'EXERCICE (60 + 61 + 62)', -(sig.consommationExercice || 0), `${(((sig.consommationExercice || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Charges consommées'],
-    ['III', 'VALEUR AJOUTÉE (I − II)', sig.valeurAjoutee || 0, `${(((sig.valeurAjoutee || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Richesse nette créée'],
-    ['63', 'Charges de personnel (Salaires + Cotisations CNAS)', -(sig.c63 || sig.chargesPersonnel || 0), `${(((sig.c63 || sig.chargesPersonnel || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Masse salariale'],
-    ['64', 'Impôts, taxes et versements assimilés', -(sig.c64 || sig.impotsTaxes || 0), `${(((sig.c64 || sig.impotsTaxes || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Taxes d\'exploitation'],
-    ['IV', 'EXCÉDENT BRUT D\'EXPLOITATION (EBE)', sig.ebe || 0, `${(((sig.ebe || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Ressource brute d\'exploitation'],
-    ['75', 'Autres produits opérationnels', sig.c75 || 0, '', 'Revenus divers'],
-    ['65', 'Autres charges opérationnelles', -(sig.c65 || 0), '', 'Charges diverses'],
-    ['68', 'Dotations aux amortissements et provisions', -(sig.c68_expl || sig.dotationsExploitation || 0), '', 'Dépréciation du capital'],
-    ['78', 'Reprises sur provisions et pertes de valeur', sig.c78_expl || sig.reprisesExploitation || 0, '', 'Annulations de provisions'],
-    ['V', 'RÉSULTAT OPÉRATIONNEL (EBIT)', sig.resultatExploitation || 0, `${(((sig.resultatExploitation || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Performance pure d\'activité'],
-    ['76/786', 'Produits financiers', sig.produitsFinanciers || 0, '', 'Placements & gains'],
-    ['66/686', 'Charges financières', -(sig.chargesFinancieres || 0), '', 'Intérêts d\'emprunts'],
-    ['VI', 'RÉSULTAT FINANCIER', sig.resultatFinancier || 0, '', 'Coût net de l\'endettement'],
-    ['VII', 'RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', sig.rcai || 0, `${(((sig.rcai || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Résultat courant'],
-    ['692/693/695/698', 'Impôts exigibles et différés sur résultats ordinaires (IBS)', -(sig.c69 || sig.impotsBenefices || 0), '', `Taux légal: ${secteur.tauxIBS}`],
-    ['VIII', 'RÉSULTAT NET DES ACTIVITÉS ORDINAIRES', sig.resultatNetOrdinaire || 0, '', 'Bénéfice ordinaire'],
-    ['77', 'Éléments extraordinaires (produits)', sig.c77 || 0, '', 'Événements exceptionnels'],
-    ['67', 'Éléments extraordinaires (charges)', -(sig.c67 || 0), '', 'Événements exceptionnels'],
-    ['IX', 'RÉSULTAT EXTRAORDINAIRE', sig.resultatExtraordinaire || 0, '', 'Solde des éléments extraordinaires'],
-    ['X', 'RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', sig.resultatNet || 0, `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, 'Bénéfice net distribuable'],
+    ...buildTCRRows(sig).map(r => {
+      const val = r.isCharge && r.val > 0 ? -r.val : (r.val || 0);
+      const pct = r.code === '70' ? '100.0%' : (r.type === 'compte' && (r.code === '75' || r.code === '65' || r.code === '68' || r.code === '78' || r.code === '76' || r.code === '66' || r.code === '77' || r.code === '67') ? '' : `${((val / ca) * 100).toFixed(1)}%`);
+      return [r.code, r.label, val, pct, tcrObservations[r.code] || ''];
+    }),
   ];
   const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
   ws3['!cols'] = [{ wch: 10 }, { wch: 48 }, { wch: 22 }, { wch: 15 }, { wch: 35 }];
   XLSX.utils.book_append_sheet(wb, ws3, 'TCR & SIG');
+
+  /* ──────────────────────────────────────────────────────────
+     FEUILLE 3 BIS : TABLEAU DE VARIATION DES CAPITAUX PROPRES (TVCP)
+     ────────────────────────────────────────────────────────── */
+  const tvcpHeader = ['Mouvement', ...tvcp.colonnes.map(c => `${c.label} (${currency})`)];
+  const wsTvcpData = [
+    ['TABLEAU DE VARIATION DES CAPITAUX PROPRES (TVCP) — SCF'],
+    [`Devise : ${currency}`],
+    [],
+    tvcpHeader,
+    ...tvcp.lignes.map(l => [l.libelle, ...tvcp.colonnes.map(c => l[c.key] || 0)]),
+    [],
+    ['SYNTHÈSE', `Montant (${currency})`],
+    ['Capitaux propres à l\'ouverture', tvcp.kpis.totalDebut || 0],
+    ['Capitaux propres à la clôture', tvcp.kpis.totalFin || 0],
+    ['Variation nette de l\'exercice', tvcp.kpis.variationNette || 0],
+    ['Résultat net de l\'exercice', tvcp.kpis.resultatNet || 0],
+    ['Dividendes estimés (N-1)', tvcp.kpis.dividendesEstimes || 0],
+  ];
+  const wsTvcp = XLSX.utils.aoa_to_sheet(wsTvcpData);
+  wsTvcp['!cols'] = [{ wch: 48 }, ...tvcp.colonnes.map(() => ({ wch: 20 }))];
+  XLSX.utils.book_append_sheet(wb, wsTvcp, 'TVCP');
+
+  /* ──────────────────────────────────────────────────────────
+     FEUILLE 3 TER : TABLEAU DES FLUX DE TRÉSORERIE (TFT) — MÉTHODE INDIRECTE
+     ────────────────────────────────────────────────────────── */
+  const wsTftData = tft.hasN1 ? [
+    ['TABLEAU DES FLUX DE TRÉSORERIE (TFT) — MÉTHODE INDIRECTE — SCF'],
+    [`Devise : ${currency}`],
+    [],
+    ['RUBRIQUE', `Montant N (${currency})`],
+    ["A. FLUX DE TRÉSORERIE LIÉS À L'ACTIVITÉ"],
+    ["Capacité d'Autofinancement (CAF)", tft.activite.caf],
+    ['Variation du Besoin en Fonds de Roulement (BFR)', -tft.activite.variationBFR],
+    ["FLUX NET DE TRÉSORERIE LIÉ À L'ACTIVITÉ (A)", tft.activite.total],
+    [],
+    ["B. FLUX DE TRÉSORERIE LIÉS AUX OPÉRATIONS D'INVESTISSEMENT"],
+    ["Acquisitions / Cessions d'immobilisations (variation brute)", -tft.investissement.variationImmo],
+    ['FLUX NET DE TRÉSORERIE LIÉ AUX INVESTISSEMENTS (B)', tft.investissement.total],
+    [],
+    ['C. FLUX DE TRÉSORERIE LIÉS AUX OPÉRATIONS DE FINANCEMENT'],
+    ['Augmentation de capital / apports', tft.financement.augmentationCapital],
+    ['Emprunts souscrits / remboursés (variation nette)', tft.financement.variationDette],
+    ['Dividendes versés (estimation)', -tft.financement.dividendesVerses],
+    ['FLUX NET DE TRÉSORERIE LIÉ AU FINANCEMENT (C)', tft.financement.total],
+    [],
+    ['SYNTHÈSE'],
+    ['VARIATION DE TRÉSORERIE DE LA PÉRIODE (A + B + C)', tft.variationTresorerie],
+    ["Trésorerie Nette à l'Ouverture (N-1)", tft.tresorerieOuverture],
+    ['Trésorerie Nette de Clôture Théorique (Ouverture + Variation)', tft.tresorerieClotureTheorique],
+    ['Écart de rapprochement (mouvements de capitaux propres non détaillés)', tft.ecartRapprochement],
+    ['Trésorerie Nette de Clôture Réelle (Bilan Fonctionnel)', tft.tresorerieClotureReelle],
+  ] : [
+    ['TABLEAU DES FLUX DE TRÉSORERIE (TFT) — MÉTHODE INDIRECTE — SCF'],
+    [],
+    ['Exercice N-1 requis : importez la balance de l\'exercice précédent depuis l\'onglet Importation pour activer ce tableau.'],
+  ];
+  const wsTft = XLSX.utils.aoa_to_sheet(wsTftData);
+  wsTft['!cols'] = [{ wch: 62 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, wsTft, 'TFT');
 
   /* ──────────────────────────────────────────────────────────
      FEUILLE 4 : RATIOS & BENCHMARKS SECTORIELS

@@ -7,6 +7,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { calculateAltmanZScore } from './solvabiliteEngine';
+import { buildTCRRows } from './financeCalculations';
 
 // ── Palette Typographique & Teintes LaTeX ──────────────────────────────
 const T = {
@@ -14,12 +15,12 @@ const T = {
   inkSecondary: [55, 65, 81],       // Gris foncé texte (#374151)
   inkMuted:     [107, 114, 128],    // Gris moyen (#6b7280)
   inkLight:     [156, 163, 175],    // Gris clair légendes (#9ca3af)
-  
+
   navy:         [15, 32, 67],       // Bleu institutionnel Oxford (#0f2043)
   darkRed:      [153, 27, 27],      // Rouge bordeaux LaTeX (#991b1b)
   darkGreen:    [22, 101, 52],      // Vert forêt LaTeX (#166534)
   darkAmber:    [146, 64, 14],      // Ocre sombre (#92400e)
-  
+
   ruleHeavy:    [17, 24, 39],       // Ligne principale 1.0pt
   ruleMedium:   [75, 85, 99],       // Ligne médiane 0.6pt
   ruleLight:    [209, 213, 219],    // Filet léger 0.3pt (#d1d5db)
@@ -77,10 +78,10 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
     doc.setFont('times', 'italic');
     doc.setFontSize(8.5);
     doc.setTextColor(...T.inkSecondary);
-    
+
     // Titre courant gauche
     doc.text('BAIQ Finance · Système Comptable Financier (SCF)', margin, 12);
-    
+
     // Dossier et exercice à droite
     doc.setFont('times', 'normal');
     doc.text(`${dossierName} · Exercice ${exerciceYear}`, W - margin, 12, { align: 'right' });
@@ -98,7 +99,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
     doc.setFont('times', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkMuted);
-    
+
     const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
     doc.text(`Document généré le ${printDate} · Traitement local sécurisé`, margin, H - 9);
 
@@ -302,12 +303,13 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
 //  FONCTION PRINCIPALE D'EXPORTATION PDF STYLE LATEX
 // ══════════════════════════════════════════════════════════════════════
 export async function generateFullPDF(data, cur, isSimulated = false, scenarioLabel = null) {
-  const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1 } = data || {};
+  const { bilan = {}, sig = {}, ratios = {}, rows = [], profil = {}, dataN1, bilanSCF = {} } = data || {};
   const r = ratios;
   const s = sig;
   const b = bilan;
   const b1 = dataN1?.bilan || null;
   const s1 = dataN1?.sig || null;
+  const bScf1 = dataN1?.bilanSCF || null;
 
   // Devise et arrondi déclarés par l'utilisateur (fenêtre de finalisation post-import /
   // Paramètres) — remplace le fmtDZD générique par défaut pour ce document précis.
@@ -441,12 +443,14 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   y += 5;
 
   const toc = [
-    ['1. Équilibre Financier & Bilan Fonctionnel SCF', '2'],
-    ['2. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '3'],
-    ['3. Ratios Financiers, Solvabilité & Délais de Rotation', '4'],
-    ['4. Analyse Comparative Pluriannuelle (N vs N-1)', '5'],
-    ['5. Matrice des Risques & Notation de Solvabilité (Altman Z\'\')', '6'],
-    ['6. Audit des Natures de Comptes & Anomalies d\'Écritures', '8'],
+    ['1. États Financiers Officiels SCF (Bilan Actif/Passif & TCR I-X)', '2'],
+    ['2. Ratios Financiers Simplifiés (Synthèse)', '4'],
+    ['3. Équilibre Financier & Bilan Fonctionnel SCF', '5'],
+    ['4. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '6'],
+    ['5. Ratios Financiers, Solvabilité & Délais de Rotation', '7'],
+    ['6. Analyse Comparative Pluriannuelle (N vs N-1)', '8'],
+    ['7. Matrice des Risques & Notation de Solvabilité (Altman Z\'\')', '9'],
+    ['8. Audit des Natures de Comptes & Anomalies d\'Écritures', '11'],
   ];
 
   toc.forEach(([title, pageNum]) => {
@@ -494,12 +498,170 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 2 — SECTION 1 : ÉQUILIBRE FINANCIER & BILAN FONCTIONNEL
+  // PAGE 2 — SECTION 1 : ÉTATS FINANCIERS OFFICIELS SCF (ARRÊTÉ DU 26/07/2008)
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '1', 'Équilibre Financier & Bilan Fonctionnel (SCF)', y);
+  y = latexSection(doc, '1', 'États Financiers Officiels SCF (Arrêté du 26/07/2008)', y);
+
+  doc.setFont('times', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...T.inkMuted);
+  const scfIntro = doc.splitTextToSize(
+    'Présentation conforme aux modèles de Bilan et de Compte de Résultat fixés par l\'arrêté du 26 juillet 2008 du ministère des finances (Système Comptable Financier, Loi 07-11, Décret 08-156) — à la différence du Bilan Fonctionnel (Section 3), de nature analytique. Le détail Brut / Amortissements-Provisions par rubrique est disponible dans l\'application, onglet « États Financiers (SCF) ».',
+    W - margin * 2
+  );
+  doc.text(scfIntro, margin, y);
+  y += scfIntro.length * 3.6 + 5;
+
+  const an = bilanSCF.actifNonCourant || {};
+  const ac = bilanSCF.actifCourant || {};
+  const an1 = bScf1?.actifNonCourant || null;
+  const ac1 = bScf1?.actifCourant || null;
+  const netOf = (line) => line?.net || 0;
+
+  y = latexSubSection(doc, '1.1. Bilan Actif — Rubriques Officielles', y);
+
+  const actifHead = [['ACTIF', 'NET N (DZD)', bScf1 ? 'NET N-1 (DZD)' : ''].filter(Boolean)];
+  const actifRow = (label, line, line1) => [label, fmtDZD(netOf(line)), bScf1 ? fmtDZD(netOf(line1)) : ''].filter((_, i) => bScf1 || i < 2);
+  const actifBody = [
+    ['ACTIF NON COURANT', '', bScf1 ? '' : ''].filter((_, i) => bScf1 || i < 2),
+    actifRow('Écart d\'acquisition (goodwill)', an.ecartAcquisition, an1?.ecartAcquisition),
+    actifRow('Immobilisations incorporelles', an.immobilisationsIncorporelles, an1?.immobilisationsIncorporelles),
+    actifRow('Terrains', an.terrains, an1?.terrains),
+    actifRow('Bâtiments', an.batiments, an1?.batiments),
+    actifRow('Autres immobilisations corporelles', an.autresImmoCorp, an1?.autresImmoCorp),
+    actifRow('Immobilisations en concession', an.immobilisationsEnConcession, an1?.immobilisationsEnConcession),
+    actifRow('Immobilisations en cours', an.immobilisationsEnCours, an1?.immobilisationsEnCours),
+    actifRow('Immobilisations financières', an.immobilisationsFinancieres, an1?.immobilisationsFinancieres),
+    actifRow('Impôts différés actif', an.impotsDifferesActif, an1?.impotsDifferesActif),
+    ['TOTAL ACTIF NON COURANT', fmtDZD(an.total || 0), bScf1 ? fmtDZD(an1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['ACTIF COURANT', '', ''].filter((_, i) => bScf1 || i < 2),
+    actifRow('Stocks et en-cours', ac.stocks, ac1?.stocks),
+    actifRow('Clients', ac.clients, ac1?.clients),
+    actifRow('Autres débiteurs', ac.autresDebiteurs, ac1?.autresDebiteurs),
+    actifRow('Impôts et assimilés', ac.impotsEtAssimilesActif, ac1?.impotsEtAssimilesActif),
+    actifRow('Autres créances et emplois assimilés', ac.autresCreancesEmploisAssimiles, ac1?.autresCreancesEmploisAssimiles),
+    actifRow('Placements et autres actifs financiers courants', ac.placements, ac1?.placements),
+    actifRow('Trésorerie', ac.tresorerie, ac1?.tresorerie),
+    ['TOTAL ACTIF COURANT', fmtDZD(ac.total || 0), bScf1 ? fmtDZD(ac1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL GÉNÉRAL DE L\'ACTIF', fmtDZD(bilanSCF.totalActif || 0), bScf1 ? fmtDZD(bScf1.totalActif || 0) : ''].filter((_, i) => bScf1 || i < 2),
+  ];
+
+  y = drawBooktabsTable(doc, actifHead, actifBody, y, {
+    boldRows: [0, 10, 11, 19, 20],
+    totalRowIndices: [10, 19],
+    columnStyles: bScf1
+      ? { 0: { cellWidth: 100 }, 1: { halign: 'right' }, 2: { halign: 'right' } }
+      : { 0: { cellWidth: 130 }, 1: { halign: 'right' } }
+  });
+
+  doc.addPage();
+  y = 22;
+
+  const cp = bilanSCF.capitauxPropres || {};
+  const pnc = bilanSCF.passifNonCourant || {};
+  const pc = bilanSCF.passifCourant || {};
+  const cp1 = bScf1?.capitauxPropres || null;
+  const pnc1 = bScf1?.passifNonCourant || null;
+  const pc1 = bScf1?.passifCourant || null;
+  const passifValRow = (label, val, val1) => [label, fmtDZD(val || 0), bScf1 ? fmtDZD(val1 || 0) : ''].filter((_, i) => bScf1 || i < 2);
+
+  y = latexSubSection(doc, '1.2. Bilan Passif — Rubriques Officielles', y);
+
+  const passifHead = [['PASSIF', 'NET N (DZD)', bScf1 ? 'NET N-1 (DZD)' : ''].filter(Boolean)];
+  const passifBody = [
+    ['CAPITAUX PROPRES', '', ''].filter((_, i) => bScf1 || i < 2),
+    passifValRow('Capital émis', cp.capitalEmis, cp1?.capitalEmis),
+    passifValRow('Capital non appelé (-)', cp.capitalNonAppele, cp1?.capitalNonAppele),
+    passifValRow('Primes et réserves', cp.primesEtReserves, cp1?.primesEtReserves),
+    passifValRow('Écarts de réévaluation', cp.ecartsReevaluation, cp1?.ecartsReevaluation),
+    passifValRow('Résultat net', cp.resultatNet, cp1?.resultatNet),
+    passifValRow('Autres capitaux propres — Report à nouveau', cp.autresCapitauxPropres, cp1?.autresCapitauxPropres),
+    ['TOTAL I — CAPITAUX PROPRES', fmtDZD(cp.total || 0), bScf1 ? fmtDZD(cp1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['PASSIFS NON COURANTS', '', ''].filter((_, i) => bScf1 || i < 2),
+    passifValRow('Emprunts et dettes financières', pnc.empruntsDettesFinancieres, pnc1?.empruntsDettesFinancieres),
+    passifValRow('Impôts (différés et provisionnés)', pnc.impotsDifferesPassif, pnc1?.impotsDifferesPassif),
+    passifValRow('Autres dettes non courantes', pnc.autresDettesNonCourantes, pnc1?.autresDettesNonCourantes),
+    passifValRow('Provisions et produits constatés d\'avance', pnc.provisionsEtProduitsConstatesAvance, pnc1?.provisionsEtProduitsConstatesAvance),
+    ['TOTAL II — PASSIFS NON COURANTS', fmtDZD(pnc.total || 0), bScf1 ? fmtDZD(pnc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['PASSIFS COURANTS', '', ''].filter((_, i) => bScf1 || i < 2),
+    passifValRow('Fournisseurs et comptes rattachés', pc.fournisseurs, pc1?.fournisseurs),
+    passifValRow('Impôts', pc.impotsEtAssimilesPassif, pc1?.impotsEtAssimilesPassif),
+    passifValRow('Autres dettes', pc.autresDettes, pc1?.autresDettes),
+    passifValRow('Trésorerie passif', pc.tresoreriePassif, pc1?.tresoreriePassif),
+    ['TOTAL III — PASSIFS COURANTS', fmtDZD(pc.total || 0), bScf1 ? fmtDZD(pc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL GÉNÉRAL DU PASSIF (I + II + III)', fmtDZD(bilanSCF.totalPassif || 0), bScf1 ? fmtDZD(bScf1.totalPassif || 0) : ''].filter((_, i) => bScf1 || i < 2),
+  ];
+
+  y = drawBooktabsTable(doc, passifHead, passifBody, y, {
+    boldRows: [0, 7, 8, 13, 14, 19, 20],
+    totalRowIndices: [7, 13, 19],
+    columnStyles: bScf1
+      ? { 0: { cellWidth: 100 }, 1: { halign: 'right' }, 2: { halign: 'right' } }
+      : { 0: { cellWidth: 130 }, 1: { halign: 'right' } }
+  });
+
+  const ecartBilan = (bilanSCF.totalActif || 0) - (bilanSCF.totalPassif || 0);
+  doc.setFont('times', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...(Math.abs(ecartBilan) < 1 ? T.darkGreen : T.darkRed));
+  doc.text(
+    Math.abs(ecartBilan) < 1 ? '✓ Bilan équilibré (Total Actif = Total Passif)' : `⚠ Écart de balance détecté : ${fmtDZD(ecartBilan)}`,
+    margin, y
+  );
+  y += 8;
+
+  y = latexSubSection(doc, '1.3. Compte de Résultat par Nature — Numérotation Officielle (I à X)', y);
+
+  const tcrRowsData = buildTCRRows(s);
+  const tcrHead = [['CODE', 'RUBRIQUE', 'MONTANT N (DZD)']];
+  const tcrBody = tcrRowsData.map(row => {
+    const val = row.isCharge && row.val > 0 ? -row.val : (row.val || 0);
+    return [row.code, row.label, fmtDZD(val)];
+  });
+  const tcrTotalIndices = tcrRowsData.reduce((acc, row, idx) => (row.type !== 'compte' ? [...acc, idx] : acc), []);
+
+  y = drawBooktabsTable(doc, tcrHead, tcrBody, y, {
+    boldRows: tcrTotalIndices,
+    totalRowIndices: tcrTotalIndices,
+    columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 110 }, 2: { halign: 'right' } }
+  });
+
+  // ──────────────────────────────────────────────────────────────────
+  // PAGE 4 — SECTION 2 : RATIOS FINANCIERS SIMPLIFIÉS (SYNTHÈSE)
+  // ──────────────────────────────────────────────────────────────────
+  doc.addPage();
+  y = 22;
+
+  y = latexSection(doc, '2', 'Ratios Financiers Simplifiés (Synthèse)', y);
+
+  doc.setFont('times', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...T.inkMuted);
+  doc.text('Vue d\'ensemble condensée des indicateurs clés — le détail complet des formules et normes sectorielles figure en Section 5.', margin, y);
+  y += 8;
+
+  y = latexKpiRow(doc, [
+    { label: 'Liquidité Générale', val: fmtNum(liqGen), sub: liqGen >= 1.2 ? 'Satisfaisante' : 'À surveiller', status: liqGen >= 1.0 ? 'ok' : 'danger' },
+    { label: 'Autonomie Financière', val: fmtPct(autFinanc), sub: autFinanc >= 0.35 ? 'Bonne autonomie' : 'Dépendance aux dettes', status: autFinanc >= 0.25 ? 'ok' : 'danger' },
+    { label: 'Marge Nette (RN / CA)', val: fmtPct(margeNette), sub: rn >= 0 ? 'Exercice bénéficiaire' : 'Exercice déficitaire', status: rn >= 0 ? 'ok' : 'danger' },
+  ], y);
+
+  y = latexKpiRow(doc, [
+    { label: 'DSO — Délai Clients', val: fmtDays(dso), sub: dso <= 60 ? 'Recouvrement rapide' : 'Délai élevé', status: dso <= 60 ? 'ok' : 'danger' },
+    { label: 'DPO — Délai Fournisseurs', val: fmtDays(dpo), sub: dpo >= 30 && dpo <= 75 ? 'Équilibré' : 'À ajuster', status: 'normal' },
+    { label: 'Rotation des Stocks', val: fmtDays(rotStock), sub: rotStock <= 90 ? 'Vélocité satisfaisante' : 'Risque de surstockage', status: rotStock <= 90 ? 'ok' : 'danger' },
+  ], y);
+
+  // ──────────────────────────────────────────────────────────────────
+  // PAGE 5 — SECTION 3 : ÉQUILIBRE FINANCIER & BILAN FONCTIONNEL
+  // ──────────────────────────────────────────────────────────────────
+  doc.addPage();
+  y = 22;
+
+  y = latexSection(doc, '3', 'Équilibre Financier & Bilan Fonctionnel (SCF)', y);
 
   // Formule mathématique
   y = latexMathBox(
@@ -517,7 +679,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     { label: 'Trésorerie Nette (TN)', val: fmtDZD(tn), sub: tn >= 0 ? 'Position de liquidité saine' : 'Recours aux concours CT', status: tn >= 0 ? 'ok' : 'danger' },
   ], y);
 
-  y = latexSubSection(doc, '1.1. Tableau Synthétique des Masses Fonctionnelles', y);
+  y = latexSubSection(doc, '3.1. Tableau Synthétique des Masses Fonctionnelles', y);
 
   const bilanHead = [['MASSE FONCTIONNELLE', 'EXERCICE N (DZD)', b1 ? 'EXERCICE N-1 (DZD)' : '', b1 ? 'VARIATION (DZD)' : ''].filter(Boolean)];
   const bilanBody = [
@@ -548,12 +710,12 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.text('Note technique : Conformément aux normes SCF, les amortissements et pertes de valeur sont reclassés en ressources stables pour apprécier la capacité totale de financement.', margin, y);
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 3 — SECTION 2 : SIG & COMPTE DE RÉSULTAT (TCR)
+  // PAGE 6 — SECTION 4 : SIG & COMPTE DE RÉSULTAT (TCR)
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '2', 'Soldes Intermédiaires de Gestion (SIG / TCR SCF)', y);
+  y = latexSection(doc, '4', 'Soldes Intermédiaires de Gestion (SIG / TCR SCF)', y);
 
   // Formule SIG
   y = latexMathBox(
@@ -570,7 +732,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     { label: 'Résultat Net de l\'Exercice', val: fmtDZD(rn), sub: `Marge Nette : ${fmtPct(margeNette)}`, status: rn >= 0 ? 'ok' : 'danger' },
   ], y);
 
-  y = latexSubSection(doc, '2.1. Tableau des Comptes de Résultats (TCR Officiel)', y);
+  y = latexSubSection(doc, '4.1. Tableau des Comptes de Résultats (TCR Officiel)', y);
 
   const sigHead = [['POSTE / SOLDE INTERMÉDIAIRE', 'COMPTES SCF', 'EXERCICE N (DZD)', s1 ? 'EXERCICE N-1' : '', s1 ? 'VARIATION (%)' : ''].filter(Boolean)];
   const sigBody = [
@@ -602,14 +764,14 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 4 — SECTION 3 : RATIOS FINANCIERS & DÉLAIS
+  // PAGE 7 — SECTION 5 : RATIOS FINANCIERS & DÉLAIS
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '3', 'Ratios Financiers, Solvabilité & Délais de Rotation', y);
+  y = latexSection(doc, '5', 'Ratios Financiers, Solvabilité & Délais de Rotation', y);
 
-  y = latexSubSection(doc, '3.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
+  y = latexSubSection(doc, '5.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
 
   const liqHead = [['RATIO / INDICATEUR', 'FORMULE SCF', 'VALEUR N', 'NORME', 'APPRÉCIATION']];
   const liqRedVal = r.liquiditeReduite || 0;
@@ -646,7 +808,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     }
   });
 
-  y = latexSubSection(doc, '3.2. Ratios de Rentabilité Économique et Financière', y);
+  y = latexSubSection(doc, '5.2. Ratios de Rentabilité Économique et Financière', y);
 
   const rentHead = [['RATIO DE RENTABILITÉ', 'VALEUR N', 'RÉFÉRENTIEL', 'ANALYSE DU RENDEMENT']];
   const rentBody = [
@@ -665,7 +827,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     }
   });
 
-  y = latexSubSection(doc, '3.3. Délais de Rotation et Cycle d\'Exploitation (en Jours)', y);
+  y = latexSubSection(doc, '5.3. Délais de Rotation et Cycle d\'Exploitation (en Jours)', y);
 
   const actHead = [['CYCLE / DÉLAI D\'EXPLOITATION', 'VALEUR N', 'NORME SCF', 'IMPACT SUR LE CASH']];
   const actBody = [
@@ -685,12 +847,12 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 5 — SECTION 4 : COMPARATIF N vs N-1
+  // PAGE 8 — SECTION 6 : COMPARATIF N vs N-1
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '4', 'Analyse Comparative Pluriannuelle (N vs N-1)', y);
+  y = latexSection(doc, '6', 'Analyse Comparative Pluriannuelle (N vs N-1)', y);
 
   if (!dataN1) {
     y = latexMathBox(
@@ -701,7 +863,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       20
     );
   } else {
-    y = latexSubSection(doc, '4.1. Tableau des Variations Structurelles et de Rentabilité', y);
+    y = latexSubSection(doc, '6.1. Tableau des Variations Structurelles et de Rentabilité', y);
 
     const compHead = [['AGRÉGAT MAJEUR', 'EXERCICE N (DZD)', 'EXERCICE N-1 (DZD)', 'VARIATION ABS. (DZD)', 'VARIATION REL. (%)']];
     const diffVal = (a, b) => (a || 0) - (b || 0);
@@ -731,10 +893,10 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     });
 
     // Synthèse de l'évolution
-    y = latexSubSection(doc, '4.2. Synthèse de la Trajectoire Pluriannuelle', y);
+    y = latexSubSection(doc, '6.2. Synthèse de la Trajectoire Pluriannuelle', y);
     const caTrend = diffVal(ca, s1.chiffreAffaires) >= 0 ? 'croissance' : 'contraction';
     const frngTrend = diffVal(frng, b1.frng) >= 0 ? 'consolidation' : 'érosion';
-    
+
     doc.setFont('times', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...T.inkSecondary);
@@ -745,12 +907,12 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 6 — SECTION 5 : DIAGNOSTIC & MATRICE DES RISQUES
+  // PAGE 9 — SECTION 7 : DIAGNOSTIC & MATRICE DES RISQUES
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '5', 'Diagnostic Analytique & Matrice des Risques', y);
+  y = latexSection(doc, '7', 'Diagnostic Analytique & Matrice des Risques', y);
 
   const diagItems = [];
 
@@ -815,7 +977,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // Recommandations prioritaires
-  y = latexSubSection(doc, '5.1. Plan d\'Action Recommandé aux Décideurs', y);
+  y = latexSubSection(doc, '7.1. Plan d\'Action Recommandé aux Décideurs', y);
 
   const actions = [
     '1. Optimisation du BFR : Réduire le délai moyen d\'encaissement client (DSO) par des relances préventives et négocier l\'alignement des délais fournisseurs (DPO).',
@@ -832,12 +994,12 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   });
 
   // ──────────────────────────────────────────────────────────────────
-  // SECTION 5.2 — NOTATION DE SOLVABILITÉ (ALTMAN Z'' & BANQUE D'ALGÉRIE)
+  // SECTION 7.2 — NOTATION DE SOLVABILITÉ (ALTMAN Z'' & BANQUE D'ALGÉRIE)
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSubSection(doc, '5.2. Notation de Solvabilité — Modèle Altman Z\'\' & Score Banque d\'Algérie', y);
+  y = latexSubSection(doc, '7.2. Notation de Solvabilité — Modèle Altman Z\'\' & Score Banque d\'Algérie', y);
 
   const solv = calculateAltmanZScore(bilan, sig, rows);
 
@@ -898,12 +1060,12 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   y += disclaimerLines.length * 3.6 + 4;
 
   // ──────────────────────────────────────────────────────────────────
-  // PAGE 7 — SECTION 6 : AUDIT DES SOLDES & ANOMALIES SCF
+  // PAGE 11 — SECTION 8 : AUDIT DES SOLDES & ANOMALIES SCF
   // ──────────────────────────────────────────────────────────────────
   doc.addPage();
   y = 22;
 
-  y = latexSection(doc, '6', 'Audit des Soldes & Conformité SCF (Loi 07-11)', y);
+  y = latexSection(doc, '8', 'Audit des Soldes & Conformité SCF (Loi 07-11)', y);
 
   const anomaliesList = [];
 
@@ -963,7 +1125,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       18
     );
   } else {
-    y = latexSubSection(doc, '6.1. Relevé Détaillé des Écritures et Soldes Inversés', y);
+    y = latexSubSection(doc, '8.1. Relevé Détaillé des Écritures et Soldes Inversés', y);
 
     const auditHead = [['COMPTE', 'INTITULÉ DU COMPTE', 'NATURE DE L\'ANOMALIE', 'EXPLICATION NORMATIVE', 'MONTANT (DZD)']];
     const auditBody = anomaliesList.slice(0, 30);

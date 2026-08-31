@@ -390,7 +390,8 @@ export function SIGView({ data, rows, formatCurrency }) {
               <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: 18 }}>auto_graph</span>
               <span style={{ fontSize: '0.74rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5b21b6' }}>{section.categorie}</span>
             </div>
-            <table className="data-table" style={{ width: '100%' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: 640 }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left' }}>Indicateur</th>
@@ -403,12 +404,12 @@ export function SIGView({ data, rows, formatCurrency }) {
               <tbody>
                 {section.rows.map((row, ri) => (
                   <tr key={ri} style={{ background: statusBg(row.ok) }}>
-                    <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{row.label}</td>
+                    <td style={{ fontWeight: 600, fontSize: '0.85rem', color: row.ok === true ? '#14532d' : row.ok === false ? '#7f1d1d' : undefined }}>{row.label}</td>
                     <td className="right mono" style={{ fontWeight: 800, fontSize: '0.92rem', color: row.ok === true ? '#059669' : row.ok === false ? '#dc2626' : 'var(--text)' }}>{row.val}</td>
                     <td style={{ textAlign: 'center' }}>
                       <span className="mono" style={{ fontSize: '0.74rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>{row.norme}</span>
                     </td>
-                    <td style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{row.detail}</td>
+                    <td style={{ fontSize: '0.74rem', color: '#6b7280', fontStyle: 'italic' }}>{row.detail}</td>
                     <td style={{ textAlign: 'center' }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 18, color: statusColor(row.ok) }}>
                         {statusIcon(row.ok)}
@@ -418,6 +419,7 @@ export function SIGView({ data, rows, formatCurrency }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
 

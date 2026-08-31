@@ -280,7 +280,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4,
                   background: hideZeroAccounts ? '#f0f8fa' : 'var(--surface-alt)',
                   borderColor: hideZeroAccounts ? '#b7dce6' : 'var(--border)',
-                  color: hideZeroAccounts ? 'var(--primary-dk)' : 'var(--text-sub)',
+                  color: hideZeroAccounts ? '#124f66' : 'var(--text-sub)',
                   transition: 'all 0.15s'
                 }}
               >
@@ -333,7 +333,8 @@ export function AuditBalanceView({ rows, formatCurrency }) {
 
           {/* Table Natures */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table className="data-table compact-table grid-lines" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.70rem' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table className="data-table compact-table grid-lines" style={{ width: '100%', minWidth: 720, tableLayout: 'fixed', fontSize: '0.70rem' }}>
               <thead style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
                 <tr>
                   <th style={{ width: '7%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>COMPTE</th>
@@ -406,6 +407,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Pagination */}
@@ -444,7 +446,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
       {activeTab === 'flux' && (
         <div>
           {/* Résumé flux — 4 cartes d'indicateurs sans score */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
             {[
               { label: 'Règles vérifiées',  val: crossAudit.regles.length,     bg: 'rgba(59, 130, 246, 0.12)', bdr: 'rgba(59, 130, 246, 0.25)', color: '#8fc6d6' },
               { label: 'Conformes',          val: crossAudit.totalConformesFlux, bg: 'rgba(16, 185, 129, 0.12)', bdr: 'rgba(16, 185, 129, 0.25)', color: '#34d399' },
@@ -521,7 +523,8 @@ export function AuditBalanceView({ rows, formatCurrency }) {
 
           {/* Règles table */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table className="data-table compact-table grid-lines" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.70rem' }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table className="data-table compact-table grid-lines" style={{ width: '100%', minWidth: 720, tableLayout: 'fixed', fontSize: '0.70rem' }}>
               <thead style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
                 <tr>
                   <th style={{ width: '11%', padding: '6px 6px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.03em', borderRight: '1px solid var(--border)' }}>CYCLE</th>
@@ -604,6 +607,7 @@ export function AuditBalanceView({ rows, formatCurrency }) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -682,10 +686,10 @@ function AccountTable({
       <div style={{
         flex: '1 1 0%',
         overflowY: 'auto',
-        overflowX: 'hidden',
+        overflowX: 'auto',
         minHeight: 0
       }}>
-        <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.74rem' }}>
+        <table style={{ width: '100%', minWidth: 280, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.74rem' }}>
           <thead>
             <tr style={{ background: thBg, color: '#94a3b8', position: 'sticky', top: 0, zIndex: 2 }}>
               <th style={{ width: '38px', padding: '6px 4px', borderBottom: `2px solid ${accentBorder}`, textAlign: 'center' }}>
@@ -1207,7 +1211,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
         <div style={{
           flex: '1 1 auto',
           overflowY: 'auto',
-          overflowX: 'hidden',
+          overflowX: 'auto',
           padding: '12px 18px',
           display: 'flex',
           flexDirection: 'column',
@@ -1310,8 +1314,8 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
                 💡 Cliquez sur <strong>« ⚡ Jointure Automatique (SCF) »</strong> ci-dessus pour rapprocher automatiquement vos comptes, ou cochez des comptes pour une jointure manuelle.
               </div>
             ) : (
-              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', minHeight: 0 }}>
+                <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
                   <thead>
                     <tr style={{ background: '#1e293b', color: '#94a3b8', textAlign: 'left', position: 'sticky', top: 0, zIndex: 3 }}>
                       <th style={{ width: '65px', padding: '7px 8px', fontWeight: 800, fontSize: '0.70rem' }}>JOINTURE</th>

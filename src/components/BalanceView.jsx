@@ -262,7 +262,7 @@ export function BalanceView({ rows }) {
                       setIsCustomMode(true);
                     }
                   }}
-                  style={{ width: 64, padding: '3px 6px', fontSize: '0.74rem', fontWeight: 800, border: isCustomMode ? '1px solid #1b6e8c' : '1px solid var(--border)', borderRadius: 6, outline: 'none', background: isCustomMode ? '#f0f8fa' : '#fff' }}
+                  style={{ width: 64, padding: '3px 6px', fontSize: '0.74rem', fontWeight: 800, color: '#171d22', border: isCustomMode ? '1px solid #1b6e8c' : '1px solid var(--border)', borderRadius: 6, outline: 'none', background: isCustomMode ? '#f0f8fa' : '#fff' }}
                 />
               </div>
             </div>
@@ -452,9 +452,9 @@ export function BalanceView({ rows }) {
                     fontWeight: 700,
                     cursor: 'pointer',
                     border: '1px solid',
-                    borderColor: subFilter === sf.id ? 'var(--primary)' : 'var(--border)',
+                    borderColor: subFilter === sf.id ? 'var(--primary)' : '#d2d0c5',
                     background: subFilter === sf.id ? 'var(--primary-lt)' : '#ffffff',
-                    color: subFilter === sf.id ? 'var(--primary-dk)' : 'var(--text-muted)',
+                    color: subFilter === sf.id ? 'var(--primary-dk)' : '#5b6570',
                     transition: 'all 0.15s ease'
                   }}
                 >

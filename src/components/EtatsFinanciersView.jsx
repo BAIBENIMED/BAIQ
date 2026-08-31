@@ -11,7 +11,7 @@ function sumLines(lines) {
 // (voir "BILAN ACTIF (présentation)", arrêté du 26/07/2008).
 function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <div className="card print-avoid-break" style={{ overflow: 'hidden' }}>
       <div className="card-header">
         <h3>{title}</h3>
       </div>
@@ -35,15 +35,25 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
                   </tr>
                 );
               }
+              // Sous-groupe purement visuel (ex. "Immobilisations corporelles", "Créances et emplois
+              // assimilés") : reproduit le regroupement du modèle officiel BILAN ACTIF (présentation),
+              // sans sous-total propre — les montants restent portés par chaque ligne détaillée.
+              if (r.subgroup) {
+                return (
+                  <tr key={i}>
+                    <td colSpan={hasN1 ? 5 : 4} style={{ paddingLeft: 32, paddingTop: 8, paddingBottom: 2, fontWeight: 700, fontSize: '0.76rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>{r.subgroup}</td>
+                  </tr>
+                );
+              }
               const l = r.line || zeroLine;
               const l1 = r.lineN1;
               return (
-                <tr key={i}>
-                  <td style={{ paddingLeft: r.total ? 16 : 32, fontWeight: r.total ? 800 : 600 }}>{r.label}</td>
+                <tr key={i} style={r.total ? { background: bandBg } : undefined}>
+                  <td style={{ paddingLeft: r.total ? 16 : (r.sub ? 48 : 32), fontWeight: r.total ? 800 : 600, color: r.total ? color : undefined }}>{r.label}</td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 500, color: r.total ? color : 'var(--text-muted)' }}>{fmt(l.brut)}</td>
-                  <td className="right mono" style={{ color: 'var(--text-muted)' }}>{l.amortProv ? `(${fmt(l.amortProv)})` : fmt(0)}</td>
+                  <td className="right mono" style={{ color: r.total ? color : 'var(--text-muted)' }}>{l.amortProv ? `(${fmt(l.amortProv)})` : fmt(0)}</td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 600, color: r.total ? color : 'var(--text)' }}>{fmt(l.net)}</td>
-                  {hasN1 && <td className="right mono">{fmt(l1?.net)}</td>}
+                  {hasN1 && <td className="right mono" style={{ color: r.total ? color : undefined }}>{fmt(l1?.net)}</td>}
                 </tr>
               );
             })}
@@ -58,7 +68,7 @@ function ActifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
 // voir "BILAN PASSIF (présentation)").
 function PassifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <div className="card print-avoid-break" style={{ overflow: 'hidden' }}>
       <div className="card-header">
         <h3>{title}</h3>
       </div>
@@ -81,10 +91,10 @@ function PassifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
                 );
               }
               return (
-                <tr key={i}>
-                  <td style={{ paddingLeft: r.total ? 16 : 32, fontWeight: r.total ? 800 : 600 }}>{r.label}</td>
+                <tr key={i} style={r.total ? { background: bandBg } : undefined}>
+                  <td style={{ paddingLeft: r.total ? 16 : 32, fontWeight: r.total ? 800 : 600, color: r.total ? color : undefined }}>{r.label}</td>
                   <td className="right mono" style={{ fontWeight: r.total ? 800 : 600, color: r.total ? color : 'var(--text)' }}>{fmt(r.val)}</td>
-                  {hasN1 && <td className="right mono">{fmt(r.valN1)}</td>}
+                  {hasN1 && <td className="right mono" style={{ color: r.total ? color : undefined }}>{fmt(r.valN1)}</td>}
                 </tr>
               );
             })}
@@ -97,6 +107,16 @@ function PassifSection({ title, color, bandBg, rows, fmt, hasN1 }) {
 
 export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency }) {
   const fmt = (v) => formatCurrency ? formatCurrency(v) : (v || 0).toLocaleString('fr-FR');
+  // Les montants des tableaux s'affichent sans le suffixe de devise (répété inutilement sur
+  // chaque ligne) — seule la bannière d'équilibre Actif/Passif garde la devise complète.
+  const decimals = profil?.rounding ?? 0;
+  const fmtNum = (v) => {
+    const num = Number(v) || 0;
+    const sign = num < 0 ? '-' : '';
+    const [intPart, decPart] = Math.abs(num).toFixed(decimals).split('.');
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${sign}${formattedInt}${decPart ? ',' + decPart : ''}`;
+  };
 
   if (!data || !sig) return (
     <EmptyState icon="summarize" title="États financiers non disponibles" message="Veuillez importer une balance comptable." maxWidth={420} />
@@ -118,22 +138,25 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
     { group: 'ACTIF NON COURANT' },
     { label: 'Écart d\'acquisition (goodwill)', line: an.ecartAcquisition, lineN1: an1?.ecartAcquisition },
     { label: 'Immobilisations incorporelles', line: an.immobilisationsIncorporelles, lineN1: an1?.immobilisationsIncorporelles },
-    { label: 'Terrains', line: an.terrains, lineN1: an1?.terrains },
-    { label: 'Bâtiments', line: an.batiments, lineN1: an1?.batiments },
-    { label: 'Autres immobilisations corporelles', line: an.autresImmoCorp, lineN1: an1?.autresImmoCorp },
-    { label: 'Immobilisations en concession', line: an.immobilisationsEnConcession, lineN1: an1?.immobilisationsEnConcession },
+    { subgroup: 'Immobilisations corporelles' },
+    { label: 'Terrains', line: an.terrains, lineN1: an1?.terrains, sub: true },
+    { label: 'Bâtiments', line: an.batiments, lineN1: an1?.batiments, sub: true },
+    { label: 'Autres immobilisations corporelles', line: an.autresImmoCorp, lineN1: an1?.autresImmoCorp, sub: true },
+    { label: 'Immobilisations en concession', line: an.immobilisationsEnConcession, lineN1: an1?.immobilisationsEnConcession, sub: true },
     { label: 'Immobilisations en cours', line: an.immobilisationsEnCours, lineN1: an1?.immobilisationsEnCours },
     { label: 'Immobilisations financières', line: an.immobilisationsFinancieres, lineN1: an1?.immobilisationsFinancieres },
     { label: 'Impôts différés actif', line: an.impotsDifferesActif, lineN1: an1?.impotsDifferesActif },
     { label: 'TOTAL ACTIF NON COURANT', line: ancTotalLine, lineN1: ancTotalLineN1, total: true },
     { group: 'ACTIF COURANT' },
-    { label: 'Stocks et en-cours', line: ac.stocks, lineN1: ac1?.stocks },
-    { label: 'Clients', line: ac.clients, lineN1: ac1?.clients },
-    { label: 'Autres débiteurs', line: ac.autresDebiteurs, lineN1: ac1?.autresDebiteurs },
-    { label: 'Impôts et assimilés', line: ac.impotsEtAssimilesActif, lineN1: ac1?.impotsEtAssimilesActif },
-    { label: 'Autres créances et emplois assimilés', line: ac.autresCreancesEmploisAssimiles, lineN1: ac1?.autresCreancesEmploisAssimiles },
-    { label: 'Placements et autres actifs financiers courants', line: ac.placements, lineN1: ac1?.placements },
-    { label: 'Trésorerie', line: ac.tresorerie, lineN1: ac1?.tresorerie },
+    { label: 'Stocks et encours', line: ac.stocks, lineN1: ac1?.stocks },
+    { subgroup: 'Créances et emplois assimilés' },
+    { label: 'Clients', line: ac.clients, lineN1: ac1?.clients, sub: true },
+    { label: 'Autres débiteurs', line: ac.autresDebiteurs, lineN1: ac1?.autresDebiteurs, sub: true },
+    { label: 'Impôts et assimilés', line: ac.impotsEtAssimilesActif, lineN1: ac1?.impotsEtAssimilesActif, sub: true },
+    { label: 'Autres créances et emplois assimilés', line: ac.autresCreancesEmploisAssimiles, lineN1: ac1?.autresCreancesEmploisAssimiles, sub: true },
+    { subgroup: 'Disponibilités et assimilés' },
+    { label: 'Placements et autres actifs financiers courants', line: ac.placements, lineN1: ac1?.placements, sub: true },
+    { label: 'Trésorerie', line: ac.tresorerie, lineN1: ac1?.tresorerie, sub: true },
     { label: 'TOTAL ACTIF COURANT', line: acTotalLine, lineN1: acTotalLineN1, total: true },
   ];
 
@@ -183,7 +206,7 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
 
       <div className="print-only" style={{ display: 'none', marginBottom: 8 }}>
         <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{nomEntreprise}</div>
-        <div style={{ fontSize: '0.85rem' }}>États financiers établis selon le Système Comptable Financier (Loi 07-11, Décret 08-156, arrêté du 26/07/2008) — Exercice clos le {new Date().toLocaleDateString('fr-FR')}</div>
+        <div style={{ fontSize: '0.85rem' }}>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</div>
       </div>
 
       <div className="card no-print" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, background: equilibre ? '#f0fdf4' : '#fef2f2', border: `1px solid ${equilibre ? '#bbf7d0' : '#fecaca'}` }}>
@@ -200,13 +223,13 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
       </div>
 
       <div className="section-title print-title" style={{ display: 'none' }}>BILAN ACTIF</div>
-      <ActifSection title="BILAN — ACTIF" color="#0b3446" bandBg="#f0f8fa" rows={actifRows} fmt={fmt} hasN1={hasN1} />
+      <ActifSection title="BILAN — ACTIF" color="#0b3446" bandBg="#f0f8fa" rows={actifRows} fmt={fmtNum} hasN1={hasN1} />
 
       <div className="section-title print-title" style={{ display: 'none' }}>BILAN PASSIF</div>
-      <PassifSection title="BILAN — PASSIF" color="#14532d" bandBg="#f0fdf4" rows={passifRows} fmt={fmt} hasN1={hasN1} />
+      <PassifSection title="BILAN — PASSIF" color="#14532d" bandBg="#f0fdf4" rows={passifRows} fmt={fmtNum} hasN1={hasN1} />
 
       <div className="section-title print-title" style={{ display: 'none' }}>COMPTE DE RÉSULTATS (par nature)</div>
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card print-avoid-break" style={{ overflow: 'hidden' }}>
         <div className="card-header">
           <h3>Compte de Résultat par Nature (TCR officiel)</h3>
         </div>
@@ -220,15 +243,18 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
               </tr>
             </thead>
             <tbody>
-              {tcrRows.map((r, i) => (
-                <tr key={i} style={r.type === 'grand-total' ? { background: '#f0f8fa' } : undefined}>
-                  <td className="mono" style={{ fontWeight: r.type !== 'compte' ? 800 : 600, color: r.type !== 'compte' ? '#124f66' : 'var(--text)' }}>{r.code}</td>
-                  <td style={{ fontWeight: r.type !== 'compte' ? 800 : 500, textTransform: r.type !== 'compte' ? 'uppercase' : 'none', fontSize: r.type !== 'compte' ? '0.78rem' : '0.85rem' }}>{r.label}</td>
-                  <td className="right mono" style={{ fontWeight: r.type !== 'compte' ? 800 : 600, color: r.type === 'grand-total' ? '#124f66' : (r.isCharge ? 'var(--red)' : 'var(--text)') }}>
-                    {r.isCharge && r.val > 0 ? `(${fmt(r.val)})` : fmt(r.val)}
-                  </td>
-                </tr>
-              ))}
+              {tcrRows.map((r, i) => {
+                const isTotalRow = r.type !== 'compte';
+                return (
+                  <tr key={i} style={isTotalRow ? { background: '#f0f8fa' } : undefined}>
+                    <td className="mono" style={{ fontWeight: isTotalRow ? 800 : 600, color: isTotalRow ? '#124f66' : 'var(--text)' }}>{r.code}</td>
+                    <td style={{ fontWeight: isTotalRow ? 800 : 500, textTransform: isTotalRow ? 'uppercase' : 'none', fontSize: isTotalRow ? '0.78rem' : '0.85rem', color: isTotalRow ? '#124f66' : undefined }}>{r.label}</td>
+                    <td className="right mono" style={{ fontWeight: isTotalRow ? 800 : 600, color: isTotalRow ? '#124f66' : (r.isCharge ? 'var(--red)' : 'var(--text)') }}>
+                      {r.isCharge && r.val > 0 ? `(${fmtNum(r.val)})` : fmtNum(r.val)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

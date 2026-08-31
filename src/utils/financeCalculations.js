@@ -1557,6 +1557,7 @@ export const calculateBilanSCF = (data, sig) => {
       else if (c.startsWith('105')) { ecartsReevaluation += -solde; }
       else if (c.startsWith('131') || c.startsWith('132')) { provisionsEtProduitsConstatesAvance += -solde; }
       else if (c.startsWith('133')) { if (solde >= 0) impotsDifferesActif += solde; else impotsDifferesPassif += -solde; }
+      else if (c.startsWith('13')) { provisionsEtProduitsConstatesAvance += -solde; } // filet générique (134-139), même logique que verifyAccountNature
       else if (c.startsWith('11')) { reportANouveau += -solde; }
       else if (c.startsWith('12')) { /* Résultat de l'exercice : repris via sig.resultatNet, non recompté ici */ }
       else if (c.startsWith('15')) { provisionsEtProduitsConstatesAvance += -solde; }
@@ -1619,8 +1620,10 @@ export const calculateBilanSCF = (data, sig) => {
       if (c.startsWith('44')) { if (solde >= 0) impotsEtAssimilesActif += solde; else impotsEtAssimilesPassif += -solde; return; }
       // Charges constatées d'avance (486) & comptes d'attente débiteurs (47) : "Autres créances et
       // emplois assimilés" au sens du manuel SCF, distincts des débiteurs classiques (42/43/45/46).
-      if (c.startsWith('486')) { autresCreancesEmploisAssimiles += solde; return; }
-      if (c.startsWith('487')) { autresDettes += -solde; return; }
+      // Signe atypique reclassé vers le poste opposé (même logique que 40/41/44/47/50 ci-dessus) :
+      // verifyAccountNature documente ces cas comme ATYPIQUE (valides) et non comme ANOMALIE.
+      if (c.startsWith('486')) { if (solde >= 0) autresCreancesEmploisAssimiles += solde; else autresDettes += -solde; return; }
+      if (c.startsWith('487')) { if (solde <= 0) autresDettes += -solde; else autresCreancesEmploisAssimiles += solde; return; }
       if (c.startsWith('47')) { if (solde >= 0) autresCreancesEmploisAssimiles += solde; else autresDettes += -solde; return; }
       // 42, 43, 45, 46, 48 (hors 486/487)
       if (solde >= 0) autresDebiteurs += solde; else autresDettes += -solde;
@@ -1631,7 +1634,7 @@ export const calculateBilanSCF = (data, sig) => {
     if (c.startsWith('5')) {
       if (c.startsWith('59')) { deprecPlacements += -solde; return; }
       if (c.startsWith('50')) { if (solde >= 0) placementsBrut += solde; else tresoreriePassif += -solde; return; }
-      if (c.startsWith('519')) { tresoreriePassif += -solde; return; }
+      if (c.startsWith('519')) { if (solde <= 0) tresoreriePassif += -solde; else tresorerie += solde; return; }
       if (solde >= 0) tresorerie += solde; else tresoreriePassif += -solde;
       return;
     }
@@ -2554,6 +2557,104 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
       resultatNet: resNetExercice
     },
     comptesClasse1
+  };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * TABLEAU DES FLUX DE TRÉSORERIE (TFT) — MÉTHODE INDIRECTE
+ * SCF Loi 07-11 / Décret 08-156 — 5ᵉ état financier obligatoire.
+ *
+ * La méthode DIRECTE (modèle officiel de l'arrêté du 26/07/2008) exige de savoir,
+ * pour chaque montant, quelle écriture précise l'a généré (quel débit correspond à
+ * quel crédit) — une information que seul le journal/grand livre détaillé possède.
+ * L'application n'importe qu'une BALANCE (totaux agrégés par compte), sans ce lien
+ * écriture par écriture : la méthode indirecte, explicitement admise par le SCF en
+ * alternative, est donc la seule fiable avec les données disponibles. Elle part du
+ * Résultat Net et le retraite (CAF, variation de BFR, mouvements des postes du bilan
+ * officiel) plutôt que de reconstituer les encaissements/décaissements bruts.
+ *
+ * Nécessite un exercice N-1 complet (bilan, sig, bilanSCF) pour être significatif —
+ * sans lui, toutes les variations seraient nulles par construction.
+ * ═══════════════════════════════════════════════════════════════
+ */
+export function calculateTFT(data) {
+  const { bilan = {}, sig = {}, bilanSCF = {}, dataN1 = null } = data || {};
+
+  if (!dataN1 || !dataN1.bilan || !dataN1.bilanSCF || !dataN1.sig) {
+    return { hasN1: false };
+  }
+
+  const b1 = dataN1.bilan;
+  const s1 = dataN1.sig;
+  const scf1 = dataN1.bilanSCF;
+  const cp = bilanSCF.capitauxPropres || {};
+  const cp1 = scf1.capitauxPropres || {};
+  const pnc = bilanSCF.passifNonCourant || {};
+  const pnc1 = scf1.passifNonCourant || {};
+
+  // ── A. FLUX LIÉS À L'ACTIVITÉ ──
+  // CAF déjà calculée par la méthode soustractive SCF (cf. calculateSIG) : Résultat Net déjà
+  // implicitement retraité des dotations/reprises et des cessions non récurrentes — ne pas
+  // recalculer une seconde version ici (source unique de vérité, cf. Index des Calculs).
+  const caf = sig.caf || 0;
+  const bfrN = bilan.bfr || 0;
+  const bfrN1 = b1.bfr || 0;
+  // Une hausse du BFR consomme de la trésorerie (capital immobilisé en stocks/créances) :
+  // elle se retranche donc du flux d'activité.
+  const variationBFR = bfrN - bfrN1;
+  const fluxActivite = caf - variationBFR;
+
+  // ── B. FLUX LIÉS AUX OPÉRATIONS D'INVESTISSEMENT ──
+  // Emplois Stables du Bilan Fonctionnel = immobilisations en valeur BRUTE (hors 28/29,
+  // classées en ressources stables) : leur variation isole l'investissement/désinvestissement
+  // réel, sans être polluée par la seule progression mécanique des amortissements.
+  const immoN = bilan.emploisStables || 0;
+  const immoN1 = b1.emploisStables || 0;
+  const variationImmo = immoN - immoN1; // positif = investissement net (décaissement)
+  const fluxInvestissement = -variationImmo;
+
+  // ── C. FLUX LIÉS AUX OPÉRATIONS DE FINANCEMENT ──
+  const capitalN = cp.capitalEmis || 0;
+  const capitalN1 = cp1.capitalEmis || 0;
+  const augmentationCapital = capitalN - capitalN1;
+
+  const detteN = pnc.empruntsDettesFinancieres || 0;
+  const detteN1 = pnc1.empruntsDettesFinancieres || 0;
+  const variationDette = detteN - detteN1;
+
+  // Dividendes versés (estimation) : la part du résultat N-1 qui n'a été ni mise en réserve
+  // ni reportée à nouveau a nécessairement été distribuée. Calculé directement à partir du
+  // Bilan Officiel SCF (N et N-1), sans dépendre du TVCP, pour rester autonome.
+  const resultatNetN1 = s1.resultatNet || 0;
+  const reservesN  = (cp.primesEtReserves || 0) + (cp.autresCapitauxPropres || 0);
+  const reservesN1 = (cp1.primesEtReserves || 0) + (cp1.autresCapitauxPropres || 0);
+  const variationReserves = reservesN - reservesN1;
+  const dividendesVerses = Math.max(0, resultatNetN1 - variationReserves);
+
+  const fluxFinancement = augmentationCapital + variationDette - dividendesVerses;
+
+  // ── SYNTHÈSE & RAPPROCHEMENT ──
+  const variationTresorerie = fluxActivite + fluxInvestissement + fluxFinancement;
+  const tresorerieOuverture = b1.tn || 0;
+  const tresorerieClotureTheorique = tresorerieOuverture + variationTresorerie;
+  const tresorerieClotureReelle = bilan.tn || 0;
+  // Écart inévitable en méthode indirecte simplifiée (sans détail journal) : mouvements de
+  // capitaux propres non couverts par les 3 catégories ci-dessus (écarts de réévaluation,
+  // subventions, reclassements...). Affiché explicitement plutôt que masqué, à l'image de
+  // l'« Écart de balance » déjà utilisé ailleurs dans l'application.
+  const ecartRapprochement = tresorerieClotureReelle - tresorerieClotureTheorique;
+
+  return {
+    hasN1: true,
+    activite: { caf, variationBFR, total: fluxActivite },
+    investissement: { variationImmo, total: fluxInvestissement },
+    financement: { augmentationCapital, variationDette, dividendesVerses, total: fluxFinancement },
+    variationTresorerie,
+    tresorerieOuverture,
+    tresorerieClotureTheorique,
+    tresorerieClotureReelle,
+    ecartRapprochement,
   };
 }
 

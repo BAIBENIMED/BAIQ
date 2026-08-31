@@ -158,7 +158,7 @@ export function PresentationView({ data, onClose, formatCurrency }) {
             </div>
 
             {/* 3 Cartes Majeures */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 32 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, marginBottom: 32 }}>
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 24 }}>
                 <span style={{ fontSize: '0.80rem', color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase' }}>Fonds de Roulement (FRNG)</span>
                 <div style={{ fontSize: '2rem', fontWeight: 900, color: '#4fb3cc', margin: '8px 0' }}>{fmt(bilan.frng)}</div>
@@ -235,7 +235,7 @@ export function PresentationView({ data, onClose, formatCurrency }) {
             </div>
 
             {/* 4 Paliers de Rentabilité */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 32 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 20, marginBottom: 32 }}>
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 20 }}>
                 <span style={{ fontSize: '0.74rem', color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase' }}>Chiffre d'Affaires (CA)</span>
                 <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#4fb3cc', margin: '6px 0' }}>{fmt(sig.chiffreAffaires)}</div>
@@ -264,7 +264,7 @@ export function PresentationView({ data, onClose, formatCurrency }) {
             {/* Répartition de la Valeur Ajoutée */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 22 }}>
               <h4 style={{ margin: '0 0 14px', fontSize: '0.92rem', color: '#e2e8f0' }}>PARTAGE DE LA VALEUR AJOUTÉE (RÉPARTITION SCF)</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
                 <div>
                   <div style={{ fontSize: '0.74rem', color: '#9ca3af' }}>Personnel (Salaires 63)</div>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b', marginTop: 3 }}>{fmt(sig.chargesPersonnel)}</div>
@@ -377,7 +377,7 @@ export function PresentationView({ data, onClose, formatCurrency }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 32 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, marginBottom: 32 }}>
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 24 }}>
                 <span style={{ fontSize: '0.80rem', color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase' }}>Score Altman Z'' (EM-Score)</span>
                 <div style={{ fontSize: '2.4rem', fontWeight: 900, color: solv.zoneColor, margin: '8px 0' }}>{solv.zScore.toFixed(2)}</div>

@@ -469,7 +469,7 @@ export function AIView({ data, geminiKey }) {
                 )}
               </div>
               <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, textAlign: 'center' }}>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>DSO Clients</div>
                     <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: analysis.metriques.dso <= 60 ? '#059669' : '#dc2626' }}>{Math.round(analysis.metriques.dso)}j</div>

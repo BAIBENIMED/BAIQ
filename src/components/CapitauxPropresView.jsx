@@ -113,14 +113,14 @@ export function CapitauxPropresView({ data, fmt }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
         
         {/* 1. Capitaux d'ouverture */}
-        <div className="card" style={{ padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--text-sub)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#f0f8fa', border: '1px solid #b7dce6', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#124f66', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Capitaux Propres d'Ouverture (1er Janv.)
           </div>
           <div className="mono" style={{ fontSize: '1.3rem', fontWeight: 900, color: '#124f66', lineHeight: 1.2 }}>
             {fmtCurrency(kpis.totalDebut)}
           </div>
-          <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)', marginTop: 4 }}>
+          <div style={{ fontSize: '0.70rem', color: '#4a7a8c', marginTop: 4 }}>
             Base initiale de l'exercice
           </div>
           <div style={{ position: 'absolute', right: -6, bottom: -6, opacity: 0.08, pointerEvents: 'none' }}>
@@ -129,12 +129,12 @@ export function CapitauxPropresView({ data, fmt }) {
         </div>
 
         {/* 2. Résultat N-1 & Affectation (Dividendes / RAN / Réserves) */}
-        <div className="card" style={{ 
-          padding: '16px 20px', 
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.02) 100%)', 
-          border: '1px solid rgba(245, 158, 11, 0.3)', 
-          position: 'relative', 
-          overflow: 'hidden' 
+        <div className="card" style={{
+          padding: '16px 20px',
+          background: '#fffbeb',
+          border: '1px solid #fde68a',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
           <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Affectation Résultat (N-1) &amp; Dividendes
@@ -155,7 +155,7 @@ export function CapitauxPropresView({ data, fmt }) {
         </div>
 
         {/* 3. Opérations de l'Exercice (Augmentation Capital + Dividendes N-1) */}
-        <div className="card" style={{ padding: '16px 20px', background: 'rgba(37, 99, 235, 0.05)', border: '1px solid rgba(37, 99, 235, 0.25)', position: 'relative', overflow: 'hidden' }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#eff6ff', border: '1px solid #bfdbfe', position: 'relative', overflow: 'hidden' }}>
           <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#124f66', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Opérations de l'Année (Capital &amp; Dividendes)
           </div>
@@ -172,7 +172,7 @@ export function CapitauxPropresView({ data, fmt }) {
         </div>
 
         {/* 4. Capitaux de clôture */}
-        <div className="card" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)', border: '1px solid #8fc6d6', position: 'relative', overflow: 'hidden' }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#e0f2ff', border: '1px solid #8fc6d6', position: 'relative', overflow: 'hidden' }}>
           <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#124f66', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Capitaux Propres de Clôture (31 Déc.)
           </div>
@@ -234,18 +234,17 @@ export function CapitauxPropresView({ data, fmt }) {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', minWidth: 900, borderCollapse: 'collapse', fontSize: '0.74rem', tableLayout: 'auto' }}>
               <thead>
                 <tr style={{ background: '#0b3446', color: '#ffffff' }}>
-                  <th style={{ width: '25%', padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 800, fontSize: '0.65rem', letterSpacing: '0.04em' }}>
                     RUBRIQUES &amp; NATURE DES VARIATIONS
                   </th>
                   {colonnes.map(col => (
                     <th
                       key={col.key}
                       style={{
-                        width: col.isTotal ? '12%' : '10.5%',
-                        padding: '8px 6px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem',
+                        padding: '8px 8px', textAlign: 'right', fontWeight: 800, fontSize: '0.65rem',
                         letterSpacing: '0.02em', whiteSpace: 'normal', lineHeight: 1.2,
                         background: col.isTotal ? '#124f66' : 'transparent',
                         color: col.isTotal ? '#4fb3cc' : '#ffffff',
@@ -320,9 +319,7 @@ export function CapitauxPropresView({ data, fmt }) {
                               color: isNegative ? '#dc2626' : (isTotalCol ? (isCloture ? '#0b3446' : '#124f66') : 'var(--text)'),
                               background: isTotalCol ? (isCloture ? 'rgba(37, 99, 235, 0.18)' : 'rgba(241, 245, 249, 0.6)') : 'transparent',
                               borderLeft: '1px solid var(--border)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
+                              whiteSpace: 'nowrap'
                             }}
                           >
                             {fmtN(val)}

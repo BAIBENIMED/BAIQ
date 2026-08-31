@@ -110,6 +110,42 @@ app.get('/api/gemini/status', (req, res) => {
   res.json({ configured: Boolean(GEMINI_API_KEY) });
 });
 
+// ── Compteur global d'analyses lancées ──────────────────────────────────────
+// Compte le nombre total d'analyses lancées sur l'application, TOUS visiteurs
+// confondus (et non par navigateur/localStorage, qui repartirait de zéro pour
+// chaque utilisateur). Persisté dans un fichier JSON local pour survivre aux
+// redémarrages du serveur — même principe de simplicité que le rate limiting
+// en mémoire ci-dessus, sans base de données dédiée.
+const analysisCountPath = path.join(__dirname, 'analysis-count.json');
+
+function readAnalysisCount() {
+  try {
+    const raw = fs.readFileSync(analysisCountPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Number.isFinite(parsed.count) ? parsed.count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeAnalysisCount(count) {
+  try {
+    fs.writeFileSync(analysisCountPath, JSON.stringify({ count }), 'utf8');
+  } catch (err) {
+    console.error('Impossible d\'écrire le compteur d\'analyses :', err?.message || err);
+  }
+}
+
+app.get('/api/analysis-count', (req, res) => {
+  res.json({ count: readAnalysisCount() });
+});
+
+app.post('/api/analysis-count/increment', (req, res) => {
+  const count = readAnalysisCount() + 1;
+  writeAnalysisCount(count);
+  res.json({ count });
+});
+
 // ── Relais sécurisé vers l'API Gemini ──────────────────────────────────────
 app.post('/api/gemini', rateLimitGemini, async (req, res) => {
   if (!GEMINI_API_KEY) {

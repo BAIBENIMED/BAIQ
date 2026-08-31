@@ -849,12 +849,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
     box-shadow: none !important;
     border: 1px solid #cbd5e1 !important;
     break-inside: avoid;
+    page-break-inside: avoid;
   }
   .data-table th, .data-table td {
     color: #000 !important;
   }
   .print-only, .print-title {
     display: block !important;
+  }
+  /* États Financiers (SCF) : chaque tableau (Bilan Actif, Bilan Passif, TCR) doit tenir sur
+     une seule page à l'impression — resserre les lignes pour maximiser les chances d'y arriver
+     en plus du break-inside:avoid ci-dessus (qui empêche une coupure EN MILIEU de tableau). */
+  .etats-financiers-print .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .etats-financiers-print .data-table thead th {
+    padding: 5px 8px;
+    font-size: 0.58rem;
+  }
+  .etats-financiers-print .data-table tbody td {
+    padding: 3px 8px;
+    font-size: 0.68rem;
   }
   .print-title {
     margin-top: 18px;

@@ -671,8 +671,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
                 <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: isCashPositive ? '#15803d' : '#b91c1c' }}>
                   {isCashPositive ? '+' : ''}{fmt(cashImpact)}
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: 'var(--text)', lineHeight: 1.35 }}>
-                  {isCashPositive 
+                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: isCashPositive ? '#166534' : '#991b1b', lineHeight: 1.35 }}>
+                  {isCashPositive
                     ? `Désengagement direct du BFR réinjecté dans les disponibilités bancaires.`
                     : `Trésorerie nette gelée sous forme de stocks supplémentaires.`
                   }
@@ -680,14 +680,14 @@ export function StockView({ rows, ratios, formatCurrency }) {
               </div>
 
               {/* Carte 2 : Coût de Possession Global */}
-              <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
+              <div style={{ padding: '14px 16px', borderRadius: 12, background: '#f0f8fa', border: '1px solid #b7dce6' }}>
                 <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#124f66', textTransform: 'uppercase', marginBottom: 3 }}>
                   Coût Global de Possession ({totalTauxPossession}%)
                 </div>
                 <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 900, color: '#124f66' }}>
                   {fmt(coutPossessionEstime)} / an
                 </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.70rem', color: '#4a7a8c', lineHeight: 1.35 }}>
                   Charges annuelles totales engagées pour détenir le stock moyen ({fmt(stockMoyen)}).
                 </p>
               </div>
@@ -822,8 +822,8 @@ export function StockView({ rows, ratios, formatCurrency }) {
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ background: 'var(--surface-alt)', borderTop: '2px solid var(--border)' }}>
-                    <td colSpan="2" style={{ fontWeight: 900, color: 'var(--text)' }}>
+                  <tr style={{ background: '#f0f8fa', borderTop: '2px solid #b7dce6' }}>
+                    <td colSpan="2" style={{ fontWeight: 900, color: '#0b3446' }}>
                       TOTAL COÛT DE POSSESSION GLOBAL DU STOCK
                     </td>
                     <td className="right mono" style={{ fontWeight: 900, color: '#124f66', fontSize: '0.80rem' }}>
@@ -907,7 +907,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
               </div>
 
               {/* Carte 2 : Synthèse Rendement & Anti-Surconsommation */}
-              <div style={{ padding: '16px', borderRadius: 12, background: 'var(--surface-alt)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ padding: '16px', borderRadius: 12, background: '#f0f8fa', border: '1px solid #b7dce6', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -918,7 +918,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                       {analyticsSCF.ratioRendement.toFixed(1)}%
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+                  <div style={{ fontSize: '0.74rem', color: '#4a7a8c', marginBottom: 8 }}>
                     Part des consommations d'approvisionnements absorbée par la production réalisée.
                   </div>
                 </div>
@@ -964,7 +964,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
                     <span style={{ color: 'var(--text-sub)' }}><strong>Compte 603</strong> — Stockage Matières (Crédit) :</span>
                     <span className="mono" style={{ fontWeight: 700, color: analyticsSCF.c603Cred > 0 ? '#059669' : 'inherit' }}>-{fmt(analyticsSCF.c603Cred)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(37,99,235,0.06)', borderRadius: 6, fontWeight: 700 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: '#eff6ff', borderRadius: 6, fontWeight: 700, color: '#124f66' }}>
                     <span>Sous-total Consommations Matières &amp; Appro (60) :</span>
                     <span className="mono" style={{ color: '#124f66' }}>{fmt(analyticsSCF.consommationsMP_Appro)}</span>
                   </div>
@@ -984,7 +984,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
                   <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#124f66', fontSize: '0.80rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#124f66', fontSize: '0.80rem', padding: '4px 6px', background: '#eff6ff', borderRadius: 6 }}>
                     <span>TOTAL CONSOMMATIONS GLOBALES (60 + Débit 72) :</span>
                     <span className="mono">{fmt(analyticsSCF.totalConsommationsGlobales)} DZD</span>
                   </div>
@@ -1021,7 +1021,7 @@ export function StockView({ rows, ratios, formatCurrency }) {
 
                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#065f46', fontSize: '0.80rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, color: '#065f46', fontSize: '0.80rem', padding: '4px 6px', background: '#ecfdf5', borderRadius: 6 }}>
                     <span>PRODUCTION TOTALE RÉALISÉE (70x ± 72) :</span>
                     <span className="mono">{fmt(analyticsSCF.productionTotaleRealisee)} DZD</span>
                   </div>
