@@ -103,7 +103,7 @@ const FORMULAS_DATABASE = [
     formule: 'TN = FRNG − BFR = Trésorerie Active (512, 53) − Trésorerie Passive (519 Concours bancaires)',
     comptes: 'Actif : Banque (512), Caisse (53), Placements (50) | Passif : Découverts & Concours bancaires courants (519)',
     explication: 'Vérification absolue de la trésorerie disponible : l\'écart FRNG − BFR doit être strictement égal à Disponibilités − Concours bancaires courants, calculés indépendamment l\'un de l\'autre à partir de la même balance. C\'est le triangle d\'équilibre fondamental de l\'analyse fonctionnelle du bilan.',
-    interpretation: 'Une TN positive et stable dans le temps est le signe d\'une entreprise qui autofinance son cycle d\'exploitation. Une TN négative n\'est pas nécessairement alarmante si elle reste限 limitée et couverte par des lignes de découvert autorisées et négociées — le risque survient quand elle devient structurelle et croissante.',
+    interpretation: 'Une TN positive et stable dans le temps est le signe d\'une entreprise qui autofinance son cycle d\'exploitation. Une TN négative n\'est pas nécessairement alarmante si elle reste limitée et couverte par des lignes de découvert autorisées et négociées — le risque survient quand elle devient structurelle et croissante.',
     intervalles: [
       { label: 'TN nettement positive', status: 'ok', desc: 'Trésorerie excédentaire — capacité à financer sans recours au crédit court terme, voire à placer les excédents.' },
       { label: 'TN proche de 0', status: 'warning', desc: 'Équilibre tendu, sensible aux variations saisonnières du BFR.' },
@@ -360,10 +360,10 @@ const FORMULAS_DATABASE = [
     id: 'autonomie_financiere',
     category: 'ratios',
     titre: 'Autonomie Financière',
-    reference: 'Ratio de structure financière usuel, retenu également dans le score de solvabilité Banque d\'Algérie (module BAIQ)',
+    reference: 'Ratio de structure financière usuel (CP / Total Bilan) — distinct du critère « Autonomie » du score Banque d\'Algérie, qui rapporte les Capitaux Propres aux seules Dettes Financières LT (voir « Score Banque d\'Algérie » ci-dessous)',
     formule: 'Autonomie Financière = Capitaux Propres / Total Passif (Bilan)',
     comptes: 'Capitaux Propres (Classe 1, hors dettes financières et provisions) / Total Bilan (Actif = Passif)',
-    explication: 'Mesure la part du financement de l\'entreprise assurée par ses propres ressources (capital, réserves, résultats accumulés) par opposition à l\'endettement. C\'est l\'indicateur central de l\'indépendance financière vis-à-vis des créanciers et des banques.',
+    explication: 'Mesure la part du financement de l\'entreprise assurée par ses propres ressources (capital, réserves, résultats accumulés) par opposition à l\'endettement. C\'est l\'indicateur central de l\'indépendance financière vis-à-vis des créanciers et des banques. À ne pas confondre avec le critère « Autonomie » du Score Banque d\'Algérie (module BAIQ), qui mesure une notion voisine mais distincte : Capitaux Propres / Dettes Financières LT (une couverture, pas une part du bilan).',
     interpretation: 'Une autonomie financière élevée renforce la capacité de négociation face aux banques (accès au crédit facilité, taux plus favorables) mais un niveau excessif peut aussi signaler un recours insuffisant à l\'effet de levier de la dette, qui pourrait accroître la rentabilité des capitaux propres (ROE) si le coût de la dette reste inférieur à la rentabilité économique.',
     intervalles: [
       { label: '≥ 50 %', status: 'ok', desc: 'Excellente autonomie — l\'entreprise se finance majoritairement par ses fonds propres.' },
@@ -416,10 +416,10 @@ const FORMULAS_DATABASE = [
     explication: 'Mesure combien de fois l\'EBE (la ressource brute générée par l\'exploitation) couvre le coût de la dette financière — c\'est l\'indicateur central examiné par une banque avant d\'accorder un nouveau crédit, car il mesure directement la marge de sécurité avant que le service de la dette ne devienne intenable.',
     interpretation: 'Un ratio proche de 1 signifie que la quasi-totalité de l\'EBE est absorbée par les seuls intérêts d\'emprunts, ne laissant aucune marge pour le remboursement du capital, les investissements ou la fiscalité — situation critique pour la pérennité.',
     intervalles: [
-      { label: '≥ 5,0x', status: 'ok', desc: 'Couverture excellente — charge de la dette très largement absorbée par l\'exploitation.' },
-      { label: 'Entre 3,0x et 5,0x', status: 'ok', desc: 'Couverture large, jugée favorable par la plupart des établissements bancaires.' },
-      { label: 'Entre 2,0x et 3,0x', status: 'warning', desc: 'Couverture suffisante mais à surveiller.' },
-      { label: '< 2,0x', status: 'danger', desc: 'Tension de charge financière — risque de difficulté à honorer le service de la dette.' },
+      { label: '≥ 5,0x', status: 'ok', desc: 'Couverture excellente — charge de la dette très largement absorbée par l\'exploitation (5/5 au critère Couverture du score Banque d\'Algérie).' },
+      { label: 'Entre 3,0x et 5,0x', status: 'ok', desc: 'Couverture large, jugée favorable par la plupart des établissements bancaires (4/5 au score Banque d\'Algérie).' },
+      { label: 'Entre 1,5x et 3,0x', status: 'warning', desc: 'Couverture suffisante mais à surveiller (2,5/5 au score Banque d\'Algérie).' },
+      { label: '< 1,5x', status: 'danger', desc: 'Tension de charge financière — risque de difficulté à honorer le service de la dette (1/5 au score Banque d\'Algérie).' },
     ],
     exemple: 'EBE = 20M DA, Charges financières = 2M DA ⇒ Couverture = 10,0x (large couverture).'
   },

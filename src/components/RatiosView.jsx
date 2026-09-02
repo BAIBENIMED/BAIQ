@@ -456,6 +456,21 @@ export function RatiosView({ data, bilan, sig, rows, formatCurrency, profil, cur
           <span className="material-symbols-outlined" style={{ color: 'var(--primary)', fontSize: 20 }}>speed</span>
           <h3 style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>Structure Financière &amp; Rentabilité</h3>
         </div>
+
+        {/* L'autonomie financière repose sur les capitaux propres. Lorsque la balance ne
+            contient aucun compte de capitaux propres, ceux-ci sont estimés forfaitairement :
+            il faut le dire ici aussi, et pas seulement dans la section Solvabilité. */}
+        {data.estimationPartielle && (
+          <div style={{ display: 'flex', gap: 8, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, marginBottom: 16 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#d97706', flexShrink: 0 }}>info</span>
+            <p style={{ fontSize: '0.74rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+              Aucun compte de capitaux propres (classes 10 à 14) n'a été trouvé dans la balance importée :
+              l'<strong>Autonomie Financière</strong> ci-dessous repose sur une répartition forfaitaire des
+              ressources stables et n'a qu'une valeur indicative.
+            </p>
+          </div>
+        )}
+
         <div className="grid-3">
           <GaugeCard
             title="Liquidité Générale"

@@ -41,7 +41,12 @@ const app = express();
 // Nécessaire derrière un proxy inverse (Render, Heroku, etc.) pour que req.ip
 // reflète la vraie IP du visiteur — sans cela, le rate limiting par IP ci-dessous
 // verrait toutes les requêtes provenir de l'IP du proxy et deviendrait inefficace.
-app.set('trust proxy', true);
+//
+// La valeur est volontairement 1 (un seul proxy de confiance, celui de l'hébergeur)
+// et non `true` : avec `true`, Express fait confiance à l'intégralité de la chaîne
+// X-Forwarded-For, qu'un client peut forger. Un script pouvait alors présenter une
+// fausse IP à chaque requête et traverser sans limite le plafond par IP ci-dessous.
+app.set('trust proxy', 1);
 
 app.use(express.json({ limit: '2mb' }));
 
@@ -136,15 +141,60 @@ function writeAnalysisCount(count) {
   }
 }
 
+// Le compteur est lu une seule fois au démarrage puis maintenu en mémoire.
+// Auparavant, chaque incrément relisait puis réécrivait le fichier : la séquence
+// n'étant pas atomique, deux requêtes simultanées perdaient un incrément, et chaque
+// appel déclenchait une écriture disque synchrone.
+let analysisCount = readAnalysisCount();
+let ecritureDifferee = null;
+
+function planifierEcriture() {
+  if (ecritureDifferee) return;
+  ecritureDifferee = setTimeout(() => {
+    ecritureDifferee = null;
+    writeAnalysisCount(analysisCount);
+  }, 5000);
+  // N'empêche pas le processus de se terminer si c'est le seul minuteur actif.
+  if (typeof ecritureDifferee.unref === 'function') ecritureDifferee.unref();
+}
+
+// Le compteur est affiché publiquement : sans plafond, une simple boucle pouvait le
+// gonfler indéfiniment. Ce plafond est plus large que celui de l'IA (une analyse est
+// une action légitimement répétable) mais ferme la porte à l'abus automatisé.
+const MAX_INCREMENTS_PAR_IP_PAR_HEURE = 40;
+const incrementsParIp = new Map();
+
+function rateLimitCompteur(req, res, next) {
+  const maintenant = Date.now();
+  const ip = req.ip || req.connection?.remoteAddress || 'inconnu';
+  const historique = purgerAnciens(incrementsParIp.get(ip) || [], maintenant);
+  if (historique.length >= MAX_INCREMENTS_PAR_IP_PAR_HEURE) {
+    // 200 volontaire : le compteur est décoratif, inutile de faire échouer l'interface.
+    return res.json({ count: analysisCount });
+  }
+  historique.push(maintenant);
+  incrementsParIp.set(ip, historique);
+  next();
+}
+
 app.get('/api/analysis-count', (req, res) => {
-  res.json({ count: readAnalysisCount() });
+  res.json({ count: analysisCount });
 });
 
-app.post('/api/analysis-count/increment', (req, res) => {
-  const count = readAnalysisCount() + 1;
-  writeAnalysisCount(count);
-  res.json({ count });
+app.post('/api/analysis-count/increment', rateLimitCompteur, (req, res) => {
+  analysisCount += 1;
+  planifierEcriture();
+  res.json({ count: analysisCount });
 });
+
+// Vide le compteur sur disque avant un arrêt propre (redéploiement, SIGTERM Render).
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    if (ecritureDifferee) clearTimeout(ecritureDifferee);
+    writeAnalysisCount(analysisCount);
+    process.exit(0);
+  });
+}
 
 // ── Relais sécurisé vers l'API Gemini ──────────────────────────────────────
 app.post('/api/gemini', rateLimitGemini, async (req, res) => {

@@ -1516,11 +1516,158 @@ const emptyBilanSCF = () => ({
   actifNonCourant: { ecartAcquisition: emptyActifLine(), immobilisationsIncorporelles: emptyActifLine(), terrains: emptyActifLine(), batiments: emptyActifLine(), autresImmoCorp: emptyActifLine(), immobilisationsEnConcession: emptyActifLine(), immobilisationsEnCours: emptyActifLine(), immobilisationsFinancieres: emptyActifLine(), impotsDifferesActif: emptyActifLine(), total: 0 },
   actifCourant: { stocks: emptyActifLine(), clients: emptyActifLine(), autresDebiteurs: emptyActifLine(), impotsEtAssimilesActif: emptyActifLine(), autresCreancesEmploisAssimiles: emptyActifLine(), placements: emptyActifLine(), tresorerie: emptyActifLine(), total: 0 },
   totalActif: 0,
-  capitauxPropres: { capitalEmis: 0, capitalNonAppele: 0, primesEtReserves: 0, ecartsReevaluation: 0, resultatNet: 0, autresCapitauxPropres: 0, total: 0 },
+  capitauxPropres: { capitalEmis: 0, capitalNonAppele: 0, primesEtReserves: 0, ecartsReevaluation: 0, resultatEnInstance: 0, resultatNet: 0, autresCapitauxPropres: 0, total: 0 },
   passifNonCourant: { empruntsDettesFinancieres: 0, impotsDifferesPassif: 0, autresDettesNonCourantes: 0, provisionsEtProduitsConstatesAvance: 0, total: 0 },
   passifCourant: { fournisseurs: 0, impotsEtAssimilesPassif: 0, autresDettes: 0, tresoreriePassif: 0, total: 0 },
   totalPassif: 0,
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CONTRÔLE D'ÉQUILIBRE DE LA BALANCE (Σ débits = Σ crédits)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Contrôle fondamental de la partie double, préalable à toute exploitation :
+ * si la balance source est déséquilibrée, le bilan, le TCR et l'ensemble des
+ * ratios qui en découlent sont faux. L'audit de balance vérifie le sens normal
+ * de chaque compte pris isolément ; ce contrôle-ci vérifie la balance dans son
+ * ensemble.
+ *
+ * Les lignes de totaux/sous-totaux du fichier source (ignore = true) sont
+ * exclues, sans quoi les montants seraient comptés deux fois.
+ *
+ * La tolérance par défaut (1 unité monétaire) absorbe les arrondis de centimes
+ * usuels sans masquer un vrai déséquilibre.
+ */
+export function checkBalanceEquilibre(rows = [], tolerance = 1) {
+  let totalDebit = 0;
+  let totalCredit = 0;
+  let lignesRetenues = 0;
+
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    if (row.ignore || !row.compte) return;
+    totalDebit += safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+    totalCredit += safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+    lignesRetenues++;
+  });
+
+  const ecart = totalDebit - totalCredit;
+  return {
+    totalDebit,
+    totalCredit,
+    ecart,
+    equilibre: Math.abs(ecart) < tolerance,
+    lignesRetenues,
+  };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CAPITAUX PROPRES — SOURCE UNIQUE DE VÉRITÉ (SCF Algérie)
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Consommée par calculateBilanSCF, calculateRatios et calculateAltmanZScore afin
+ * qu'un seul et même montant de capitaux propres circule dans toute l'application
+ * (bilan officiel, ratios, rating bancaire). Auparavant, ces trois moteurs
+ * appliquaient chacun leur propre agrégation et pouvaient diverger jusqu'au signe.
+ *
+ * Classement aligné sur celui du Bilan Officiel SCF :
+ *   - 10x (hors 109)  → Capital émis
+ *   - 109             → Capital souscrit non appelé (porté en déduction)
+ *   - 104, 106, 14    → Primes et réserves
+ *   - 105             → Écarts de réévaluation
+ *   - 11              → Report à nouveau
+ *   - 12              → Résultat en instance d'affectation
+ *   - classe 13       → EXCLUE (131/132 subventions & provisions, 133 impôts
+ *                       différés : classés en PASSIFS NON COURANTS au bilan)
+ *   - 15 à 18         → EXCLUS (dettes)
+ *   - Résultat de l'exercice → sig.resultatNet (issu des classes 6/7)
+ *
+ * ⚠️ Le compte 12 et sig.resultatNet sont CUMULATIFS, non redondants : dans une
+ * balance avant affectation, les classes 6/7 portent le résultat de l'exercice en
+ * cours tandis que le compte 12 porte celui de l'exercice précédent non encore
+ * affecté — les deux figurent bien au passif. Ignorer le compte 12 déséquilibrait
+ * le bilan officiel du montant exact de son solde.
+ * Si les classes 6/7 sont absentes (balance postérieure à la clôture), sig.resultatNet
+ * vaut 0 et c'est le solde du compte 12 qui constitue le résultat de l'exercice.
+ *
+ * @param {Array}  rows    Lignes de balance
+ * @param {object} sig     Soldes intermédiaires de gestion (pour resultatNet)
+ * @param {object} options { ressourcesStables } — si fourni ET si la balance ne
+ *   contient AUCUN compte de capitaux propres, active le repli forfaitaire (70 %
+ *   des ressources stables) en signalant estimationPartielle. Volontairement NON
+ *   transmis par calculateBilanSCF : un état financier officiel ne doit jamais
+ *   contenir de montant estimé.
+ */
+export function computeCapitauxPropres(rows = [], sig = null, options = {}) {
+  const { ressourcesStables = 0 } = options || {};
+
+  let capitalEmis = 0, capitalNonAppele = 0, primesEtReserves = 0;
+  let ecartsReevaluation = 0, reportANouveau = 0, resultatEnInstance = 0;
+  let compteCapitauxTrouve = false;
+  let classes67Presentes = false;
+
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    if (row.ignore || !row.compte) return;
+    const c = row.compte.toString().trim();
+    const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+    const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+    const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
+
+    if (c.startsWith('6') || c.startsWith('7')) {
+      if (deb !== 0 || cred !== 0) classes67Presentes = true;
+      return;
+    }
+    if (!c.startsWith('1')) return;
+
+    if (c.startsWith('109'))      { capitalNonAppele += solde; compteCapitauxTrouve = true; }
+    else if (c.startsWith('104') || c.startsWith('106') || c.startsWith('14')) { primesEtReserves += -solde; compteCapitauxTrouve = true; }
+    else if (c.startsWith('105')) { ecartsReevaluation += -solde; compteCapitauxTrouve = true; }
+    else if (c.startsWith('13'))  { /* Passifs non courants — hors capitaux propres */ }
+    else if (c.startsWith('11'))  { reportANouveau += -solde; compteCapitauxTrouve = true; }
+    else if (c.startsWith('12'))  { resultatEnInstance += -solde; compteCapitauxTrouve = true; }
+    else if (c.startsWith('15') || c.startsWith('16') || c.startsWith('17') || c.startsWith('18')) { /* Dettes */ }
+    else { capitalEmis += -solde; compteCapitauxTrouve = true; }
+  });
+
+  let resultatNet = sig?.resultatNet || 0;
+  // Balance postérieure à la clôture : le résultat ne figure plus dans les classes 6/7.
+  if (!classes67Presentes && resultatEnInstance !== 0) {
+    resultatNet = resultatEnInstance;
+    resultatEnInstance = 0;
+  }
+
+  // Repli forfaitaire : uniquement si AUCUN compte de capitaux propres n'a été trouvé
+  // dans la balance (structure non détaillée). Une somme nulle obtenue à partir de
+  // comptes réellement présents est un résultat légitime, jamais remplacé.
+  let estimationPartielle = false;
+  if (!compteCapitauxTrouve && ressourcesStables > 0) {
+    estimationPartielle = true;
+    const estime = Math.max(0, ressourcesStables * 0.7);
+    primesEtReserves = Math.max(0, estime * 0.4);
+    capitalEmis = estime - primesEtReserves;
+    capitalNonAppele = 0;
+    ecartsReevaluation = 0;
+    reportANouveau = 0;
+    resultatEnInstance = 0;
+    resultatNet = 0;
+  }
+
+  const capital = capitalEmis - capitalNonAppele;
+  const reserves = primesEtReserves + ecartsReevaluation + reportANouveau + resultatEnInstance + resultatNet;
+
+  return {
+    capitalEmis,
+    capitalNonAppele,               // brut (positif si débiteur) — à porter en déduction
+    primesEtReserves,
+    ecartsReevaluation,
+    reportANouveau,
+    resultatEnInstance,
+    resultatNet,
+    capital,                        // Capital émis net du non appelé
+    reserves,                       // Réserves & bénéfices non distribués (Altman X2)
+    total: capital + reserves,
+    estimationPartielle,
+  };
+}
 
 export const calculateBilanSCF = (data, sig) => {
   const rows = Array.isArray(data) ? data : (data?.rows || null);
@@ -1538,8 +1685,6 @@ export const calculateBilanSCF = (data, sig) => {
   let clientsBrut = 0, deprecCreances = 0, autresDebiteurs = 0, impotsEtAssimilesActif = 0, autresCreancesEmploisAssimiles = 0;
   let placementsBrut = 0, deprecPlacements = 0, tresorerie = 0;
 
-  let capitalEmis = 0, capitalNonAppele = 0, primesEtReserves = 0, ecartsReevaluation = 0, reportANouveau = 0;
-
   let empruntsDettesFinancieres = 0, autresDettesNonCourantes = 0, provisionsEtProduitsConstatesAvance = 0;
   let fournisseurs = 0, impotsEtAssimilesPassif = 0, autresDettes = 0, tresoreriePassif = 0;
 
@@ -1550,21 +1695,18 @@ export const calculateBilanSCF = (data, sig) => {
     const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
     const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
 
-    // ── CLASSE 1 : Capitaux Propres & Dettes Financières ──
+    // ── CLASSE 1 : Dettes & assimilés ──
+    // Les postes de CAPITAUX PROPRES (10x, 104/105/106, 11, 12, 14) ne sont volontairement
+    // pas agrégés ici : ils le sont par computeCapitauxPropres() plus bas, source unique de
+    // vérité partagée avec calculateRatios et calculateAltmanZScore.
     if (c.startsWith('1')) {
-      if (c.startsWith('109')) { capitalNonAppele += solde; }
-      else if (c.startsWith('104') || c.startsWith('106') || c.startsWith('14')) { primesEtReserves += -solde; }
-      else if (c.startsWith('105')) { ecartsReevaluation += -solde; }
-      else if (c.startsWith('131') || c.startsWith('132')) { provisionsEtProduitsConstatesAvance += -solde; }
+      if (c.startsWith('131') || c.startsWith('132')) { provisionsEtProduitsConstatesAvance += -solde; }
       else if (c.startsWith('133')) { if (solde >= 0) impotsDifferesActif += solde; else impotsDifferesPassif += -solde; }
       else if (c.startsWith('13')) { provisionsEtProduitsConstatesAvance += -solde; } // filet générique (134-139), même logique que verifyAccountNature
-      else if (c.startsWith('11')) { reportANouveau += -solde; }
-      else if (c.startsWith('12')) { /* Résultat de l'exercice : repris via sig.resultatNet, non recompté ici */ }
       else if (c.startsWith('15')) { provisionsEtProduitsConstatesAvance += -solde; }
       else if (c.startsWith('16')) { empruntsDettesFinancieres += -solde; }
       else if (c.startsWith('17')) { autresDettesNonCourantes += -solde; } // Dettes rattachées à des participations
       else if (c.startsWith('18')) { if (solde >= 0) autresDebiteurs += solde; else autresDettes += -solde; }
-      else { capitalEmis += -solde; }
       return;
     }
 
@@ -1669,18 +1811,20 @@ export const calculateBilanSCF = (data, sig) => {
 
   const totalActif = actifNonCourant.total + actifCourant.total;
 
-  const resultatNet = sig?.resultatNet || 0;
+  // Capitaux propres : agrégat unique partagé avec les ratios et le rating bancaire.
+  // Aucune option de repli forfaitaire n'est transmise ici — un état financier officiel
+  // ne doit jamais contenir de montant estimé.
+  const cp = computeCapitauxPropres(rows, sig);
   const capitauxPropres = {
-    capitalEmis,
-    capitalNonAppele: -capitalNonAppele,
-    primesEtReserves,
-    ecartsReevaluation,
-    resultatNet,
-    autresCapitauxPropres: reportANouveau,
-    total: 0,
+    capitalEmis: cp.capitalEmis,
+    capitalNonAppele: -cp.capitalNonAppele,
+    primesEtReserves: cp.primesEtReserves,
+    ecartsReevaluation: cp.ecartsReevaluation,
+    resultatEnInstance: cp.resultatEnInstance,
+    resultatNet: cp.resultatNet,
+    autresCapitauxPropres: cp.reportANouveau,
+    total: cp.total,
   };
-  capitauxPropres.total = capitauxPropres.capitalEmis + capitauxPropres.capitalNonAppele + capitauxPropres.primesEtReserves
-    + capitauxPropres.ecartsReevaluation + capitauxPropres.resultatNet + capitauxPropres.autresCapitauxPropres;
 
   const passifNonCourant = {
     empruntsDettesFinancieres,
@@ -1948,7 +2092,6 @@ export const calculateRatios = (bilan, sig, rows) => {
   let dettesFournisseurs = 0;
   let stockInitialTotal = 0;
   let stockFinalTotal = 0;
-  let capitauxPropres = 0;
   let dettesFinancieresLT = 0;
   let provisionsRisques = 0;
 
@@ -1988,11 +2131,6 @@ export const calculateRatios = (bilan, sig, rows) => {
         if (soldeNet > 0) dettesFournisseurs += soldeNet;
       }
 
-      // Capitaux Propres (Comptes 10, 11, 12, 13, 14 — hors compte 15 qui est une dette potentielle, cf. ci-dessous)
-      if (c.startsWith('10') || c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14')) {
-        capitauxPropres += -solde;
-      }
-
       // Provisions pour risques et charges (Compte 15) : dette potentielle, exclue des Capitaux Propres
       if (c.startsWith('15')) {
         provisionsRisques += -solde;
@@ -2005,10 +2143,12 @@ export const calculateRatios = (bilan, sig, rows) => {
     });
   }
 
-  // Fallback si capitaux propres non décomposés
-  if (capitauxPropres === 0 && (bilan.ressourcesStables || 0) > 0) {
-    capitauxPropres = (bilan.ressourcesStables || 0) * 0.7;
-  }
+  // Capitaux propres : même agrégat que le Bilan Officiel SCF et que le rating bancaire
+  // (cf. computeCapitauxPropres). Le repli forfaitaire n'est activé que si la balance ne
+  // contient AUCUN compte de capitaux propres ; il est alors signalé par estimationPartielle,
+  // que l'interface doit afficher (ne jamais présenter un montant estimé comme mesuré).
+  const cp = computeCapitauxPropres(rows, sig, { ressourcesStables: bilan.ressourcesStables || 0 });
+  const capitauxPropres = cp.total;
 
   const ca = sig.chiffreAffaires || 0;
   const achats = sig.achats || sig.c60 || 0;
@@ -2084,6 +2224,8 @@ export const calculateRatios = (bilan, sig, rows) => {
     stockFinalTotal,
     dettesFournisseurs,
     capitauxPropres,
+    capitauxPropresDetail: cp,
+    estimationPartielle: cp.estimationPartielle,
     dettesFinancieresLT,
     provisionsRisques,
     achats,

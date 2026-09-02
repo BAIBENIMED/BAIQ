@@ -175,6 +175,7 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
     { label: 'Primes et réserves', val: cp.primesEtReserves, valN1: cp1?.primesEtReserves },
     { label: 'Écarts de réévaluation', val: cp.ecartsReevaluation, valN1: cp1?.ecartsReevaluation },
     { label: 'Résultat net', val: cp.resultatNet, valN1: cp1?.resultatNet },
+    { label: 'Résultat en instance d\'affectation', val: cp.resultatEnInstance, valN1: cp1?.resultatEnInstance },
     { label: 'Autres capitaux propres — Report à nouveau', val: cp.autresCapitauxPropres, valN1: cp1?.autresCapitauxPropres },
     { label: 'TOTAL I — CAPITAUX PROPRES', val: cp.total, valN1: cp1?.total, total: true },
     { group: 'PASSIFS NON COURANTS' },
@@ -217,7 +218,10 @@ export function EtatsFinanciersView({ data, sig, dataN1, profil, formatCurrency 
         <div style={{ fontSize: '0.85rem' }}>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</div>
       </div>
 
-      <div className="card no-print" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, background: equilibre ? '#f0fdf4' : '#fef2f2', border: `1px solid ${equilibre ? '#bbf7d0' : '#fecaca'}` }}>
+      {/* Un bilan équilibré n'a pas besoin d'imprimer son bandeau de contrôle ; un bilan
+          DÉSÉQUILIBRÉ, si — c'est précisément au moment où l'état part chez un tiers
+          (banque, associé, administration) que l'avertissement doit rester visible. */}
+      <div className={`card ${equilibre ? 'no-print' : ''}`} style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, background: equilibre ? '#f0fdf4' : '#fef2f2', border: `1px solid ${equilibre ? '#bbf7d0' : '#fecaca'}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="material-symbols-outlined" style={{ color: equilibre ? '#059669' : '#dc2626' }}>{equilibre ? 'check_circle' : 'error'}</span>
           <span style={{ fontWeight: 800, fontSize: '0.85rem', color: equilibre ? '#14532d' : '#7f1d1d' }}>

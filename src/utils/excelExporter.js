@@ -169,6 +169,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['Primes et réserves', cp.primesEtReserves || 0, n1SCF?.capitauxPropres?.primesEtReserves || ''],
     ['Écarts de réévaluation', cp.ecartsReevaluation || 0, n1SCF?.capitauxPropres?.ecartsReevaluation || ''],
     ['Résultat net', cp.resultatNet || 0, n1SCF?.capitauxPropres?.resultatNet || ''],
+    ['Résultat en instance d\'affectation', cp.resultatEnInstance || 0, n1SCF?.capitauxPropres?.resultatEnInstance || ''],
     ['Autres capitaux propres — Report à nouveau', cp.autresCapitauxPropres || 0, n1SCF?.capitauxPropres?.autresCapitauxPropres || ''],
     ['TOTAL I — CAPITAUX PROPRES', cp.total || 0, n1SCF?.capitauxPropres?.total || ''],
     [],

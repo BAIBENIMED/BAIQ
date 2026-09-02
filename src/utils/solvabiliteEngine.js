@@ -1,3 +1,7 @@
+// Extension .js explicite : permet d'exécuter ce moteur en Node pur (harness de test)
+// en plus du bundler Vite, qui accepte les deux formes.
+import { computeCapitauxPropres } from './financeCalculations.js';
+
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Solvabilité, Rating & Score de Risque
    Modèle Altman Z''-Score (Marchés émergents / Entreprises non cotées)
@@ -21,10 +25,17 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
   const ebit = sig.resultatExploitation || (sig.ebe || 0) - (sig.dotationsExploitation || sig.c68_expl || 0);
   const ebe  = sig.ebe || 0;
 
-  // Calcul des composantes des Capitaux Propres & Dettes
-  let capital = 0;
-  let reservesAndRetained = 0;
-  let capitauxPropres;
+  // Capitaux Propres : agrégat unique partagé avec le Bilan Officiel SCF et les ratios
+  // (cf. computeCapitauxPropres dans financeCalculations.js). Auparavant recalculé ici de
+  // façon divergente — le résultat de l'exercice manquait, ce qui pouvait opposer le signe
+  // des capitaux propres entre l'onglet États Financiers et l'onglet Ratios.
+  // ⚠️ Le repli forfaitaire (aucun compte de capitaux propres dans la balance) est une
+  // ESTIMATION, signalée par estimationPartielle et affichée partout où le rating apparaît.
+  const cp = computeCapitauxPropres(rows, sig, { ressourcesStables: bilan.ressourcesStables || 0 });
+  const reservesAndRetained = cp.reserves;
+  const capitauxPropres = cp.total;
+  const estimationPartielle = cp.estimationPartielle;
+
   let dettesFinancieresLT = 0;
   let provisionsRisques = 0;
   let dettesCourtTerme = (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0);
@@ -35,16 +46,8 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       const c = r.compte.toString().trim();
       const solde = r.solde || 0; // créditeur = négatif en base
 
-      // Compte 10x : Capital
-      if (c.startsWith('10')) {
-        capital += -solde;
-      }
-      // Comptes 11, 12, 13, 14 : Réserves, Report à nouveau, Résultat de l'exercice, Subventions
-      else if (c.startsWith('11') || c.startsWith('12') || c.startsWith('13') || c.startsWith('14')) {
-        reservesAndRetained += -solde;
-      }
       // Compte 15 : Provisions pour risques et charges — dette potentielle, exclue des Capitaux Propres
-      else if (c.startsWith('15')) {
+      if (c.startsWith('15')) {
         provisionsRisques += -solde;
       }
       // Compte 16 : Emprunts et dettes financières à long terme
@@ -52,21 +55,6 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
         dettesFinancieresLT += -solde;
       }
     });
-  }
-
-  // Fallback si la balance détaillée n'est pas décomposée
-  // ⚠️ Ceci est une ESTIMATION FORFAITAIRE (non une donnée réelle de la balance) :
-  // elle doit être signalée à l'utilisateur (cf. estimationPartielle ci-dessous) partout
-  // où le Z''-Score / rating est affiché, pour ne pas laisser croire à une précision
-  // qu'elle n'a pas.
-  let estimationPartielle = false;
-  if (capital === 0 && reservesAndRetained === 0) {
-    estimationPartielle = true;
-    capitauxPropres = Math.max(0, (bilan.ressourcesStables || 0) * 0.7);
-    reservesAndRetained = Math.max(0, capitauxPropres * 0.4);
-    capital = capitauxPropres - reservesAndRetained;
-  } else {
-    capitauxPropres = capital + reservesAndRetained;
   }
 
   // Total Dettes = Dettes CT + Dettes Financières LT + Provisions (dette potentielle, cf. reclassement ci-dessus)
@@ -148,14 +136,23 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
 
   // Couverture des charges financières
   const chargesFin = sig.chargesFinancieres || 0;
-  const couvertureChargesFin = chargesFin > 0 ? Math.max(0, ebe / chargesFin) : 99;
+  // Sans charge financière, la couverture est théoriquement infinie — mais uniquement si
+  // l'EBE est positif. Un EBE négatif sans charge financière n'est pas une force : le
+  // critère est ramené au plancher plutôt que crédité de 5/5.
+  const couvertureChargesFin = chargesFin > 0 ? Math.max(0, ebe / chargesFin) : (ebe > 0 ? 99 : 0);
 
   // ── Score Banque d'Algérie (Sur 20 Points) ──
   const ca = (sig.chiffreAffaires !== undefined && sig.chiffreAffaires !== null && sig.chiffreAffaires > 0)
     ? sig.chiffreAffaires
     : (sig.c70 || sig.productionExercice || 0);
 
-  const ratioAutonomie = dettesFinancieresLT > 0 ? capitauxPropres / dettesFinancieresLT : 99;
+  // Sans dette financière LT, l'autonomie est maximale — mais uniquement si les capitaux
+  // propres sont positifs. Des fonds propres négatifs sans emprunt ne traduisent pas une
+  // indépendance financière : ils traduisent qu'aucun prêteur n'accorde de concours.
+  // Le critère est donc ramené au plancher (1/5) au lieu d'être crédité de 5/5.
+  const ratioAutonomie = dettesFinancieresLT > 0
+    ? capitauxPropres / dettesFinancieresLT
+    : (capitauxPropres > 0 ? 99 : 0);
   const ratioRentabilite = ca > 0 ? (ebe / ca) : (ebe > 0 ? 0.20 : 0);
   // Liquidité Générale = (Actif Circulant + Trésorerie Active) / Dettes CT — alignée sur calculateRatios.liquiditeGenerale
   const ratioLiquiditeGen = ((bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0)) / Math.max(1, dettesCourtTerme);
@@ -212,7 +209,9 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
       detailsBA: {
         autonomie: {
           val: ratioAutonomie,
-          displayVal: dettesFinancieresLT <= 0 ? 'Sans dette LT (100%)' : `${(ratioAutonomie).toFixed(2)}x`,
+          displayVal: dettesFinancieresLT <= 0
+            ? (capitauxPropres > 0 ? 'Sans dette LT (100%)' : 'Capitaux propres négatifs')
+            : `${(ratioAutonomie).toFixed(2)}x`,
           score: autonomieScore,
           label: 'Autonomie Financière (CP / DLT)'
         },
@@ -230,7 +229,9 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
         },
         couverture: {
           val: couvertureChargesFin,
-          displayVal: chargesFin <= 0 ? 'Sans charge fin. (∞)' : `${couvertureChargesFin.toFixed(2)}x`,
+          displayVal: chargesFin <= 0
+            ? (ebe > 0 ? 'Sans charge fin. (∞)' : 'EBE négatif')
+            : `${couvertureChargesFin.toFixed(2)}x`,
           score: couvertureScore,
           label: 'Couverture Intérêts (EBE / Charges Fin)'
         }

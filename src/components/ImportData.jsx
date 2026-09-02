@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react';
-import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF } from '../utils/financeCalculations';
+import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF, checkBalanceEquilibre } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
 import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
 import { useEscapeKey } from '../utils/useEscapeKey';
@@ -522,6 +522,29 @@ export function ImportData({ onDataImported }) {
               )}
             </div>
             {errorN1 && <div style={{ fontSize: '0.7rem', color: '#b91c1c', background: '#fee2e2', padding: '6px 10px', borderRadius: 6 }}>{errorN1}</div>}
+
+            {/* Contrôle de la partie double (Σ débits = Σ crédits) remonté AVANT le lancement.
+                Ce contrôle existait déjà, mais uniquement dans la modale d'aperçu qu'il fallait
+                ouvrir manuellement : on pouvait donc lancer l'analyse d'une balance déséquilibrée
+                sans jamais en être averti, alors que tout ce qui en découle (bilan, TCR, ratios)
+                est alors faux. */}
+            {[{ rows: parsedN, label: 'N' }, { rows: parsedN1, label: 'N-1' }].map(({ rows, label }) => {
+              if (!rows) return null;
+              const eq = checkBalanceEquilibre(rows);
+              if (eq.equilibre) return null;
+              return (
+                <div key={label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: '0.72rem', color: '#991b1b' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>error</span>
+                  <span>
+                    <strong>Balance {label} déséquilibrée</strong> — écart de{' '}
+                    <strong>{Math.round(Math.abs(eq.ecart)).toLocaleString('fr-FR')} DA</strong>
+                    {' '}entre le total des débits ({Math.round(eq.totalDebit).toLocaleString('fr-FR')}) et celui des crédits ({Math.round(eq.totalCredit).toLocaleString('fr-FR')}).
+                    {' '}Le bilan, le compte de résultat et les ratios calculés à partir de cette balance seront inexacts.
+                    {' '}Vérifiez le mapping des colonnes et les lignes de totaux via « 👁 Voir » avant de poursuivre.
+                  </span>
+                </div>
+              );
+            })}
 
             {/* Bouton de Validation unique très visible */}
             <button

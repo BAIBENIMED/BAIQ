@@ -6,6 +6,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { calculateAltmanZScore } from './solvabiliteEngine';
 import { buildTCRRows } from './financeCalculations';
 
@@ -55,29 +56,44 @@ const fmtDays = (v) => {
 
 const safeDiv = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 
-// Reproduit fidèlement, en vectoriel, le badge BAIQ affiché dans la barre latérale de
-// l'application (voir App.jsx : carré noir arrondi, lettre "B" blanche, point rouge et
-// barre blanche) — plutôt que le fichier public/baiq_logo.jpg (logo bleu générique, non
-// utilisé à l'écran). Dessin natif jsPDF : net à toute échelle, aucune image à charger.
-function drawBaiqBadge(doc, x, y, size) {
+// Capture le badge BAIQ RÉEL affiché dans la barre latérale de l'application (voir
+// App.jsx, .baiq-logo-badge : carré noir arrondi, "B" blanc, point rouge + barre blanche
+// formant un "i" stylisé) via html2canvas, pour une fidélité pixel-parfaite à l'interface
+// — un rendu vectoriel à la main s'était révélé imprécis (proportions Flexbox difficiles
+// à reproduire à l'identique). Retourne { dataUrl, ratio } ou null si la capture échoue
+// (badge non monté dans le DOM, etc.) ; l'appelant doit alors se rabattre sur du texte seul.
+async function captureBaiqBadge() {
+  try {
+    const el = document.querySelector('.baiq-logo-badge');
+    if (!el) return null;
+    const canvas = await html2canvas(el, { scale: 8, backgroundColor: null });
+    // Un badge non visible (sidebar repliée en mode mobile, onglet en arrière-plan, etc.)
+    // produit un canvas 0×0 — dataURL invalide qui ferait échouer doc.addImage() plus loin.
+    if (!canvas.width || !canvas.height) return null;
+    return { dataUrl: canvas.toDataURL('image/png'), ratio: canvas.height / canvas.width };
+  } catch {
+    return null;
+  }
+}
+
+// Dessine le badge à la position/taille données. Utilise l'image capturée si disponible,
+// sinon un repli vectoriel simplifié (texte "B" seul) pour ne jamais faire échouer l'export.
+function drawBaiqBadge(doc, x, y, size, badgeImg) {
+  if (badgeImg) {
+    doc.addImage(badgeImg.dataUrl, 'PNG', x, y, size, size * badgeImg.ratio);
+    return;
+  }
   doc.setFillColor(10, 10, 10);
   doc.roundedRect(x, y, size, size, size * 0.28, size * 0.28, 'F');
-
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(size * 0.62);
+  doc.setFontSize(size * 0.55);
   doc.setTextColor(255, 255, 255);
-  doc.text('B', x + size * 0.32, y + size * 0.68, { align: 'center' });
-
-  const barX = x + size * 0.72;
-  doc.setFillColor(229, 72, 77);
-  doc.circle(barX, y + size * 0.32, size * 0.045, 'F');
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(barX - size * 0.035, y + size * 0.42, size * 0.07, size * 0.32, size * 0.02, size * 0.02, 'F');
+  doc.text('B', x + size / 2, y + size * 0.68, { align: 'center' });
 }
 
 // Lockup complet (badge + wordmark "BAIQ" + ligne de signature), pour la page de garde.
 // `align` : 'center' centre l'ensemble sur x ; 'left' démarre le badge à x.
-function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left') {
+function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left', badgeImg = null) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(badgeSize * 1.05);
   const wordmarkW = doc.getTextWidth('BAIQ');
@@ -85,7 +101,7 @@ function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left') {
   const totalW = badgeSize + gap + wordmarkW;
   const startX = align === 'center' ? x - totalW / 2 : x;
 
-  drawBaiqBadge(doc, startX, y, badgeSize);
+  drawBaiqBadge(doc, startX, y, badgeSize, badgeImg);
 
   const textX = startX + badgeSize + gap;
   doc.setFont('helvetica', 'bold');
@@ -102,7 +118,7 @@ function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left') {
 }
 
 // ── En-tête et Pied de Page — bandeau institutionnel BAIQ ──────────────
-function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N') {
+function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N', badgeImg = null) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const margin = 18;
@@ -126,7 +142,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
 
     // ── En-tête de page ──
     const badgeSize = 6.5;
-    drawBaiqBadge(doc, margin, 7, badgeSize);
+    drawBaiqBadge(doc, margin, 7, badgeSize, badgeImg);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...T.navy);
@@ -150,14 +166,18 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
     doc.line(margin, H - 14, W - margin, H - 14);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...T.inkMuted);
 
+    // Texte raccourci pour ne jamais chevaucher le folio centré, quelle que soit la longueur
+    // du nom de mois (« septembre »/« novembre » vs « mai ») — l'ancien texte, plus long
+    // (« ... · Traitement local sécurisé »), débordait jusqu'à s'y superposer.
     const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
-    doc.text(`Document généré le ${printDate} · Traitement local sécurisé`, margin, H - 9);
+    doc.text(`Document généré le ${printDate}`, margin, H - 9);
 
     // Folio centré
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
     doc.setTextColor(...T.inkPrimary);
     doc.text(`— ${p} / ${totalPages} —`, W / 2, H - 9, { align: 'center' });
 
@@ -168,8 +188,22 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
   }
 }
 
+// Empêche un titre de se retrouver seul en bas de page (règle typographique de base :
+// un titre doit toujours être suivi d'au moins un peu de son contenu). Si l'espace restant
+// avant le pied de page est insuffisant, force un saut de page et repart du haut.
+function ensurePageSpace(doc, y, minSpace) {
+  const H = doc.internal.pageSize.getHeight();
+  const footerZone = 20; // hauteur réservée au pied de page
+  if (y + minSpace > H - footerZone) {
+    doc.addPage();
+    return 22; // marge haute standard, cohérente avec le reste du document
+  }
+  return y;
+}
+
 // ── Titre de Section — bandeau coloré avec pastille numérotée BAIQ ─────
 function latexSection(doc, number, title, y) {
+  y = ensurePageSpace(doc, y, 24);
   const W = doc.internal.pageSize.getWidth();
   const margin = 18;
   const bandH = 9;
@@ -202,6 +236,7 @@ function latexSection(doc, number, title, y) {
 
 // ── Sous-titre ───────────────────────────────────────────────────────
 function latexSubSection(doc, title, y) {
+  y = ensurePageSpace(doc, y, 32);
   const margin = 18;
   // Petit repère vertical or — cohérent avec la pastille de section
   doc.setFillColor(...T.gold);
@@ -316,7 +351,17 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
       lineWidth: 0,
     },
     columnStyles: opts.columnStyles || {},
-    willDrawCell: (data) => {
+    // didParseCell (pas willDrawCell) : autoTable calcule déjà la police au moment du parsing,
+    // pour la mesure du texte — une mutation de style dans willDrawCell arrive trop tard et
+    // n'affecte pas le rendu du glyphe (bug constaté : boldRows ne produisait aucun gras malgré
+    // la mutation). didParseCell s'exécute avant cette mesure, donc avant le rendu réel.
+    didParseCell: (data) => {
+      // Toute colonne alignée à droite représente un montant dans ce document (convention
+      // constante du fichier) — mise en gras systématique pour une meilleure lisibilité des
+      // chiffres, y compris hors lignes de total (déjà en gras via boldRows ci-dessous).
+      if (data.section === 'body' && data.cell.styles.halign === 'right') {
+        data.cell.styles.fontStyle = 'bold';
+      }
       if (opts.boldRows && opts.boldRows.includes(data.row.index)) {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = T.navy;
@@ -420,6 +465,10 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const solvabiliteCalc = totalDettesExig > 0.01 ? safeDiv(totalActif, totalDettesExig) : 0;
   const solvabiliteVal  = (r.solvabilite && r.solvabilite > 0) ? r.solvabilite : solvabiliteCalc;
 
+  // Capture pixel-parfaite du badge réel de l'interface (voir captureBaiqBadge ci-dessus) —
+  // avant toute manipulation du document, pour ne pas dépendre d'un état DOM qui changerait.
+  const badgeImg = await captureBaiqBadge();
+
   // Création du document jsPDF (Format A4 standardisé)
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
@@ -431,7 +480,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   let y = 30;
 
   // Logo BAIQ centré — identique au mark de l'interface (badge "B" + wordmark + signature)
-  drawBaiqMark(doc, W / 2, y, 16, 'center');
+  drawBaiqMark(doc, W / 2, y, 16, 'center', badgeImg);
   y += 20;
 
   // Filet d'accent — teinte de marque
@@ -641,6 +690,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     passifValRow('Primes et réserves', cp.primesEtReserves, cp1?.primesEtReserves),
     passifValRow('Écarts de réévaluation', cp.ecartsReevaluation, cp1?.ecartsReevaluation),
     passifValRow('Résultat net', cp.resultatNet, cp1?.resultatNet),
+    passifValRow('Résultat en instance d\'affectation', cp.resultatEnInstance, cp1?.resultatEnInstance),
     passifValRow('Autres capitaux propres — Report à nouveau', cp.autresCapitauxPropres, cp1?.autresCapitauxPropres),
     ['TOTAL I — CAPITAUX PROPRES', fmtDZD(cp.total || 0), bScf1 ? fmtDZD(cp1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
     ['PASSIFS NON COURANTS', '', ''].filter((_, i) => bScf1 || i < 2),
@@ -1215,7 +1265,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   // APPLICATION DES EN-TÊTES & PIEDS DE PAGE STYLE FANCYHDR
   // ──────────────────────────────────────────────────────────────────
   const totalPages = doc.internal.getNumberOfPages();
-  applyLatexHeaderFooter(doc, totalPages, dossierName, 'N');
+  applyLatexHeaderFooter(doc, totalPages, dossierName, 'N', badgeImg);
 
   // Téléchargement du fichier
   const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');

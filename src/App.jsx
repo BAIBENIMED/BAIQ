@@ -27,16 +27,19 @@ import { SECTEURS } from './utils/secteurs';
 
 /* Avatar supprimé — on utilise des initiales */
 
+// Ordre : (1) Saisie, (2) Vue d'ensemble, (3) Données brutes & contrôle, (4) les 5 états
+// financiers officiels SCF regroupés (Bilan/CR, TVCP, TFT), (5) outils d'analyse interne
+// (Bilan Fonctionnel, SIG, Stocks, Ratios), (6) simulation, (7) référence, (8) sortie/IA.
 const NAV = [
   { id: 'import',      label: 'Importation',           icon: 'upload_file'   },
   { id: 'dashboard',   label: "Vue d'ensemble",         icon: 'dashboard'     },
   { id: 'balance',     label: 'Balance Générale',       icon: 'account_balance'},
   { id: 'audit',       label: 'Audit Balance (SCF)',    icon: 'fact_check'    },
-  { id: 'bilan',       label: 'Bilan Fonctionnel',      icon: 'account_tree'  },
-  { id: 'sig',         label: 'SIG & TCR (SCF)',        icon: 'analytics'     },
   { id: 'etats_financiers', label: 'États Financiers (SCF)', icon: 'summarize' },
   { id: 'capitaux',    label: 'Capitaux Propres (TVCP)', icon: 'account_balance_wallet' },
   { id: 'tft',         label: 'Flux de Trésorerie (TFT)', icon: 'waterfall_chart' },
+  { id: 'bilan',       label: 'Bilan Fonctionnel',      icon: 'account_tree'  },
+  { id: 'sig',         label: 'SIG & TCR (SCF)',        icon: 'analytics'     },
   { id: 'stocks',      label: 'Variation Stocks',       icon: 'warehouse'     },
   { id: 'ratios',      label: 'Ratios Financiers',      icon: 'query_stats'   },
   { id: 'whatif',      label: 'Simulateur What-If',     icon: 'tune'          },
@@ -1029,7 +1032,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
              {/* BAIQ Logo Mark */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div style={{
+              <div className="baiq-logo-badge" style={{
                 width: 34, height: 34, borderRadius: 10,
                 background: '#0a0a0a',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2,
