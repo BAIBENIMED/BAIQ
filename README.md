@@ -62,18 +62,36 @@ public repart donc de zéro à chaque mise en ligne.
 > avant toute montée en charge : il faudrait alors un stockage partagé (Redis, Postgres).
 
 **Sur le plan gratuit** (pas de disque disponible), l'instance est en outre mise en veille puis
-détruite après une quinzaine de minutes d'inactivité : le fichier local disparaît alors très
-fréquemment. Deux options :
+détruite après une quinzaine de minutes d'inactivité — et un simple changement de variable
+d'environnement provoque le même effacement, au même titre qu'un vrai déploiement de code. Le
+fichier local disparaît donc très fréquemment.
 
-- **Palliatif sans coût** (déjà en place) : un plancher est codé en dur dans `server.js`
-  (`BASELINE_CONSTATEE`, relevé du 02/09/2026). Le compteur repart de cette valeur au lieu de
-  zéro à chaque réveil de l'instance. Pour le relever **sans redéployer**, définir la variable
-  `ANALYSIS_COUNT_BASELINE` sur l'hébergeur : elle est prioritaire sur la valeur du code.
-  À n'ajuster que sur un total réellement observé — le nombre affiché reste ainsi un minorant
-  honnête, jamais un chiffre gonflé. Pensez à le relever de temps en temps, sinon il se périme.
-- **Vraie persistance sans quitter la gratuité** : brancher un stockage clé-valeur externe à
-  offre gratuite (Upstash Redis, Supabase…) et y déplacer la lecture/écriture du compteur.
-  Cela suppose de créer un compte chez ce fournisseur.
+#### Vraie persistance, gratuite : Upstash Redis (recommandé)
+
+`server.js` sait déjà s'en servir — il suffit de créer la base et de renseigner deux variables,
+aucune ligne de code à toucher.
+
+1. Créer un compte sur [upstash.com](https://upstash.com) (gratuit, aucune carte requise)
+2. **Create Database** → type **Redis**, plan **Free**, choisir une région
+3. Dans la page de la base, section **REST API**, copier les deux valeurs :
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+4. Sur Render, onglet **Environment** du service `baiq`, ajouter ces deux variables avec les
+   valeurs copiées
+
+Une fois les deux variables présentes, le compteur bascule automatiquement sur Upstash — il
+survit dès lors à tous les redéploiements et redémarrages, plus besoin de relever un plancher à
+la main. Si Upstash devient temporairement injoignable, le serveur se replie silencieusement sur
+le mécanisme local ci-dessous (jamais d'erreur visible pour l'utilisateur).
+
+#### Sans Upstash : palliatif sans coût déjà en place
+
+Un plancher est codé en dur dans `server.js` (`BASELINE_CONSTATEE`, relevé daté). Le compteur
+repart de cette valeur au lieu de zéro à chaque réveil de l'instance. Pour le relever **sans
+redéployer**, définir la variable `ANALYSIS_COUNT_BASELINE` sur l'hébergeur : elle est prioritaire
+sur la valeur du code. À n'ajuster que sur un total réellement observé — le nombre affiché reste
+ainsi un minorant honnête, jamais un chiffre gonflé. Pensez à le relever de temps en temps, sinon
+il se périme à chaque redéploiement.
 
 Dans tous les cas, l'application fonctionne normalement sans aucune de ces options — seul le
 compteur se réinitialise.

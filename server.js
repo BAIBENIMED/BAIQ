@@ -13,12 +13,11 @@
  * Start Command  : npm run start
  *
  * Variables d'environnement :
- *   - GEMINI_API_KEY       (requise pour les rapports IA)
- *   - ANALYSIS_COUNT_FILE  (recommandée en production) chemin du compteur global
- *     d'analyses. Le système de fichiers de Render étant éphémère, laisser la
- *     valeur par défaut ferait repartir le compteur public de zéro à chaque
- *     redéploiement. Attacher un disque (Disks → Add Disk, Mount Path /var/data)
- *     puis définir ANALYSIS_COUNT_FILE=/var/data/analysis-count.json
+ *   - GEMINI_API_KEY              (requise pour les rapports IA)
+ *   - UPSTASH_REDIS_REST_URL      (recommandée en production) stockage externe du
+ *   - UPSTASH_REDIS_REST_TOKEN    compteur global d'analyses — voir le bloc de code
+ *     dédié plus bas pour le détail. Survit à tous les redéploiements et redémarrages,
+ *     contrairement au fichier local (ANALYSIS_COUNT_FILE, en repli si absentes).
  */
 import express from 'express';
 import path from 'path';
@@ -207,6 +206,45 @@ const ANALYSIS_COUNT_BASELINE =
 let analysisCount = Math.max(readAnalysisCount(), ANALYSIS_COUNT_BASELINE);
 let ecritureDifferee = null;
 
+// ── Stockage externe optionnel du compteur (Upstash Redis) ─────────────────
+// Le fichier local ci-dessus ne survit à AUCUN redéploiement ni redémarrage sur le
+// plan gratuit de Render — y compris un simple changement de variable d'environnement,
+// qui efface le disque éphémère au même titre qu'un vrai déploiement de code. Le
+// plancher ANALYSIS_COUNT_BASELINE n'est qu'un palliatif : il faut le relever à la main
+// après chaque perte réelle.
+//
+// Upstash Redis (offre gratuite, API REST — aucune connexion TCP à gérer, un simple
+// fetch() suffit) élimine le problème à la racine : le compteur vit hors du conteneur,
+// il survit à tous les redéploiements et redémarrages.
+//
+// Entièrement optionnel : sans les deux variables ci-dessous, le comportement précédent
+// (fichier local + plancher) reste strictement inchangé — et si Upstash est configuré
+// mais temporairement injoignable, chaque appel se replie silencieusement sur ce même
+// mécanisme local plutôt que de faire échouer la requête.
+//   UPSTASH_REDIS_REST_URL   (ex: https://xxx-xxx-12345.upstash.io)
+//   UPSTASH_REDIS_REST_TOKEN
+const UPSTASH_URL = (process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
+const UPSTASH_ACTIF = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+const UPSTASH_CLE = 'baiq:analysis_count';
+
+async function upstash(...commande) {
+  const url = `${UPSTASH_URL}/${commande.map(encodeURIComponent).join('/')}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+  if (!res.ok) throw new Error(`Upstash a répondu ${res.status}`);
+  const { result } = await res.json();
+  return result;
+}
+
+if (UPSTASH_ACTIF) {
+  // SETNX : n'initialise la clé QUE si elle n'existe pas déjà côté Upstash — ne réécrase
+  // jamais un total réel déjà accumulé, ne sert qu'à amorcer le tout premier démarrage
+  // avec le plancher connu plutôt que de partir de zéro.
+  upstash('SETNX', UPSTASH_CLE, String(ANALYSIS_COUNT_BASELINE)).catch(err => {
+    console.error("⚠ Initialisation du compteur Upstash impossible :", err?.message || err);
+  });
+}
+
 function planifierEcriture() {
   if (ecritureDifferee) return;
   ecritureDifferee = setTimeout(() => {
@@ -236,11 +274,28 @@ function rateLimitCompteur(req, res, next) {
   next();
 }
 
-app.get('/api/analysis-count', (req, res) => {
+app.get('/api/analysis-count', async (req, res) => {
+  if (UPSTASH_ACTIF) {
+    try {
+      const val = await upstash('GET', UPSTASH_CLE);
+      const n = Number.parseInt(val, 10);
+      if (Number.isFinite(n)) return res.json({ count: n });
+    } catch (err) {
+      console.error('Lecture Upstash échouée, repli sur le compteur local :', err?.message || err);
+    }
+  }
   res.json({ count: analysisCount });
 });
 
-app.post('/api/analysis-count/increment', rateLimitCompteur, (req, res) => {
+app.post('/api/analysis-count/increment', rateLimitCompteur, async (req, res) => {
+  if (UPSTASH_ACTIF) {
+    try {
+      const n = await upstash('INCR', UPSTASH_CLE);
+      return res.json({ count: n });
+    } catch (err) {
+      console.error('Incrément Upstash échoué, repli sur le compteur local :', err?.message || err);
+    }
+  }
   analysisCount += 1;
   planifierEcriture();
   res.json({ count: analysisCount });
