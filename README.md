@@ -44,6 +44,26 @@ appels Gemini en gardant la clé API côté serveur. Il faut donc déployer un *
 5. Dans l'onglet **Environment**, ajouter la variable `GEMINI_API_KEY` avec votre clé
 6. Créer le service
 
+#### Conserver le compteur global d'analyses
+
+Le compteur affiché dans l'application est **global** (tous visiteurs confondus) : il est tenu
+par le serveur, pas par le navigateur. Il est enregistré dans un fichier JSON.
+
+Or **le système de fichiers de Render est éphémère** : il est remis à zéro à chaque
+redéploiement et à chaque redémarrage d'instance. Sans la configuration ci-dessous, le compteur
+public repart donc de zéro à chaque mise en ligne.
+
+1. Onglet **Disks** → **Add Disk**, Mount Path : `/var/data` (1 Go suffit largement)
+2. Onglet **Environment** → ajouter `ANALYSIS_COUNT_FILE=/var/data/analysis-count.json`
+
+> ⚠️ Les disques Render ne sont disponibles que sur les plans payants, et un service muni d'un
+> disque ne peut plus tourner qu'en **une seule instance**. C'est sans conséquence ici (le
+> compteur est de toute façon tenu en mémoire par une instance unique), mais à garder en tête
+> avant toute montée en charge : il faudrait alors un stockage partagé (Redis, Postgres).
+
+Sans disque persistant, l'application fonctionne normalement — seul le compteur se réinitialise
+périodiquement.
+
 ### Sur tout autre hébergeur Node (Railway, Fly.io, VPS, etc.)
 
 ```bash
