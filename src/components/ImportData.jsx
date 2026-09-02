@@ -301,16 +301,26 @@ export function ImportData({ onDataImported }) {
                 {savedDossiers.slice(0, 3).map(d => (
                   <div
                     key={d.id}
-                    onClick={() => loadSavedDossier(d)}
                     style={{
                       background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px',
-                      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s'
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.15s'
                     }}
                   >
-                    <div style={{ minWidth: 0, flex: 1 }}>
+                    {/* L'ouverture est portée par un vrai <button> plutôt que par la carte entière :
+                        celle-ci contient déjà le bouton Supprimer, et un rôle « button » ne peut pas
+                        contenir d'élément interactif. Ce bouton occupe tout l'espace disponible
+                        (flex: 1), la zone cliquable à la souris reste donc la même. */}
+                    <button
+                      onClick={() => loadSavedDossier(d)}
+                      aria-label={`Ouvrir le dossier ${d.nom}, modifié le ${d.date}`}
+                      style={{
+                        minWidth: 0, flex: 1, textAlign: 'left', cursor: 'pointer',
+                        background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit'
+                      }}
+                    >
                       <div style={{ fontWeight: 800, fontSize: '0.80rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.nom}</div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Modifié le {d.date}</div>
-                    </div>
+                    </button>
                     <button
                       onClick={(e) => deleteDossierFromStorage(d.id, e)}
                       aria-label={`Supprimer le dossier ${d.nom}`}
@@ -406,6 +416,9 @@ export function ImportData({ onDataImported }) {
                   <button
                     onClick={() => handleQuickLaunchSample(s)}
                     title="Lancer directement l'analyse (sans aperçu)"
+                    /* Le title seul est identique pour les trois exemples : sans le nom de
+                       l'exemple, un lecteur d'écran annoncerait trois fois la même chose. */
+                    aria-label={`Lancer directement l'analyse de l'exemple ${s.badge} (sans aperçu)`}
                     style={{
                       padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
                       color: '#124f66', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
@@ -418,6 +431,7 @@ export function ImportData({ onDataImported }) {
                   <button
                     onClick={() => downloadSampleExcel(s.id)}
                     title="Télécharger cet exemple au format Excel"
+                    aria-label={`Télécharger l'exemple ${s.badge} au format Excel`}
                     style={{
                       padding: '6px 8px', border: 'none', borderLeft: '1px solid #e2e8f0', background: '#f8fafc',
                       color: '#124f66', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s'

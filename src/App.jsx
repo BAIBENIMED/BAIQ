@@ -35,6 +35,7 @@ import { exportFinancialWorkbook, generateFullPDF } from './utils/lazyExporters'
 import { calculateStockEvolution, applyTvaRegimeToRatios } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
+import { clickable } from './utils/clickable';
 
 /* Avatar supprimé — on utilise des initiales */
 
@@ -681,7 +682,7 @@ export default function App() {
           <div 
             className={`kpi-card ${!r.rotationStocks ? '' : r.rotationStocks <= 45 ? 'kpi-good' : r.rotationStocks <= 75 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
-            onClick={() => setTab('ratios')}
+            {...clickable(() => setTab('ratios'))}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -706,7 +707,7 @@ export default function App() {
           <div 
             className={`kpi-card ${!r.delaiRecouvrement ? '' : r.delaiRecouvrement <= 45 ? 'kpi-good' : r.delaiRecouvrement <= 60 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
-            onClick={() => setTab('ratios')}
+            {...clickable(() => setTab('ratios'))}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -731,7 +732,7 @@ export default function App() {
           <div 
             className={`kpi-card ${!r.delaiFournisseurs ? '' : r.delaiFournisseurs >= 45 && r.delaiFournisseurs <= 90 ? 'kpi-good' : r.delaiFournisseurs > 90 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
-            onClick={() => setTab('ratios')}
+            {...clickable(() => setTab('ratios'))}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -756,7 +757,7 @@ export default function App() {
           <div 
             className={`kpi-card ${!r.bfrJoursCA ? '' : r.bfrJoursCA <= 60 ? 'kpi-good' : r.bfrJoursCA <= 90 ? 'kpi-warning' : 'kpi-bad'}`}
             style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} 
-            onClick={() => setTab('ratios')}
+            {...clickable(() => setTab('ratios'))}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1166,6 +1167,7 @@ export default function App() {
             <button
               onClick={toggleTheme}
               title={theme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'}
+              aria-label={theme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair'}
               style={{
                 width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border)',
                 background: 'var(--surface-alt)', cursor: 'pointer', display: 'flex',

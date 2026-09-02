@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { AccountDetailDrawer } from './AccountDetailDrawer';
 import { EmptyState } from './EmptyState';
 import { buildTCRRows } from '../utils/financeCalculations';
+import { clickable } from '../utils/clickable';
 
 export function SIGView({ data, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
@@ -235,7 +236,11 @@ export function SIGView({ data, rows, formatCurrency }) {
                 return (
                   <tr
                     key={i}
-                    onClick={() => isCompte && openDrillDownForCode(r.code, r.label)}
+                    /* Seules les lignes de compte ouvrent un détail : les totaux et sous-totaux
+                       ne doivent donc pas entrer dans l'ordre de tabulation. */
+                    {...(isCompte
+                      ? clickable(() => openDrillDownForCode(r.code, r.label), `Détail du compte ${r.code} — ${r.label}`)
+                      : {})}
                     style={{ background: rowBg, fontWeight, color, cursor: isCompte ? 'pointer' : 'default' }}
                   >
                     <td>

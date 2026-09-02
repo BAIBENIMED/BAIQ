@@ -874,6 +874,7 @@ export function AIView({ data, geminiKey }) {
               />
               <button
                 onClick={sendMessage}
+                aria-label="Envoyer le message"
                 disabled={!data || isLoading || !inputText.trim()}
                 style={{ width: 42, height: 42, borderRadius: 10, border: 'none', cursor: (!data || isLoading || !inputText.trim()) ? 'not-allowed' : 'pointer', background: (!data || !inputText.trim()) ? '#e2e8f0' : 'linear-gradient(135deg, #1b6e8c, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >

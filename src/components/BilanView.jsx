@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AccountDetailDrawer } from './AccountDetailDrawer';
 import { EmptyState } from './EmptyState';
+import { clickable } from '../utils/clickable';
 
 export function BilanView({ data, dataN1, rows, formatCurrency }) {
   const [drawerState, setDrawerState] = useState({ isOpen: false, title: '', accountPrefixes: [], excludePrefixes: [] });
@@ -258,7 +259,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                     const diff = (r.val || 0) - (r.valN1 || 0);
                     const pct  = r.valN1 ? (diff / Math.abs(r.valN1)) * 100 : 0;
                     return (
-                      <tr key={i} onClick={() => openDrillDown(r.label, r.prefixes, r.exclude)} style={{ cursor: 'pointer' }}>
+                      <tr key={i} {...clickable(() => openDrillDown(r.label, r.prefixes, r.exclude), `Détail du poste ${r.label}`)} style={{ cursor: 'pointer' }}>
                         <td style={{ paddingLeft: 32, fontWeight: 600 }}>{r.label}</td>
                         <td className="right" style={{ color: r.color || 'var(--text)', fontWeight: 700 }}>{fmt(r.val)}</td>
                         {isComparative && <td className="right mono">{fmt(r.valN1)}</td>}
@@ -283,7 +284,7 @@ export function BilanView({ data, dataN1, rows, formatCurrency }) {
                     const diff = (r.val || 0) - (r.valN1 || 0);
                     const pct  = r.valN1 ? (diff / Math.abs(r.valN1)) * 100 : 0;
                     return (
-                      <tr key={i} onClick={() => openDrillDown(r.label, r.prefixes, r.exclude)} style={{ cursor: 'pointer' }}>
+                      <tr key={i} {...clickable(() => openDrillDown(r.label, r.prefixes, r.exclude), `Détail du poste ${r.label}`)} style={{ cursor: 'pointer' }}>
                         <td style={{ paddingLeft: 32, fontWeight: 600 }}>{r.label}</td>
                         <td className="right" style={{ color: r.color || 'var(--text)', fontWeight: 700 }}>{fmt(r.val)}</td>
                         {isComparative && <td className="right mono">{fmt(r.valN1)}</td>}
