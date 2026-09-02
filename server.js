@@ -184,7 +184,20 @@ function writeAnalysisCount(count) {
 // Auparavant, chaque incrément relisait puis réécrivait le fichier : la séquence
 // n'étant pas atomique, deux requêtes simultanées perdaient un incrément, et chaque
 // appel déclenchait une écriture disque synchrone.
-let analysisCount = readAnalysisCount();
+// Plancher du compteur (ANALYSIS_COUNT_BASELINE).
+//
+// Sur un hébergeur SANS disque persistant — typiquement le plan gratuit de Render, où
+// l'instance est détruite après une quinzaine de minutes d'inactivité — le fichier local
+// disparaît très fréquemment et le compteur public retomberait à zéro plusieurs fois par
+// jour. Ce plancher permet de repartir d'un total déjà atteint plutôt que de zéro.
+//
+// À n'ajuster QUE sur un total réellement observé : la valeur affichée reste ainsi un
+// minorant honnête (« au moins N analyses lancées »), jamais un chiffre gonflé.
+// La vraie solution reste un stockage partagé (disque persistant, Redis, Postgres) ;
+// ce plancher n'est qu'un palliatif pour les hébergements éphémères.
+const ANALYSIS_COUNT_BASELINE = Number.parseInt(process.env.ANALYSIS_COUNT_BASELINE || '0', 10) || 0;
+
+let analysisCount = Math.max(readAnalysisCount(), ANALYSIS_COUNT_BASELINE);
 let ecritureDifferee = null;
 
 function planifierEcriture() {

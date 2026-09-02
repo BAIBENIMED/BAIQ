@@ -61,8 +61,20 @@ public repart donc de zéro à chaque mise en ligne.
 > compteur est de toute façon tenu en mémoire par une instance unique), mais à garder en tête
 > avant toute montée en charge : il faudrait alors un stockage partagé (Redis, Postgres).
 
-Sans disque persistant, l'application fonctionne normalement — seul le compteur se réinitialise
-périodiquement.
+**Sur le plan gratuit** (pas de disque disponible), l'instance est en outre mise en veille puis
+détruite après une quinzaine de minutes d'inactivité : le fichier local disparaît alors très
+fréquemment. Deux options :
+
+- **Palliatif sans coût** : définir `ANALYSIS_COUNT_BASELINE` sur un total déjà atteint (p. ex.
+  `ANALYSIS_COUNT_BASELINE=250`). Le compteur repart de cette valeur au lieu de zéro à chaque
+  réveil de l'instance. À n'ajuster que sur un total réellement observé — le nombre affiché
+  reste ainsi un minorant honnête, jamais un chiffre gonflé.
+- **Vraie persistance sans quitter la gratuité** : brancher un stockage clé-valeur externe à
+  offre gratuite (Upstash Redis, Supabase…) et y déplacer la lecture/écriture du compteur.
+  Cela suppose de créer un compte chez ce fournisseur.
+
+Dans tous les cas, l'application fonctionne normalement sans aucune de ces options — seul le
+compteur se réinitialise.
 
 ### Sur tout autre hébergeur Node (Railway, Fly.io, VPS, etc.)
 
