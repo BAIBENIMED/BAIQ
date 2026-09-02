@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 /**
  * Parseur de nombre robuste pour les exports comptables (SCF Algérie & au-delà).
  *
@@ -1092,7 +1090,7 @@ export function calculateStockEvolution(rows) {
 export const parseFile = async (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         let data;
         if (file.name.endsWith('.csv')) {
@@ -1120,7 +1118,12 @@ export const parseFile = async (file) => {
               });
             });
         } else {
-          // Utiliser xlsx pour Excel (en mode tableau 2D)
+          // Utiliser xlsx pour Excel (en mode tableau 2D).
+          // Chargé dynamiquement : la bibliothèque pèse plusieurs centaines de kilo-octets
+          // et ne sert qu'ici, à l'import d'un fichier .xlsx. Un import statique l'aurait
+          // embarquée dans le bundle initial de tous les visiteurs, y compris ceux qui
+          // n'importent qu'un CSV ou consultent un dossier déjà enregistré.
+          const XLSX = await import('xlsx');
           const workbook = XLSX.read(e.target.result, { type: 'binary' });
           const firstSheet = workbook.SheetNames[0];
           data = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { header: 1 });

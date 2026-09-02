@@ -7,7 +7,6 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import * as XLSX from 'xlsx';
 import realDataAlgerie2026 from './realDataAlgerie2026.json';
 import realDataIbai2025 from './realDataIbai2025.json';
 
@@ -77,10 +76,13 @@ export const SAMPLE_BALANCES = [
 ];
 
 /**
- * Génère et télécharge un fichier Excel réel (.xlsx) pour un exemple donné
+ * Génère et télécharge un fichier Excel réel (.xlsx) pour un exemple donné.
+ * xlsx est chargé dynamiquement (cf. parseFile) : cette fonction n'est appelée qu'au
+ * clic sur « Télécharger cet exemple », il serait inutile d'en peser le bundle initial.
  */
-export function downloadSampleExcel(sampleId) {
+export async function downloadSampleExcel(sampleId) {
   const sample = SAMPLE_BALANCES.find(s => s.id === sampleId) || SAMPLE_BALANCES[0];
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   const headers = [

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { MODEL_TEMPLATES, MAX_SCENARIOS, createScenario, createSimulationEntryFromLines, recalculateSimulatedDataset } from '../utils/simulationEngine';
-import { generateFullPDF } from '../utils/pdfExporter';
+import { generateFullPDF } from '../utils/lazyExporters';
 import { useEscapeKey } from '../utils/useEscapeKey';
 
 const SCENARIO_COLORS = ['#1b6e8c', '#c08a2e', '#7c3aed'];

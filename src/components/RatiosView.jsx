@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { getSecteur } from '../utils/secteurs';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
-import { exportFinancialWorkbook } from '../utils/excelExporter';
+import { exportFinancialWorkbook } from '../utils/lazyExporters';
 
 // ── Gauge Card (demi-cercle) ──
 const GaugeCard = ({ title, description, value, min, max, isPercentage, targetNorm }) => {

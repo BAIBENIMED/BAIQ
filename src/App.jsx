@@ -1,7 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { 
   BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie 
 } from 'recharts';
+
+// Vues lourdes chargées à la demande : elles ne sont pas affichées au premier
+// écran et représentent une part importante du bundle (tableaux d'audit, rapports,
+// simulateur, assistant IA). Le code n'est téléchargé qu'à l'ouverture de l'onglet.
+const AuditBalanceView = lazy(() => import('./components/AuditBalanceView').then(m => ({ default: m.AuditBalanceView })));
+const StockView = lazy(() => import('./components/StockView').then(m => ({ default: m.StockView })));
+const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
+const AIView = lazy(() => import('./components/AIView').then(m => ({ default: m.AIView })));
+const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator').then(m => ({ default: m.WhatIfSimulator })));
+const CalculationsIndexView = lazy(() => import('./components/CalculationsIndexView').then(m => ({ default: m.CalculationsIndexView })));
+const PresentationView = lazy(() => import('./components/PresentationView').then(m => ({ default: m.PresentationView })));
+
 import { ImportData } from './components/ImportData';
 import { BilanView } from './components/BilanView';
 import { SIGView } from './components/SIGView';
@@ -10,17 +22,16 @@ import { CapitauxPropresView } from './components/CapitauxPropresView';
 import { TableauFluxTresorerieView } from './components/TableauFluxTresorerieView';
 import { RatiosView } from './components/RatiosView';
 import { BalanceView } from './components/BalanceView';
-import { AuditBalanceView } from './components/AuditBalanceView';
-import { StockView } from './components/StockView';
-import { ReportsView } from './components/ReportsView';
-import { AIView } from './components/AIView';
-import { WhatIfSimulator } from './components/WhatIfSimulator';
-import { CalculationsIndexView } from './components/CalculationsIndexView';
+
+
+
+
+
+
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { PostImportConfigModal } from './components/PostImportConfigModal';
-import { PresentationView } from './components/PresentationView';
-import { exportFinancialWorkbook } from './utils/excelExporter';
-import { generateFullPDF } from './utils/pdfExporter';
+
+import { exportFinancialWorkbook, generateFullPDF } from './utils/lazyExporters';
 import { calculateStockEvolution, applyTvaRegimeToRatios } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
@@ -1190,7 +1201,16 @@ export default function App() {
               </div>
             </div>
           )}
-          {renderContent()}
+          {/* Les vues lourdes sont chargées à la demande (cf. lazy() en haut de fichier) :
+              ce Suspense couvre le court instant de téléchargement du module de l'onglet. */}
+          <Suspense fallback={
+            <div className="card fade-in" style={{ maxWidth: 420, margin: '60px auto', padding: '40px 32px', textAlign: 'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--primary)', display: 'block', marginBottom: 12 }}>hourglass_top</span>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>Chargement du module…</p>
+            </div>
+          }>
+            {renderContent()}
+          </Suspense>
         </main>
       </div>
 

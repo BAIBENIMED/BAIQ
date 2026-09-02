@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { exportFinancialWorkbook } from '../utils/excelExporter';
+import { exportFinancialWorkbook } from '../utils/lazyExporters';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
 import { generateGeminiReport, generateLocalStructuredReport } from '../utils/aiEngine';
-import { generateFullPDF } from '../utils/pdfExporter';
+import { generateFullPDF } from '../utils/lazyExporters';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Rapport Financier Complet avec Diagnostic IA Gemini
