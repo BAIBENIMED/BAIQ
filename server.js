@@ -11,7 +11,14 @@
  * Déploiement sur Render : créer un "Web Service" (et non un "Static Site"),
  * Build Command : npm install && npm run build
  * Start Command  : npm run start
- * Variable d'environnement à définir : GEMINI_API_KEY
+ *
+ * Variables d'environnement :
+ *   - GEMINI_API_KEY       (requise pour les rapports IA)
+ *   - ANALYSIS_COUNT_FILE  (recommandée en production) chemin du compteur global
+ *     d'analyses. Le système de fichiers de Render étant éphémère, laisser la
+ *     valeur par défaut ferait repartir le compteur public de zéro à chaque
+ *     redéploiement. Attacher un disque (Disks → Add Disk, Mount Path /var/data)
+ *     puis définir ANALYSIS_COUNT_FILE=/var/data/analysis-count.json
  */
 import express from 'express';
 import path from 'path';
@@ -118,24 +125,56 @@ app.get('/api/gemini/status', (req, res) => {
 // ── Compteur global d'analyses lancées ──────────────────────────────────────
 // Compte le nombre total d'analyses lancées sur l'application, TOUS visiteurs
 // confondus (et non par navigateur/localStorage, qui repartirait de zéro pour
-// chaque utilisateur). Persisté dans un fichier JSON local pour survivre aux
-// redémarrages du serveur — même principe de simplicité que le rate limiting
-// en mémoire ci-dessus, sans base de données dédiée.
-const analysisCountPath = path.join(__dirname, 'analysis-count.json');
+// chaque utilisateur). Persisté dans un fichier JSON, sans base de données —
+// même principe de simplicité que le rate limiting en mémoire ci-dessus.
+//
+// ⚠️ EMPLACEMENT DU FICHIER EN PRODUCTION
+// Par défaut, le fichier est écrit à côté de server.js. Sur un hébergeur dont le
+// système de fichiers est éphémère (Render, Heroku...), ce répertoire est REMIS À
+// ZÉRO à chaque redéploiement et à chaque redémarrage d'instance : le compteur
+// public repartirait de zéro sans prévenir.
+// Pour le conserver, attacher un disque persistant et définir la variable
+// d'environnement ANALYSIS_COUNT_FILE sur un chemin situé dans ce disque, p. ex. :
+//     ANALYSIS_COUNT_FILE=/var/data/analysis-count.json
+// (sur Render : Disks → Add Disk, Mount Path /var/data).
+//
+// Limite connue : le compteur vit en mémoire et n'est vidé que dans ce fichier. Un
+// déploiement à PLUSIEURS instances ferait diverger puis s'écraser les compteurs
+// de chaque instance ; il faudrait alors un stockage partagé (Redis, Postgres).
+const analysisCountPath = process.env.ANALYSIS_COUNT_FILE
+  ? path.resolve(process.env.ANALYSIS_COUNT_FILE)
+  : path.join(__dirname, 'analysis-count.json');
 
 function readAnalysisCount() {
   try {
     const raw = fs.readFileSync(analysisCountPath, 'utf8');
     const parsed = JSON.parse(raw);
     return Number.isFinite(parsed.count) ? parsed.count : 0;
-  } catch {
+  } catch (err) {
+    // Fichier absent = premier démarrage légitime, on part de 0 en silence.
+    // Toute autre erreur (droits insuffisants, disque non monté, JSON corrompu)
+    // signifie qu'un compteur existant est peut-être sur le point d'être écrasé
+    // par un 0 : il faut que cela se voie dans les journaux.
+    if (err?.code !== 'ENOENT') {
+      console.error(
+        `⚠ Compteur d'analyses illisible (${analysisCountPath}) : ${err?.message || err}\n` +
+        "  Démarrage à 0 — si un compteur existait, il sera écrasé au prochain incrément."
+      );
+    }
     return 0;
   }
 }
 
 function writeAnalysisCount(count) {
   try {
-    fs.writeFileSync(analysisCountPath, JSON.stringify({ count }), 'utf8');
+    fs.mkdirSync(path.dirname(analysisCountPath), { recursive: true });
+    // Écriture atomique : on écrit d'abord un fichier temporaire, puis on le renomme.
+    // Un rename est atomique sur le même volume, si bien qu'une coupure en pleine
+    // écriture ne peut pas laisser un JSON tronqué — qui serait ensuite illisible
+    // et ramènerait le compteur à zéro.
+    const tmp = `${analysisCountPath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ count }), 'utf8');
+    fs.renameSync(tmp, analysisCountPath);
   } catch (err) {
     console.error('Impossible d\'écrire le compteur d\'analyses :', err?.message || err);
   }
