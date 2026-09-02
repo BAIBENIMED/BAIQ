@@ -1,6 +1,21 @@
 <!doctype html>
 <html lang="fr">
   <head>
+    <!--
+      Redirection vers le service Web qui fait réellement tourner server.js.
+      baiq.onrender.com reste un Static Site historique (Render n'exécute jamais
+      de backend sur ce type de service : /api/* y répond 404, le compteur global
+      et l'Assistant IA n'y ont jamais fonctionné). Le service actif est
+      baiq-web.onrender.com. Un Redirect Rule côté Render couvre déjà les chemins
+      qui n'ont pas de fichier statique correspondant, mais la racine "/" sert
+      toujours cet index.html en priorité — d'où ce filet de sécurité, restreint
+      au seul ancien nom d'hôte pour ne jamais s'appliquer au service actif.
+    -->
+    <script>
+      if (location.hostname === 'baiq.onrender.com') {
+        location.replace('https://baiq-web.onrender.com' + location.pathname + location.search + location.hash);
+      }
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
