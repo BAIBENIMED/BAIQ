@@ -255,6 +255,27 @@ export function ImportData({ onDataImported }) {
         </div>
       </div>
 
+      {/* Comment ça marche — toujours visible (pas de fermeture / première-fois à gérer),
+          pour qu'un nouvel utilisateur comprenne le flux d'un coup d'œil sans gêner un
+          utilisateur récurrent qui reviendrait importer sa balance du mois suivant. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: '18px 22px' }}>
+        {[
+          { icon: 'upload_file', color: '#1b6e8c', titre: '1. Importer', texte: 'Déposez votre balance comptable SCF (Excel/CSV), exercice N et N-1 si disponible.' },
+          { icon: 'insights', color: '#7c3aed', titre: '2. Analyser', texte: "BAIQ génère automatiquement bilan officiel, SIG, ratios, score de solvabilité (Banque d'Algérie, Altman Z'') et audit de cohérence." },
+          { icon: 'download', color: '#059669', titre: '3. Exporter', texte: "Rapport PDF structuré, classeur Excel multi-feuilles, ou posez vos questions à l'Assistant IA." },
+        ].map((etape, i) => (
+          <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: `${etape.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 19, color: etape.color }}>{etape.icon}</span>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', marginBottom: 2 }}>{etape.titre}</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45 }}>{etape.texte}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {saveError && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10,
