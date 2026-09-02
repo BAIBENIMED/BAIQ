@@ -195,7 +195,14 @@ function writeAnalysisCount(count) {
 // minorant honnête (« au moins N analyses lancées »), jamais un chiffre gonflé.
 // La vraie solution reste un stockage partagé (disque persistant, Redis, Postgres) ;
 // ce plancher n'est qu'un palliatif pour les hébergements éphémères.
-const ANALYSIS_COUNT_BASELINE = Number.parseInt(process.env.ANALYSIS_COUNT_BASELINE || '0', 10) || 0;
+//
+// La valeur par défaut ci-dessous est un relevé daté, pas une constante : total constaté
+// au 02/09/2026. Elle évite d'avoir à définir la variable sur l'hébergeur, mais elle se
+// périme — la variable d'environnement ANALYSIS_COUNT_BASELINE reste prioritaire et permet
+// de relever le plancher sans redéployer.
+const BASELINE_CONSTATEE = 200; // relevé du 02/09/2026
+const ANALYSIS_COUNT_BASELINE =
+  Number.parseInt(process.env.ANALYSIS_COUNT_BASELINE || String(BASELINE_CONSTATEE), 10) || 0;
 
 let analysisCount = Math.max(readAnalysisCount(), ANALYSIS_COUNT_BASELINE);
 let ecritureDifferee = null;

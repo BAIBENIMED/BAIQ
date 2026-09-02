@@ -65,10 +65,12 @@ public repart donc de zéro à chaque mise en ligne.
 détruite après une quinzaine de minutes d'inactivité : le fichier local disparaît alors très
 fréquemment. Deux options :
 
-- **Palliatif sans coût** : définir `ANALYSIS_COUNT_BASELINE` sur un total déjà atteint (p. ex.
-  `ANALYSIS_COUNT_BASELINE=250`). Le compteur repart de cette valeur au lieu de zéro à chaque
-  réveil de l'instance. À n'ajuster que sur un total réellement observé — le nombre affiché
-  reste ainsi un minorant honnête, jamais un chiffre gonflé.
+- **Palliatif sans coût** (déjà en place) : un plancher est codé en dur dans `server.js`
+  (`BASELINE_CONSTATEE`, relevé du 02/09/2026). Le compteur repart de cette valeur au lieu de
+  zéro à chaque réveil de l'instance. Pour le relever **sans redéployer**, définir la variable
+  `ANALYSIS_COUNT_BASELINE` sur l'hébergeur : elle est prioritaire sur la valeur du code.
+  À n'ajuster que sur un total réellement observé — le nombre affiché reste ainsi un minorant
+  honnête, jamais un chiffre gonflé. Pensez à le relever de temps en temps, sinon il se périme.
 - **Vraie persistance sans quitter la gratuité** : brancher un stockage clé-valeur externe à
   offre gratuite (Upstash Redis, Supabase…) et y déplacer la lecture/écriture du compteur.
   Cela suppose de créer un compte chez ce fournisseur.
