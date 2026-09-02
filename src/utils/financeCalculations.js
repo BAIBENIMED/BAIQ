@@ -13,7 +13,7 @@
  * le séparateur qui apparaît EN DERNIER dans la chaîne est le séparateur décimal,
  * l'autre est un séparateur de milliers à supprimer.
  */
-export const safeNum = (v) => {
+export const safeNum = (v, decimalSeparator) => {
   if (v === undefined || v === null || v === '') return 0;
   if (typeof v === 'number') return isNaN(v) ? 0 : v;
 
@@ -39,12 +39,27 @@ export const safeNum = (v) => {
     } else {
       s = s.replace(/,/g, '');
     }
-  } else if (hasComma) {
-    const commaCount = (s.match(/,/g) || []).length;
-    s = commaCount > 1 ? s.replace(/,/g, '') : s.replace(',', '.');
-  } else if (hasDot) {
-    const dotCount = (s.match(/\./g) || []).length;
-    if (dotCount > 1) s = s.replace(/\./g, '');
+  } else if (hasComma || hasDot) {
+    const sep = hasComma ? ',' : '.';
+    const count = (s.match(hasComma ? /,/g : /\./g) || []).length;
+
+    if (count > 1) {
+      // "1.234.567" / "1,234,567" : plusieurs occurrences ⇒ séparateur de milliers.
+      s = s.split(sep).join('');
+    } else if (estAmbigu(s, sep)) {
+      // Cas indécidable sur la seule cellule : UN séparateur suivi d'EXACTEMENT
+      // 3 chiffres ("1.234" = 1234 ou 1,234 ?). Si l'appelant a identifié le
+      // séparateur décimal du fichier (cf. detectDecimalSeparator), on s'y fie ;
+      // sinon on conserve la lecture décimale historique, pour ne rien changer
+      // au comportement des appels existants.
+      if (decimalSeparator !== undefined && decimalSeparator !== sep) {
+        s = s.split(sep).join('');          // séparateur de milliers
+      } else if (sep === ',') {
+        s = s.replace(',', '.');            // décimale
+      }
+    } else if (sep === ',') {
+      s = s.replace(',', '.');
+    }
   }
 
   // Nettoyage final de tout caractère résiduel non numérique (hors point/tiret)
@@ -54,6 +69,69 @@ export const safeNum = (v) => {
   if (isNaN(n)) return 0;
   return negative ? -n : n;
 };
+
+/**
+ * Un séparateur unique suivi d'exactement trois chiffres est indécidable isolément :
+ * "1.234" vaut 1234 (séparateur de milliers) ou 1,234 (décimale). Un groupe de milliers
+ * fait toujours exactement 3 chiffres ; trois décimales sont rares en comptabilité, mais
+ * la cellule seule ne permet pas de conclure.
+ */
+function estAmbigu(s, sep) {
+  const i = s.lastIndexOf(sep);
+  if (i === -1) return false;
+  return /^\d{3}$/.test(s.slice(i + 1));
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DÉTECTION DU SÉPARATEUR DÉCIMAL À L'ÉCHELLE DU FICHIER
+ * ═══════════════════════════════════════════════════════════════════════════
+ * « 1.234 » vaut 1234 dans un export français (point = milliers) et 1,234 dans un
+ * export anglo-saxon (point = décimale) : un facteur 1000 d'écart sur un montant
+ * comptable, sans que rien ne le signale. La cellule seule ne permet pas de trancher —
+ * l'ensemble du fichier, si.
+ *
+ * Indices exploités :
+ *   1. Une valeur portant les DEUX séparateurs ("1.234,56") : le dernier est la décimale.
+ *   2. Un séparateur répété ("1.234.567") : c'est celui des milliers, donc l'autre est
+ *      la décimale.
+ *   3. Un séparateur unique suivi d'un nombre de chiffres ≠ 3 ("12,5" / "1234.56") :
+ *      un groupe de milliers faisant toujours 3 chiffres, c'est une décimale.
+ *
+ * Les cellules ambiguës ne votent pas : ce sont précisément celles à trancher.
+ *
+ * @param   {Array} samples Valeurs brutes des colonnes de montants
+ * @returns {'.'|','|null}  Séparateur décimal du fichier, ou null si aucun indice —
+ *                          aucune décimale n'ayant alors été observée nulle part, les
+ *                          cas ambigus relèvent du séparateur de milliers.
+ */
+export function detectDecimalSeparator(samples = []) {
+  let votesPoint = 0;
+  let votesVirgule = 0;
+
+  for (const brut of samples) {
+    if (brut === undefined || brut === null || typeof brut === 'number') continue;
+    let s = String(brut).trim().replace(/[\u00a0\u202f\u2009\u2007\u2008\s]/g, '');
+    if (!s) continue;
+    if (/^\(.*\)$/.test(s)) s = s.slice(1, -1);
+    if (!/[0-9]/.test(s)) continue;
+
+    const nbPoints = (s.match(/\./g) || []).length;
+    const nbVirgules = (s.match(/,/g) || []).length;
+
+    if (nbPoints && nbVirgules) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) votesVirgule++; else votesPoint++;
+      continue;
+    }
+    if (nbPoints > 1) { votesVirgule++; continue; }
+    if (nbVirgules > 1) { votesPoint++; continue; }
+    if (nbPoints === 1 && !estAmbigu(s, '.')) { votesPoint++; continue; }
+    if (nbVirgules === 1 && !estAmbigu(s, ',')) { votesVirgule++; continue; }
+  }
+
+  if (votesPoint === 0 && votesVirgule === 0) return null;
+  return votesPoint >= votesVirgule ? '.' : ',';
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -1290,62 +1368,40 @@ export const parseFile = async (file) => {
           return reject(new Error("Impossible de trouver la ligne d'en-tête (la colonne 'Compte' est introuvable)."));
         }
 
+        // ── Séparateur décimal du fichier ──
+        // Déterminé UNE fois sur l'ensemble des colonnes de montants, avant de lire la
+        // moindre ligne : « 1.234 » ne peut pas se trancher cellule par cellule, mais le
+        // reste du fichier porte presque toujours l'indice qui manque (une valeur à
+        // 2 décimales, un séparateur répété…). Sans cette passe, un export dont les
+        // milliers sont séparés par un point et sans décimales était lu 1000 fois trop
+        // petit, silencieusement.
+        const colonnesMontants = [
+          colMap.soldeDebutDebitIdx, colMap.soldeDebutCreditIdx,
+          colMap.mouvDebitIdx, colMap.mouvCreditIdx,
+          colMap.soldeFinDebitIdx, colMap.soldeFinCreditIdx,
+        ].filter(idx => idx !== undefined && idx !== null && idx !== -1);
+
+        const echantillons = [];
+        for (let i = headerRowIndex + 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length === 0) continue;
+          for (const idx of colonnesMontants) echantillons.push(row[idx]);
+        }
+        const separateurDecimal = detectDecimalSeparator(echantillons);
+
         const normalized = [];
         for (let i = headerRowIndex + 1; i < data.length; i++) {
           const row = data[i];
           if (!row || row.length === 0) continue;
-          
+
           const compte = String(row[colMap.compte] || '').trim();
           const libelle = String(row[colMap.libelle] || '').trim();
-          
-          const parseNumber = (val) => {
-            if (typeof val === 'number') return isNaN(val) ? 0 : val;
-            if (!val && val !== 0) return 0;
 
-            let s = String(val).trim();
-            if (!s) return 0;
-
-            // Supprimer tous types d'espaces (normaux, insécables, fins...) utilisés comme séparateurs de milliers
-            s = s.replace(/[\u00a0\u202f\u2009\u2007\u2008\u0020\t]/g, '').replace(/\s/g, '');
-
-            // Notation comptable négative entre parenthèses : (1234,56) → -1234,56
-            let negative = false;
-            if (/^\(.*\)$/.test(s)) {
-              negative = true;
-              s = s.slice(1, -1);
-            }
-
-            const hasComma = s.includes(',');
-            const hasDot = s.includes('.');
-
-            if (hasComma && hasDot) {
-              // Les deux séparateurs sont présents : celui qui apparaît EN DERNIER est le séparateur
-              // décimal, l'autre est un séparateur de milliers à supprimer.
-              // Ex FR : "1.234.567,89" (point = milliers, virgule = décimale)
-              // Ex EN : "1,234,567.89" (virgule = milliers, point = décimale)
-              if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
-                s = s.replace(/\./g, '').replace(',', '.');
-              } else {
-                s = s.replace(/,/g, '');
-              }
-            } else if (hasComma) {
-              // Une seule virgule → décimale française ("1234,56").
-              // Plusieurs virgules → séparateurs de milliers anglo-saxons ("1,234,567").
-              const commaCount = (s.match(/,/g) || []).length;
-              s = commaCount > 1 ? s.replace(/,/g, '') : s.replace(',', '.');
-            } else if (hasDot) {
-              // Plusieurs points → séparateurs de milliers français/belges ("1.234.567").
-              // Un seul point → décimale ("1234.56").
-              const dotCount = (s.match(/\./g) || []).length;
-              if (dotCount > 1) s = s.replace(/\./g, '');
-            }
-
-            const n = parseFloat(s);
-            if (isNaN(n)) return 0;
-            return negative ? -n : n;
-          };
-
-          const getCol = (idx) => (idx !== undefined && idx !== null && idx !== -1) ? parseNumber(row[idx]) : 0;
+          // safeNum() porte désormais seule la logique de parsing — elle était jusqu'ici
+          // dupliquée à l'identique dans cette boucle. Le séparateur décimal détecté sur
+          // l'ensemble du fichier lui est transmis pour trancher les valeurs ambiguës
+          // du type « 1.234 ».
+          const getCol = (idx) => (idx !== undefined && idx !== null && idx !== -1) ? safeNum(row[idx], separateurDecimal) : 0;
 
           const soldeDebutDebit  = getCol(colMap.soldeDebutDebitIdx);
           const soldeDebutCredit = getCol(colMap.soldeDebutCreditIdx);

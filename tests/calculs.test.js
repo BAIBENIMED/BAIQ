@@ -25,6 +25,7 @@ import {
   calculateBilanSCF,
   checkBalanceEquilibre,
   computeCapitauxPropres,
+  detectDecimalSeparator,
   safeNum,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
@@ -276,4 +277,55 @@ test('safeNum interprète les formats comptables courants', () => {
   assert.equal(safeNum(''), 0);
   assert.equal(safeNum(null), 0);
   assert.equal(safeNum('abc'), 0);
+});
+
+// ── 6. Séparateur décimal ambigu ───────────────────────────────────────────
+
+test('detectDecimalSeparator lit l\'indice porté par le reste du fichier', () => {
+  // Deux séparateurs dans une même valeur : le dernier est la décimale.
+  assert.equal(detectDecimalSeparator(['1.234.567,89']), ',', 'format français');
+  assert.equal(detectDecimalSeparator(['1,234,567.89']), '.', 'format anglo-saxon');
+  // Séparateur répété : c'est celui des milliers, donc l'autre est la décimale.
+  assert.equal(detectDecimalSeparator(['1.234.567']), ',', 'points répétés = milliers');
+  // Nombre de chiffres ≠ 3 après le séparateur : un groupe de milliers en fait toujours 3.
+  assert.equal(detectDecimalSeparator(['1234.56']), '.', 'deux décimales');
+  assert.equal(detectDecimalSeparator(['12,5']), ',', 'une décimale');
+  // Uniquement des cas ambigus : aucun indice exploitable.
+  assert.equal(detectDecimalSeparator(['1.234', '5.678']), null, 'tout est ambigu');
+  assert.equal(detectDecimalSeparator([]), null);
+});
+
+test('safeNum tranche « 1.234 » selon le séparateur décimal du fichier', () => {
+  // Sans indication : lecture décimale historique, comportement inchangé.
+  assert.equal(safeNum('1.234'), 1.234);
+  assert.equal(safeNum('1,234'), 1.234);
+
+  // Le fichier utilise la virgule comme décimale ⇒ le point est un séparateur de milliers.
+  assert.equal(safeNum('1.234', ','), 1234);
+  assert.equal(safeNum('1,234', ','), 1.234);
+
+  // Le fichier utilise le point comme décimale ⇒ la virgule sépare les milliers.
+  assert.equal(safeNum('1.234', '.'), 1.234);
+  assert.equal(safeNum('1,234', '.'), 1234);
+
+  // Aucune décimale observée dans tout le fichier ⇒ ce sont des milliers.
+  assert.equal(safeNum('1.234', null), 1234);
+  assert.equal(safeNum('1,234', null), 1234);
+
+  // Les valeurs non ambiguës ne sont jamais affectées par l'indication.
+  assert.equal(safeNum('1234.56', ','), 1234.56, 'deux décimales restent décimales');
+  assert.equal(safeNum('12,5', '.'), 12.5, 'une décimale reste décimale');
+  assert.equal(safeNum('1.234.567', ','), 1234567, 'séparateur répété inchangé');
+});
+
+test('un export à milliers pointés sans décimales n\'est plus divisé par 1000', () => {
+  // Cas réel visé : "1.234.567" ailleurs dans le fichier révèle que le point sépare
+  // les milliers, ce qui permet de lire "5.000" comme 5000 et non comme 5,000.
+  const colonne = ['1.234.567', '5.000', '250', '12.500'];
+  const sep = detectDecimalSeparator(colonne);
+  assert.equal(sep, ',', 'le point est identifié comme séparateur de milliers');
+  assert.deepEqual(
+    colonne.map(v => safeNum(v, sep)),
+    [1234567, 5000, 250, 12500]
+  );
 });
