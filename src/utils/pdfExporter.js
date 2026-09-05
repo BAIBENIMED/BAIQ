@@ -621,7 +621,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.setFontSize(7.5);
   doc.setTextColor(...T.inkMuted);
   const scfIntro = doc.splitTextToSize(
-    'Présentation conforme aux modèles officiels de Bilan et de Compte de Résultat du Système Comptable Financier (SCF) — à la différence du Bilan Fonctionnel (Section 3), de nature analytique. Le détail Brut / Amortissements-Provisions par rubrique est disponible dans l\'application, onglet « États Financiers (SCF) ».',
+    'Présentation conforme aux modèles officiels de Bilan et de Compte de Résultat du Système Comptable Financier (SCF) — à la différence du Bilan Fonctionnel (Section 3), de nature analytique.',
     W - margin * 2
   );
   doc.text(scfIntro, margin, y);
@@ -632,13 +632,45 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const an1 = bScf1?.actifNonCourant || null;
   const ac1 = bScf1?.actifCourant || null;
   const netOf = (line) => line?.net || 0;
+  const brutOf = (line) => line?.brut || 0;
+  const amortOf = (line) => line?.amortProv || 0;
+  // Amortissements/dépréciations affichés entre parenthèses (convention comptable de
+  // présentation d'une déduction), même logique que l'écran États Financiers (SCF).
+  const fmtAmort = (v) => (v ? `(${fmtDZD(v)})` : fmtDZD(0));
+  // Total Brut/Amort./Net d'une section : somme de toutes ses rubriques hors la clé
+  // "total" elle-même — même calcul que sumLines() dans EtatsFinanciersView.jsx, pour
+  // que le PDF et l'écran affichent des totaux identiques.
+  const sommeSection = (obj) => Object.keys(obj || {}).filter(k => k !== 'total').reduce((s, k) => {
+    const l = obj[k] || {};
+    return { brut: s.brut + (l.brut || 0), amortProv: s.amortProv + (l.amortProv || 0), net: s.net + (l.net || 0) };
+  }, { brut: 0, amortProv: 0, net: 0 });
+
+  const ancTotal = sommeSection(an);
+  const ancTotal1 = an1 ? sommeSection(an1) : null;
+  const acTotal = sommeSection(ac);
+  const acTotal1 = ac1 ? sommeSection(ac1) : null;
 
   y = latexSubSection(doc, '1.1. Bilan Actif — Rubriques Officielles', y);
 
-  const actifHead = [['ACTIF', 'NET N (DZD)', bScf1 ? 'NET N-1 (DZD)' : ''].filter(Boolean)];
-  const actifRow = (label, line, line1) => [label, fmtDZD(netOf(line)), bScf1 ? fmtDZD(netOf(line1)) : ''].filter((_, i) => bScf1 || i < 2);
+  // Ordre demandé : Brut N, puis Amort./Prov. N, puis Net N, puis Net N-1 — identique à
+  // l'écran États Financiers (SCF) et au modèle officiel "BILAN ACTIF (présentation)".
+  const actifHead = [['ACTIF', 'BRUT N', 'AMORT./PROV.', 'NET N', bScf1 ? 'NET N-1' : ''].filter(Boolean)];
+  const actifRow = (label, line, line1) => [
+    label,
+    fmtDZD(brutOf(line)),
+    fmtAmort(amortOf(line)),
+    fmtDZD(netOf(line)),
+    bScf1 ? fmtDZD(netOf(line1)) : '',
+  ].filter((_, i) => bScf1 || i < 4);
+  const actifTotalRow = (label, tot, tot1) => [
+    label,
+    fmtDZD(tot.brut),
+    fmtAmort(tot.amortProv),
+    fmtDZD(tot.net),
+    bScf1 ? fmtDZD(tot1?.net || 0) : '',
+  ].filter((_, i) => bScf1 || i < 4);
   const actifBody = [
-    ['ACTIF NON COURANT', '', bScf1 ? '' : ''].filter((_, i) => bScf1 || i < 2),
+    ['ACTIF NON COURANT', '', '', '', ''].filter((_, i) => bScf1 || i < 4),
     actifRow('Écart d\'acquisition (goodwill)', an.ecartAcquisition, an1?.ecartAcquisition),
     actifRow('Immobilisations incorporelles', an.immobilisationsIncorporelles, an1?.immobilisationsIncorporelles),
     actifRow('Terrains', an.terrains, an1?.terrains),
@@ -648,8 +680,8 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     actifRow('Immobilisations en cours', an.immobilisationsEnCours, an1?.immobilisationsEnCours),
     actifRow('Immobilisations financières', an.immobilisationsFinancieres, an1?.immobilisationsFinancieres),
     actifRow('Impôts différés actif', an.impotsDifferesActif, an1?.impotsDifferesActif),
-    ['TOTAL ACTIF NON COURANT', fmtDZD(an.total || 0), bScf1 ? fmtDZD(an1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
-    ['ACTIF COURANT', '', ''].filter((_, i) => bScf1 || i < 2),
+    actifTotalRow('TOTAL ACTIF NON COURANT', ancTotal, ancTotal1),
+    ['ACTIF COURANT', '', '', '', ''].filter((_, i) => bScf1 || i < 4),
     actifRow('Stocks et en-cours', ac.stocks, ac1?.stocks),
     actifRow('Clients', ac.clients, ac1?.clients),
     actifRow('Autres débiteurs', ac.autresDebiteurs, ac1?.autresDebiteurs),
@@ -657,16 +689,20 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     actifRow('Autres créances et emplois assimilés', ac.autresCreancesEmploisAssimiles, ac1?.autresCreancesEmploisAssimiles),
     actifRow('Placements et autres actifs financiers courants', ac.placements, ac1?.placements),
     actifRow('Trésorerie', ac.tresorerie, ac1?.tresorerie),
-    ['TOTAL ACTIF COURANT', fmtDZD(ac.total || 0), bScf1 ? fmtDZD(ac1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
-    ['TOTAL GÉNÉRAL DE L\'ACTIF', fmtDZD(bilanSCF.totalActif || 0), bScf1 ? fmtDZD(bScf1.totalActif || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    actifTotalRow('TOTAL ACTIF COURANT', acTotal, acTotal1),
+    actifTotalRow(
+      'TOTAL GÉNÉRAL DE L\'ACTIF',
+      { brut: ancTotal.brut + acTotal.brut, amortProv: ancTotal.amortProv + acTotal.amortProv, net: bilanSCF.totalActif || 0 },
+      (ancTotal1 && acTotal1) ? { net: bScf1.totalActif || 0 } : null
+    ),
   ];
 
   y = drawBooktabsTable(doc, actifHead, actifBody, y, {
     boldRows: [0, 10, 11, 19, 20],
     totalRowIndices: [10, 19],
     columnStyles: bScf1
-      ? { 0: { cellWidth: 100 }, 1: { halign: 'right' }, 2: { halign: 'right' } }
-      : { 0: { cellWidth: 130 }, 1: { halign: 'right' } }
+      ? { 0: { cellWidth: 50 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+      : { 0: { cellWidth: 68 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
   });
 
   doc.addPage();
