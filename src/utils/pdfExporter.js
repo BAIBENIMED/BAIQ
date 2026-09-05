@@ -10,51 +10,32 @@ import html2canvas from 'html2canvas';
 import { calculateAltmanZScore } from './solvabiliteEngine';
 import { buildTCRRows, auditBalanceAccounts } from './financeCalculations';
 
-const MARGIN = 18;
+const MARGIN = 17;
 
-// ── Palette — jetons BAIQ (src/index.css :root, mode clair) ────────────
 const T = {
-  inkPrimary:   [22, 24, 26],       // Encre des titres et montants
-  inkSecondary: [61, 65, 71],       // Corps de texte
-  inkMuted:     [135, 141, 148],    // Libellés de colonne, légendes
-  inkLight:     [176, 181, 186],    // Valeurs nulles, tirets
+  inkPrimary:   [16, 22, 27],
+  inkSecondary: [58, 66, 74],
+  inkMuted:     [116, 126, 136],
+  inkLight:     [176, 183, 190],
 
-  navy:         [18, 79, 102],      // --primary-dk BAIQ (#124f66)
-  darkRed:      [176, 42, 42],      // Alerte, contraste renforcé pour l'impression
-  darkGreen:    [21, 105, 76],      // Favorable, contraste renforcé
-  darkAmber:    [140, 92, 22],      // Vigilance
+  navy:         [18, 79, 102],     // accent porteur
+  navyDeep:     [11, 52, 70],
+  darkRed:      [166, 38, 38],
+  darkGreen:    [20, 100, 72],
+  darkAmber:    [133, 88, 20],
 
-  ruleHeavy:    [22, 24, 26],       // \bottomrule — 0.6 pt
-  ruleMedium:   [22, 24, 26],       // \midrule — 0.35 pt
-  ruleLight:    [228, 230, 232],    // Filet de ligne courante — 0.15 pt
-  boxBg:        [242, 245, 246],    // Fond des agrégats et des totaux
-  boxBorder:    [220, 238, 242],    // --primary-lt BAIQ (#dceef2)
-  accentBg:     [246, 232, 204],    // --accent-lt BAIQ
-
-  gold:         [156, 110, 30],     // --accent-dk BAIQ (#9c6e1e) — signature
+  ruleHeavy:    [16, 22, 27],      // cadre extérieur
+  ruleMedium:   [18, 79, 102],     // règles de structure
+  ruleLight:    [196, 205, 211],   // grille intérieure
+  boxBg:        [238, 244, 246],   // fond d'en-tête de tableau
+  boxBorder:    [18, 79, 102],
+  accentBg:     [246, 232, 204],
+  gold:         [156, 110, 30],
 };
-
-// ── Fonctions Utilitaires de Formatage ─────────────────────────────────
-// Note : fmtDZD (devise/arrondi du dossier) reste défini localement dans
-// generateFullPDF. Pour alléger les colonnes de montants, dupliquez-le en
-// version « nue » (sans suffixe de devise) et mettez l'unité dans l'en-tête
-// de colonne — « MONTANT N (DZD) » — au lieu de la répéter sur chaque ligne :
-//
-//   const fmtMoneyBare = (v) => {
-//     if (v === null || v === undefined || isNaN(v)) return '—';
-//     const num = Number(v);
-//     const [i, d] = Math.abs(num).toFixed(docRounding).split('.');
-//     return `${num < 0 ? '-' : ''}${i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${d ? ',' + d : ''}`;
-//   };
-//
-// puis utilisez fmtMoneyBare dans les tableaux et fmtDZD dans les tuiles KPI
-// et le texte courant. Rien d'autre à changer : les en-têtes du fichier
-// portent déjà « (DZD) ».
 
 const fmtPct = (v, d = 1) => {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  const prefix = v > 0 ? '+' : '';
-  return `${prefix}${(v * 100).toFixed(d)} %`;
+  return `${v > 0 ? '+' : ''}${(v * 100).toFixed(d)} %`;
 };
 
 const fmtNum = (v, d = 2) => {
@@ -69,26 +50,24 @@ const fmtDays = (v) => {
 
 const safeDiv = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 
-// Une cellule « vide de sens » : zéro strict ou tiret. Atténuée dans les
-// tableaux pour que la colonne de montants se lise d'un coup d'œil.
 const isVoidCell = (s) => {
   const t = String(s ?? '').trim();
   return t === '' || t === '—' || t === '-' || /^-?0(?:[.,]0+)?(?:\s\D+)?$/.test(t);
 };
 
-// Capture le badge BAIQ RÉEL affiché dans la barre latérale de l'application (voir
-// App.jsx, .baiq-logo-badge : carré noir arrondi, "B" blanc, point rouge + barre blanche
-// formant un "i" stylisé) via html2canvas, pour une fidélité pixel-parfaite à l'interface
-// — un rendu vectoriel à la main s'était révélé imprécis (proportions Flexbox difficiles
-// à reproduire à l'identique). Retourne { dataUrl, ratio } ou null si la capture échoue
-// (badge non monté dans le DOM, etc.) ; l'appelant doit alors se rabattre sur du texte seul.
+// Petit intitulé en capitales espacées — le libellé de champ du formulaire.
+function fieldLabel(doc, text, x, y, size = 6.2, color = T.inkMuted) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(size);
+  doc.setTextColor(...color);
+  doc.text(String(text).toUpperCase(), x, y);
+}
+
 async function captureBaiqBadge() {
   try {
     const el = document.querySelector('.baiq-logo-badge');
     if (!el) return null;
     const canvas = await html2canvas(el, { scale: 8, backgroundColor: null });
-    // Un badge non visible (sidebar repliée en mode mobile, onglet en arrière-plan, etc.)
-    // produit un canvas 0×0 — dataURL invalide qui ferait échouer doc.addImage() plus loin.
     if (!canvas.width || !canvas.height) return null;
     return { dataUrl: canvas.toDataURL('image/png'), ratio: canvas.height / canvas.width };
   } catch {
@@ -96,8 +75,6 @@ async function captureBaiqBadge() {
   }
 }
 
-// Dessine le badge à la position/taille données. Utilise l'image capturée si disponible,
-// sinon un repli vectoriel simplifié (texte "B" seul) pour ne jamais faire échouer l'export.
 function drawBaiqBadge(doc, x, y, size, badgeImg) {
   if (badgeImg) {
     doc.addImage(badgeImg.dataUrl, 'PNG', x, y, size, size * badgeImg.ratio);
@@ -111,14 +88,18 @@ function drawBaiqBadge(doc, x, y, size, badgeImg) {
   doc.text('B', x + size / 2, y + size * 0.68, { align: 'center' });
 }
 
-// Lockup complet (badge + wordmark "BAIQ" + ligne de signature), pour la page de garde.
-// `align` : 'center' centre l'ensemble sur x ; 'left' démarre le badge à x.
+// Lockup encadré : badge + wordmark + signature, dans un cartouche à filet.
 function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left', badgeImg = null) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(badgeSize * 1.05);
   const wordmarkW = doc.getTextWidth('BAIQ');
-  const gap = badgeSize * 0.28;
-  const totalW = badgeSize + gap + wordmarkW;
+  const gap = badgeSize * 0.3;
+  const sigW = (() => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(badgeSize * 0.26);
+    return doc.getTextWidth('BALANCE AND FINANCIAL ANALYTICS');
+  })();
+  const totalW = badgeSize + gap + Math.max(wordmarkW, sigW);
   const startX = align === 'center' ? x - totalW / 2 : x;
 
   drawBaiqBadge(doc, startX, y, badgeSize, badgeImg);
@@ -127,224 +108,259 @@ function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left', badgeImg = null
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(badgeSize * 1.05);
   doc.setTextColor(...T.inkPrimary);
-  doc.text('BAIQ', textX, y + badgeSize * 0.56);
+  doc.text('BAIQ', textX, y + badgeSize * 0.55);
 
-  // Signature en capitales espacées, sous le wordmark
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(badgeSize * 0.23);
-  doc.setTextColor(...T.inkMuted);
-  doc.text('BALANCE AND FINANCIAL ANALYTICS', textX, y + badgeSize * 0.92);
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.3);
+  doc.line(textX, y + badgeSize * 0.66, textX + sigW, y + badgeSize * 0.66);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(badgeSize * 0.26);
+  doc.setTextColor(...T.navy);
+  doc.text('BALANCE AND FINANCIAL ANALYTICS', textX, y + badgeSize * 0.96);
 
   return { width: totalW, startX };
 }
 
-// ── En-tête et Pied de Page ────────────────────────────────────────────
+// ── En-tête / pied de page : bandeaux à filets, folio encadré ──────────
 function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N', badgeImg = null) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const margin = MARGIN;
+  const m = MARGIN;
+  const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
 
-    // ── Page de garde : pied de page seul ──
     if (p === 1) {
-      doc.setDrawColor(...T.ruleLight);
-      doc.setLineWidth(0.15);
-      doc.line(margin, H - 15, W - margin, H - 15);
+      // Page de garde : double filet de pied, mention de confidentialité centrée
+      doc.setDrawColor(...T.navy);
+      doc.setLineWidth(0.6);
+      doc.line(m, H - 17, W - m, H - 17);
+      doc.setLineWidth(0.2);
+      doc.line(m, H - 16, W - m, H - 16);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(...T.inkMuted);
-      doc.text('BAIQ Platform — Rapport financier confidentiel à usage de gestion et d\'audit.', margin, H - 10);
-      doc.text('1', W - margin, H - 10, { align: 'right' });
+      fieldLabel(doc, 'Document confidentiel — usage de gestion et d\'audit', m, H - 11, 6.4, T.inkMuted);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.4);
+      doc.setTextColor(...T.navy);
+      doc.text('BAIQ PLATFORM', W - m, H - 11, { align: 'right' });
       continue;
     }
 
-    // ── En-tête ──
-    const badgeSize = 5.5;
-    drawBaiqBadge(doc, margin, 7.5, badgeSize, badgeImg);
+    // ── En-tête : bandeau plein étroit + ligne d'identification ──
+    doc.setFillColor(...T.navy);
+    doc.rect(m, 8, W - m * 2, 5.6, 'F');
+
+    const badgeSize = 4.2;
+    drawBaiqBadge(doc, m + 1.6, 8.7, badgeSize, badgeImg);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...T.inkPrimary);
-    doc.text('BAIQ', margin + badgeSize + 2.2, 11.6);
+    doc.setFontSize(7.2);
+    doc.setTextColor(255, 255, 255);
+    doc.text('BAIQ', m + 1.6 + badgeSize + 1.8, 11.9);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(...T.inkMuted);
-    const right = `${dossierName.toUpperCase()} · EXERCICE ${exerciceYear}`;
-    doc.text(doc.splitTextToSize(right, W - margin * 2 - 40)[0], W - margin, 11.6, { align: 'right' });
+    doc.setFontSize(6.4);
+    doc.text('RAPPORT D\'ANALYSE FINANCIÈRE — SYSTÈME COMPTABLE FINANCIER (SCF)', m + 1.6 + badgeSize + 12, 11.9);
 
-    doc.setDrawColor(...T.inkPrimary);
-    doc.setLineWidth(0.3);
-    doc.line(margin, 14, W - margin, 14);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.4);
+    doc.text(`EXERCICE ${String(exerciceYear).toUpperCase()}`, W - m - 1.8, 11.9, { align: 'right' });
 
-    // ── Pied de page ──
+    // Ligne d'identification du dossier, sous le bandeau
     doc.setDrawColor(...T.ruleLight);
-    doc.setLineWidth(0.15);
-    doc.line(margin, H - 13.5, W - margin, H - 13.5);
+    doc.setLineWidth(0.2);
+    doc.line(m, 17.4, W - m, 17.4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.4);
+    doc.setTextColor(...T.inkMuted);
+    doc.text(doc.splitTextToSize(`Entité : ${dossierName}`, W - m * 2 - 40)[0], m, 16.6);
+    doc.text(`Établi le ${printDate}`, W - m, 16.6, { align: 'right' });
 
-    const printDate = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+    // ── Pied de page : filet + folio encadré ──
+    doc.setDrawColor(...T.navy);
+    doc.setLineWidth(0.4);
+    doc.line(m, H - 14, W - m, H - 14);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.2);
     doc.setTextColor(...T.inkMuted);
-    doc.text('BAIQ · Système Comptable Financier (SCF)', margin, H - 9);
-    doc.text(`Généré le ${printDate} · Traitement local sécurisé`, W - margin, H - 9, { align: 'right' });
+    doc.text('BAIQ · Traitement local sécurisé — aucune donnée transmise à un tiers.', m, H - 9.6);
 
-    // Folio centré, sans tirets décoratifs
+    const folio = `${p} / ${totalPages}`;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...T.inkPrimary);
-    doc.text(`${p} / ${totalPages}`, W / 2, H - 9, { align: 'center' });
+    doc.setFontSize(6.8);
+    const fw = doc.getTextWidth(folio) + 5;
+    doc.setDrawColor(...T.navy);
+    doc.setLineWidth(0.3);
+    doc.rect(W - m - fw, H - 13, fw, 5.2, 'S');
+    doc.setTextColor(...T.navy);
+    doc.text(folio, W - m - fw / 2, H - 9.4, { align: 'center' });
   }
 }
 
-// Empêche un titre de se retrouver seul en bas de page (règle typographique de base :
-// un titre doit toujours être suivi d'au moins un peu de son contenu). Si l'espace restant
-// avant le pied de page est insuffisant, force un saut de page et repart du haut.
 function ensurePageSpace(doc, y, minSpace) {
   const H = doc.internal.pageSize.getHeight();
-  const footerZone = 20; // hauteur réservée au pied de page
-  if (y + minSpace > H - footerZone) {
+  if (y + minSpace > H - 20) {
     doc.addPage();
-    return 22; // marge haute standard, cohérente avec le reste du document
+    return 24;
   }
   return y;
 }
 
-// ── Titre de Section — numéro à l'or, intitulé en capitales, règle pleine
+// ── Titre de section : cartouche encadré, numéro en réserve blanche ────
 function latexSection(doc, number, title, y) {
   y = ensurePageSpace(doc, y, 26);
   const W = doc.internal.pageSize.getWidth();
-  const margin = MARGIN;
+  const m = MARGIN;
+  const h = 9.6;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(...T.gold);
-  doc.text(String(number), margin, y + 5.6);
-  const numW = doc.getTextWidth(String(number));
-
+  doc.setFillColor(...T.navy);
+  doc.rect(m, y, h, h, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.setTextColor(...T.inkPrimary);
-  doc.text(title.toUpperCase(), margin + numW + 5, y + 5, {
-    maxWidth: W - margin * 2 - numW - 5,
-  });
+  doc.setTextColor(255, 255, 255);
+  doc.text(String(number), m + h / 2, y + h / 2 + 3.3, { align: 'center' });
 
-  doc.setDrawColor(...T.inkPrimary);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y + 8.4, W - margin, y + 8.4);
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.4);
+  doc.rect(m + h, y, W - m * 2 - h, h, 'S');
 
-  return y + 15;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.6);
+  doc.setTextColor(...T.navyDeep);
+  doc.text(title.toUpperCase(), m + h + 4, y + h / 2 + 1.7, { maxWidth: W - m * 2 - h - 8 });
+
+  return y + h + 6;
 }
 
-// ── Sous-titre ─────────────────────────────────────────────────────────
+// ── Sous-titre : intitulé de rubrique numérotée, filet de soulignement ─
 function latexSubSection(doc, title, y) {
   y = ensurePageSpace(doc, y, 32);
-  const margin = MARGIN;
+  const W = doc.internal.pageSize.getWidth();
+  const m = MARGIN;
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...T.navy);
-  doc.text(title, margin, y);
-  return y + 5.5;
+  doc.setFontSize(8.6);
+  doc.setTextColor(...T.navyDeep);
+  doc.text(title, m, y);
+  const tw = Math.min(doc.getTextWidth(title), W - m * 2);
+
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.35);
+  doc.line(m, y + 1.6, m + tw, y + 1.6);
+
+  return y + 6;
 }
 
-// ── Ligne de définition / formule — remplace l'encadré ─────────────────
-// Le paramètre `height` est conservé pour compatibilité d'appel mais ignoré :
-// la hauteur suit désormais le texte, ce qui évite les blocs à moitié vides
-// et les sous-titres tronqués sur une seule ligne.
+// ── Cadre de formule : cartouche à onglet « FORMULE » ──────────────────
 function latexMathBox(doc, formulaText, subtitle, y, height = 18) { // eslint-disable-line no-unused-vars
   const W = doc.internal.pageSize.getWidth();
-  const margin = MARGIN;
-  let cy = y + 3.5;
+  const m = MARGIN;
+  const boxW = W - m * 2;
 
   doc.setFont('courier', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...T.navy);
-  doc.text(doc.splitTextToSize(formulaText, W - margin * 2), margin, cy);
-  cy += 5;
+  doc.setFontSize(8.4);
+  const fLines = doc.splitTextToSize(formulaText, boxW - 12);
 
+  let subLines = [];
   if (subtitle) {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(...T.inkSecondary);
-    const lines = doc.splitTextToSize(subtitle, W - margin * 2);
-    doc.text(lines, margin, cy);
-    cy += lines.length * 3.5;
+    doc.setFontSize(7.4);
+    subLines = doc.splitTextToSize(subtitle, boxW - 12);
   }
 
-  return cy + 6;
+  const h = 6 + fLines.length * 4.2 + (subLines.length ? subLines.length * 3.4 + 2 : 0) + 4;
+
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.35);
+  doc.rect(m, y, boxW, h, 'S');
+  doc.setFillColor(...T.navy);
+  doc.rect(m, y, 1.6, h, 'F');
+
+  // Onglet de libellé, posé sur le filet supérieur
+  doc.setFillColor(255, 255, 255);
+  doc.rect(m + 6, y - 1.6, 20, 3.2, 'F');
+  fieldLabel(doc, 'Formule', m + 7.4, y + 0.9, 5.8, T.navy);
+
+  let cy = y + 7.4;
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(8.4);
+  doc.setTextColor(...T.navyDeep);
+  doc.text(fLines, m + 6, cy);
+  cy += fLines.length * 4.2;
+
+  if (subLines.length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.4);
+    doc.setTextColor(...T.inkSecondary);
+    doc.text(subLines, m + 6, cy + 1.4);
+  }
+
+  return y + h + 6;
 }
 
-// ── Tuiles KPI — filet supérieur, hauteur automatique ──────────────────
+// ── Tuiles de chiffres clés : champs de formulaire jointifs ────────────
 function latexKpiRow(doc, items, y) {
   const W = doc.internal.pageSize.getWidth();
-  const margin = MARGIN;
-  const gap = 6;
-  const colW = (W - margin * 2 - gap * (items.length - 1)) / items.length;
-  let maxH = 0;
+  const m = MARGIN;
+  const n = items.length || 1;
+  const colW = (W - m * 2) / n;
+  const labelH = 5.2;
+  const bodyH = 17;
+  const h = labelH + bodyH;
+
+  y = ensurePageSpace(doc, y, h + 6);
 
   items.forEach((item, idx) => {
-    const x = margin + idx * (colW + gap);
+    const x = m + idx * colW;
     const tone =
       item.status === 'ok' ? T.darkGreen :
       item.status === 'danger' ? T.darkRed :
-      item.status === 'caution' ? T.darkAmber : null;
+      item.status === 'caution' ? T.darkAmber : T.navy;
 
-    // Filet supérieur : encre par défaut, couleur du statut si renseigné
-    doc.setDrawColor(...(tone || T.inkPrimary));
-    doc.setLineWidth(0.5);
-    doc.line(x, y, x + colW, y);
+    // Bandeau de libellé
+    doc.setFillColor(...T.boxBg);
+    doc.rect(x, y, colW, labelH, 'F');
+    doc.setDrawColor(...T.navy);
+    doc.setLineWidth(0.3);
+    doc.rect(x, y, colW, h, 'S');
+    doc.line(x, y + labelH, x + colW, y + labelH);
 
-    // Libellé sur une ou deux lignes, en capitales
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.4);
-    doc.setTextColor(...T.inkMuted);
-    const labelLines = doc.splitTextToSize(String(item.label || '').toUpperCase(), colW).slice(0, 2);
-    doc.text(labelLines, x, y + 4);
-    const labelH = Math.max(labelLines.length, 2) * 2.8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.9);
+    doc.setTextColor(...T.navyDeep);
+    const label = doc.splitTextToSize(String(item.label || '').toUpperCase(), colW - 5)[0];
+    doc.text(label, x + 2.5, y + 3.5);
 
-    // Valeur : corps adapté à la longueur, jamais tronquée
+    // Valeur
     const raw = String(item.val ?? '—');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(raw.length > 16 ? 11 : raw.length > 12 ? 13 : raw.length > 8 ? 15 : 17);
+    doc.setFontSize(raw.length > 16 ? 10 : raw.length > 12 ? 12 : raw.length > 8 ? 13.5 : 15);
     doc.setTextColor(...T.inkPrimary);
-    const valY = y + 4 + labelH + 4.5;
-    doc.text(doc.splitTextToSize(raw, colW)[0], x, valY);
+    doc.text(doc.splitTextToSize(raw, colW - 5)[0], x + 2.5, y + labelH + 7.4);
 
-    let cy = valY + 4.5;
-
-    // Appréciation, précédée d'une puce carrée à la couleur du statut
+    // Appréciation, précédée d'un carré de statut
     if (item.sub) {
-      let tx = x;
-      if (tone) {
-        doc.setFillColor(...tone);
-        doc.rect(x, cy - 1.5, 1.5, 1.5, 'F');
-        tx = x + 3;
-      }
-      doc.setFont('helvetica', tone ? 'bold' : 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(...(tone || T.inkSecondary));
-      const subLines = doc.splitTextToSize(String(item.sub), colW - (tone ? 3 : 0)).slice(0, 2);
-      doc.text(subLines, tx, cy);
-      cy += subLines.length * 3.1;
+      doc.setFillColor(...tone);
+      doc.rect(x + 2.5, y + labelH + 10.6, 1.4, 1.4, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.4);
+      doc.setTextColor(...tone);
+      const subLines = doc.splitTextToSize(String(item.sub), colW - 8).slice(0, 2);
+      doc.text(subLines, x + 5.2, y + labelH + 12);
     }
-
-    maxH = Math.max(maxH, cy - y);
   });
 
-  return y + maxH + 8;
+  return y + h + 6;
 }
 
-// ── Table Booktabs ─────────────────────────────────────────────────────
+// ── Tableau : grille complète, allure de formulaire officiel ───────────
 function drawBooktabsTable(doc, head, body, startY, opts = {}) {
-  const margin = MARGIN;
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const m = MARGIN;
+  const W = doc.internal.pageSize.getWidth();
   const emphasized = new Set(opts.boldRows || []);
-  const totals = new Set(opts.totalRowIndices || []);
-  // Hooks éventuellement fournis par l'appelant : chaînés après ceux du thème.
   const userParse = opts.didParseCell;
   const userDraw = opts.didDrawCell;
 
@@ -352,63 +368,52 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
     head,
     body,
     startY,
-    margin: { left: margin, right: margin },
-    theme: 'plain', // Filets sobres façon booktabs, sans zébrage
+    margin: { left: m, right: m },
+    theme: 'grid',
     styles: {
       font: 'helvetica',
-      fontSize: 7.8,
+      fontSize: 7.6,
       textColor: T.inkSecondary,
-      cellPadding: { top: 2.8, bottom: 2.8, left: 0, right: 4 },
-      lineWidth: 0,
+      cellPadding: { top: 2.2, bottom: 2.2, left: 2.4, right: 2.4 },
+      lineWidth: 0.15,
+      lineColor: T.ruleLight,
       valign: 'top',
     },
     headStyles: {
       font: 'helvetica',
-      fontStyle: 'normal',
-      fontSize: 6.4,
-      textColor: T.inkMuted,
-      fillColor: false, // Pas de fond : la règle sous l'en-tête suffit à le détacher
-      lineWidth: 0,
-      cellPadding: { top: 0, bottom: 2.8, left: 0, right: 4 },
+      fontStyle: 'bold',
+      fontSize: 6.3,
+      textColor: T.navyDeep,
+      fillColor: T.boxBg,
+      lineWidth: 0.25,
+      lineColor: T.navy,
+      cellPadding: { top: 2.4, bottom: 2.4, left: 2.4, right: 2.4 },
     },
     columnStyles: opts.columnStyles || {},
     ...opts,
-    // Les hooks du thème sont déclarés APRÈS le spread : ils gagnent sur ceux
-    // passés en opts, qu'ils rappellent en fin de traitement (userParse/userDraw).
-    // didParseCell (pas willDrawCell) : autoTable calcule déjà la police au moment du parsing,
-    // pour la mesure du texte — une mutation de style dans willDrawCell arrive trop tard et
-    // n'affecte pas le rendu du glyphe (bug constaté : boldRows ne produisait aucun gras malgré
-    // la mutation). didParseCell s'exécute avant cette mesure, donc avant le rendu réel.
+    // Hooks du thème déclarés après le spread : ils gagnent et rappellent
+    // ceux fournis par l'appelant.
     didParseCell: (data) => {
       const { section, cell, row, column } = data;
-      if (section !== 'body') return;
+      if (section === 'head' && Array.isArray(cell.text)) {
+        cell.text = cell.text.map((t) => String(t).toUpperCase());
+      }
+      if (section !== 'body') { if (userParse) userParse(data); return; }
 
       const isEmph = emphasized.has(row.index);
 
-      // Toute colonne alignée à droite représente un montant dans ce document
-      // (convention constante du fichier) : encre pleine, jamais grasse — la
-      // hiérarchie passe par les filets et les fonds, pas par le poids du texte.
-      if (cell.styles.halign === 'right') {
-        cell.styles.textColor = T.inkPrimary;
-      }
+      if (cell.styles.halign === 'right') cell.styles.textColor = T.inkPrimary;
 
-      // Agrégat / total : capitales, encre pleine, fond teinté sur toute la ligne
       if (isEmph) {
         cell.styles.fontStyle = 'bold';
-        cell.styles.textColor = T.inkPrimary;
+        cell.styles.textColor = T.navyDeep;
         cell.styles.fillColor = T.boxBg;
-        cell.styles.cellPadding = {
-          top: 3.2, bottom: 3.2,
-          left: column.index === 0 ? 1.8 : 0,
-          right: 4,
-        };
+        cell.styles.lineWidth = 0.25;
+        cell.styles.lineColor = T.navy;
         if (column.index === 0 && Array.isArray(cell.text)) {
           cell.text = cell.text.map((t) => String(t).toUpperCase());
         }
-      }
-
-      // Zéros et tirets atténués : l'œil va aux valeurs réelles
-      if (!isEmph && isVoidCell(cell.text?.[0])) {
+      } else if (isVoidCell(cell.text?.[0])) {
         cell.styles.textColor = T.inkLight;
       }
 
@@ -416,57 +421,32 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
     },
     didDrawCell: (data) => {
       const { doc: d, cell, row, column, section } = data;
-      const first = column.index === 0;
-      if (!first) {
-        if (userDraw) userDraw(data);
-        return;
-      }
 
-      // \toprule (haut du tableau) — hairline : c'est le \midrule qui porte l'accent
-      if (section === 'head' && row.index === 0) {
+      // Cadre extérieur du tableau, tracé sur la première/dernière colonne
+      if (column.index === 0) {
         d.setDrawColor(...T.ruleHeavy);
-        d.setLineWidth(0.1);
-        d.line(margin, cell.y, pageWidth - margin, cell.y);
+        d.setLineWidth(0.45);
+        if (section === 'head' && row.index === 0) {
+          d.line(m, cell.y, W - m, cell.y);
+        }
+        if (section === 'body' && row.index === body.length - 1) {
+          d.line(m, cell.y + cell.height, W - m, cell.y + cell.height);
+        }
+        d.line(m, cell.y, m, cell.y + cell.height);
       }
-
-      // \midrule (sous les en-têtes)
-      if (section === 'head' && row.index === head.length - 1) {
-        d.setDrawColor(...T.ruleMedium);
-        d.setLineWidth(0.35);
-        d.line(margin, cell.y + cell.height, pageWidth - margin, cell.y + cell.height);
-      }
-
-      if (section === 'body') {
-        const isLast = row.index === body.length - 1;
-
-        // Filet de ligne courante — ni sous un agrégat teinté, ni avant le \bottomrule
-        if (!emphasized.has(row.index) && !isLast) {
-          d.setDrawColor(...T.ruleLight);
-          d.setLineWidth(0.15);
-          d.line(margin, cell.y + cell.height, pageWidth - margin, cell.y + cell.height);
-        }
-
-        // Filet moyen au-dessus d'un total intermédiaire
-        if (totals.has(row.index)) {
-          d.setDrawColor(...T.ruleMedium);
-          d.setLineWidth(0.35);
-          d.line(margin, cell.y, pageWidth - margin, cell.y);
-        }
-
-        // \bottomrule (fin du tableau)
-        if (isLast) {
-          d.setDrawColor(...T.ruleHeavy);
-          d.setLineWidth(0.6);
-          d.line(margin, cell.y + cell.height, pageWidth - margin, cell.y + cell.height);
-        }
+      if (column.index === data.table.columns.length - 1) {
+        d.setDrawColor(...T.ruleHeavy);
+        d.setLineWidth(0.45);
+        d.line(cell.x + cell.width, cell.y, cell.x + cell.width, cell.y + cell.height);
       }
 
       if (userDraw) userDraw(data);
     },
   });
 
-  return (doc.lastAutoTable ? doc.lastAutoTable.finalY : startY) + 9;
+  return (doc.lastAutoTable ? doc.lastAutoTable.finalY : startY) + 7;
 }
+
 
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1219,8 +1199,9 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkSecondary);
-    doc.text(act, margin + 2, y);
-    y += 5;
+    const actLines = doc.splitTextToSize(act, W - margin * 2 - 2);
+    doc.text(actLines, margin + 2, y);
+    y += actLines.length * 4 + 1;
   });
 
   // ──────────────────────────────────────────────────────────────────
