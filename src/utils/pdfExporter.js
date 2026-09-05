@@ -614,18 +614,26 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.text('TABLE DES MATIÈRES', margin, y);
   y += 5;
 
-  const toc = [
-    ['1. États Financiers Officiels SCF (Bilan Actif/Passif & TCR I-X)', '2'],
-    ['2. Ratios Financiers Simplifiés (Synthèse)', '4'],
-    ['3. Équilibre Financier & Bilan Fonctionnel SCF', '5'],
-    ['4. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '6'],
-    ['5. Ratios Financiers, Solvabilité & Délais de Rotation', '7'],
-    ['6. Analyse Comparative Pluriannuelle (N vs N-1)', '8'],
-    ['7. Matrice des Risques & Notation de Solvabilité (Altman Z\'\')', '9'],
-    ['8. Audit des Natures de Comptes & Anomalies d\'Écritures', '11'],
-  ];
+  const sectionPages = {};
 
-  toc.forEach(([title, pageNum]) => {
+  // Le numéro de page de chaque section n'est connu qu'une fois tout le document
+  // généré (le nombre de pages par section varie selon les données : N-1 présent
+  // ou non, nombre d'anomalies d'audit, etc.). On dessine donc la table des
+  // matières une première fois avec un espace réservé, puis on revient sur cette
+  // page à la toute fin (voir tocPatch plus bas) pour y inscrire les vrais numéros.
+  const toc = [
+    ['1. États Financiers Officiels SCF (Bilan Actif/Passif & TCR I-X)', '1'],
+    ['2. Ratios Financiers Simplifiés (Synthèse)', '2'],
+    ['3. Équilibre Financier & Bilan Fonctionnel SCF', '3'],
+    ['4. Compte de Résultat & Soldes Intermédiaires de Gestion (TCR)', '4'],
+    ['5. Ratios Financiers, Solvabilité & Délais de Rotation', '5'],
+    ['6. Analyse Comparative Pluriannuelle (N vs N-1)', '6'],
+    ['7. Matrice des Risques & Notation de Solvabilité (Altman Z\'\')', '7'],
+    ['8. Audit des Natures de Comptes & Anomalies d\'Écritures', '8'],
+  ];
+  const tocPatch = [];
+
+  toc.forEach(([title, sectionKey]) => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...T.inkPrimary);
@@ -644,9 +652,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     }
     doc.setLineDash([]);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...T.navy);
-    doc.text(pageNum, W - margin, y, { align: 'right' });
+    tocPatch.push({ sectionKey, y });
     y += 5;
   });
 
@@ -675,6 +681,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['1'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '1', 'États Financiers Officiels SCF (Arrêté du 26/07/2008)', y);
 
   doc.setFont('helvetica', 'italic');
@@ -844,6 +851,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['2'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '2', 'Ratios Financiers Simplifiés (Synthèse)', y);
 
   doc.setFont('helvetica', 'italic');
@@ -870,6 +878,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['3'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '3', 'Équilibre Financier & Bilan Fonctionnel (SCF)', y);
 
   // Formule mathématique
@@ -916,7 +925,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(...T.inkMuted);
-  doc.text('Note technique : Conformément aux normes SCF, les amortissements et pertes de valeur sont reclassés en ressources stables pour apprécier la capacité totale de financement.', margin, y);
+  doc.text('Note technique : Conformément aux normes SCF, les amortissements et pertes de valeur sont reclassés en ressources stables pour apprécier la capacité totale de financement.', margin, y, { maxWidth: W - margin * 2 });
 
   // ──────────────────────────────────────────────────────────────────
   // PAGE 6 — SECTION 4 : SIG & COMPTE DE RÉSULTAT (TCR)
@@ -924,6 +933,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['4'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '4', 'Soldes Intermédiaires de Gestion (SIG / TCR SCF)', y);
 
   // Formule SIG
@@ -978,6 +988,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['5'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '5', 'Ratios Financiers, Solvabilité & Délais de Rotation', y);
 
   y = latexSubSection(doc, '5.1. Ratios de Liquidité, Solvabilité & Autonomie Financière', y);
@@ -1061,6 +1072,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['6'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '6', 'Analyse Comparative Pluriannuelle (N vs N-1)', y);
 
   if (!dataN1) {
@@ -1121,6 +1133,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['7'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '7', 'Diagnostic Analytique & Matrice des Risques', y);
 
   const diagItems = [];
@@ -1282,6 +1295,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   doc.addPage();
   y = 22;
 
+  sectionPages['8'] = doc.internal.getNumberOfPages();
   y = latexSection(doc, '8', 'Audit des Soldes & Conformité SCF', y);
 
   // Source unique de vérité (partagée avec l'onglet Audit Balance et l'export Excel) :
@@ -1339,9 +1353,26 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
       doc.setTextColor(...T.inkMuted);
-      doc.text(`... et ${anomaliesList.length - 30} autres anomalies supplémentaires consultables dans l'onglet Audit Balance de la plateforme.`, margin, y);
+      doc.text(`... et ${anomaliesList.length - 30} autres anomalies supplémentaires consultables dans l'onglet Audit Balance de la plateforme.`, margin, y, { maxWidth: W - margin * 2 });
     }
   }
+
+  // ──────────────────────────────────────────────────────────────────
+  // CORRECTION DE LA TABLE DES MATIÈRES (PAGE 1)
+  // Les numéros de page réels ne sont connus qu'une fois toutes les sections
+  // dessinées (leur nombre de pages varie selon les données). On revient donc
+  // sur la page 1 pour remplacer les espaces réservés par les vrais numéros.
+  // ──────────────────────────────────────────────────────────────────
+  doc.setPage(1);
+  tocPatch.forEach(({ sectionKey, y: rowY }) => {
+    const pageNum = String(sectionPages[sectionKey] || '?');
+    doc.setFillColor(255, 255, 255);
+    doc.rect(W - margin - 12, rowY - 3.5, 12, 4.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...T.navy);
+    doc.text(pageNum, W - margin, rowY, { align: 'right' });
+  });
 
   // ──────────────────────────────────────────────────────────────────
   // APPLICATION DES EN-TÊTES & PIEDS DE PAGE STYLE FANCYHDR
