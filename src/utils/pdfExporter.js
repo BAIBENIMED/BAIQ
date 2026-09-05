@@ -8,7 +8,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { calculateAltmanZScore } from './solvabiliteEngine';
-import { buildTCRRows } from './financeCalculations';
+import { buildTCRRows, auditBalanceAccounts } from './financeCalculations';
 
 // ── Palette BAIQ — reprend exactement les jetons de couleur de l'application
 // (src/index.css :root, mode clair) pour que le document imprimé soit
@@ -1216,48 +1216,26 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y = latexSection(doc, '8', 'Audit des Soldes & Conformité SCF', y);
 
-  const anomaliesList = [];
+  // Source unique de vérité (partagée avec l'onglet Audit Balance et l'export Excel) :
+  // ce bloc réimplémentait auparavant sa propre liste de motifs anormaux, avec un seuil
+  // de matérialité de 0,01 DA — bien en-deçà du seuil de 100 DA retenu ailleurs — et une
+  // couverture partielle (aucun contrôle, par exemple, sur les comptes 15/16/28/29/39/49/59
+  // ou 131/132, pourtant vérifiés par verifyAccountNature). Résultat : un résidu de
+  // quelques dizaines de dinars pouvait apparaître dans le PDF alors qu'il n'apparaissait
+  // plus dans l'application ni dans le classeur Excel, et certaines anomalies réelles de
+  // ces autres comptes n'apparaissaient jamais dans le PDF.
+  const auditResult = auditBalanceAccounts(rows);
+  const anomaliesList = auditResult.comptesAudit
+    .filter(c => c.verification.statut !== 'CONFORME')
+    .map(c => [
+      c.compte,
+      c.libelle || c.verification.classeLabel,
+      `${c.verification.statut} — ${c.verification.nature}`,
+      c.verification.diagnostic,
+      fmtDZD(Math.abs(c.netSolde)),
+    ]);
 
-  if (rows && rows.length > 0) {
-    rows.forEach(r => {
-      if (!r || !r.compte || r.ignore) return;
-      const c   = r.compte.toString().trim();
-      const cl  = c[0];
-      const p2  = c.slice(0, 2);
-      const p3  = c.slice(0, 3);
-      const sd  = Math.abs(r.soldeFinDebit || 0);
-      const sc  = Math.abs(r.soldeFinCredit || 0);
-      const isD = sd > 0.01 && sc < 0.01;
-      const isC = sc > 0.01 && sd < 0.01;
-
-      // 1. Caisse créditrice
-      if (['531','532','533','534'].includes(p3) && isC) {
-        anomaliesList.push([c, r.libelle || 'Caisse', 'CAISSE CRÉDITRICE', 'Impossibilité matérielle', fmtDZD(sc)]);
-      }
-      // 2. Fournisseurs débiteurs (hors 409)
-      if (p2 === '40' && !['406','409'].includes(p3) && isD) {
-        anomaliesList.push([c, r.libelle || 'Fournisseur', 'FOURNISSEUR DÉBITEUR', 'Solde inversé (acompte non reclassé ?)', fmtDZD(sd)]);
-      }
-      // 3. Clients créditeurs (hors 419)
-      if (p2 === '41' && p3 !== '419' && isC) {
-        anomaliesList.push([c, r.libelle || 'Client', 'CLIENT CRÉDITEUR', 'Solde inversé (avoir non imputé ?)', fmtDZD(sc)]);
-      }
-      // 4. Comptes 47x non soldés
-      if (p2 === '47' && (sd + sc) > 0.01) {
-        anomaliesList.push([c, r.libelle || 'Attente', 'COMPTE D\'ATTENTE NON SOLDÉ', 'Régularisation requise avant arrêté', fmtDZD(sd + sc)]);
-      }
-      // 5. Charges créditrices (hors 609, 619, 629, 603, 69x, 692)
-      if (cl === '6' && p3 !== '609' && p3 !== '619' && p3 !== '629' && p3 !== '603' && !c.startsWith('69') && !c.startsWith('692') && isC) {
-        anomaliesList.push([c, r.libelle || 'Charge', 'CHARGE CRÉDITRICE', 'Compte classe 6 anormalement créditeur', fmtDZD(sc)]);
-      }
-      // 6. Produits débiteurs (hors 709, 72x, 724)
-      if (cl === '7' && p3 !== '709' && !c.startsWith('72') && !c.startsWith('724') && isD) {
-        anomaliesList.push([c, r.libelle || 'Produit', 'PRODUIT DÉBITEUR', 'Compte classe 7 anormalement débiteur', fmtDZD(sd)]);
-      }
-    });
-  }
-
-  const conformiteScore = rows.length > 0 ? Math.round(((rows.length - anomaliesList.length) / rows.length) * 100) : 100;
+  const conformiteScore = auditResult.scoreCoherence;
 
   y = latexKpiRow(doc, [
     { label: 'Lignes de Balance Contrôlées', val: `${rows.length} comptes`, sub: 'Périmètre exhaustif SCF', status: 'normal' },
