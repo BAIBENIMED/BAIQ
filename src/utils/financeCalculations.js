@@ -133,6 +133,14 @@ export function detectDecimalSeparator(samples = []) {
   return votesPoint >= votesVirgule ? '.' : ',';
 }
 
+// Seuil de matérialité de l'audit de balance : un compte dont le sens est anormal
+// (ex. un compte de charge créditeur) n'est signalé ATYPIQUE/ANOMALIE que si son solde
+// dépasse ce montant. En-deçà, ce n'est qu'un résidu d'arrondi ou un montant négligeable
+// sans portée réelle pour le lecteur des états — pas la peine de le remonter comme un
+// vrai défaut de saisie. Valeur choisie par l'utilisateur (100 DA), au lieu du simple
+// filtre anti-centimes précédent (1 DA).
+export const SEUIL_MATERIALITE_AUDIT = 100;
+
 /**
  * ═══════════════════════════════════════════════════════════════
  * VÉRIFICATION DE LA NATURE DES COMPTES (SCF Algérie — Loi 07-11)
@@ -148,9 +156,8 @@ export function verifyAccountNature(compte, soldeFinDebit = 0, soldeFinCredit = 
   const deb = parseNum(soldeFinDebit);
   const cred = parseNum(soldeFinCredit);
   const netSolde = deb - cred; // > 0 = Débiteur, < 0 = Créditeur, 0 = Nul
-  const MIN_SIGNIFICANT = 1.0; // Seuil de matérialité SCF : ignorer les résidus de centimes / très petits montants (< 1 DA)
-  const isDeb = netSolde >= MIN_SIGNIFICANT;
-  const isCred = netSolde <= -MIN_SIGNIFICANT;
+  const isDeb = netSolde >= SEUIL_MATERIALITE_AUDIT;
+  const isCred = netSolde <= -SEUIL_MATERIALITE_AUDIT;
   const isNul = !isDeb && !isCred;
 
   // ── CLASSE 1 : COMPTES DE CAPITAUX (Passif / Capitaux Propres & Dettes LT) ──

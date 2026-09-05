@@ -27,6 +27,8 @@ import {
   computeCapitauxPropres,
   detectDecimalSeparator,
   safeNum,
+  verifyAccountNature,
+  SEUIL_MATERIALITE_AUDIT,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
 
@@ -316,6 +318,39 @@ test('safeNum tranche « 1.234 » selon le séparateur décimal du fichier', () 
   assert.equal(safeNum('1234.56', ','), 1234.56, 'deux décimales restent décimales');
   assert.equal(safeNum('12,5', '.'), 12.5, 'une décimale reste décimale');
   assert.equal(safeNum('1.234.567', ','), 1234567, 'séparateur répété inchangé');
+});
+
+// ── 7. Seuil de matérialité de l'audit de balance ──────────────────────────
+
+test('un solde anormal mais immatériel (< 100 DA) n\'est plus signalé', () => {
+  assert.equal(SEUIL_MATERIALITE_AUDIT, 100);
+
+  // Caisse légèrement créditrice (50 DA) : résidu immatériel, plus une anomalie critique.
+  const caisseMinime = verifyAccountNature('53', 0, 50);
+  assert.equal(caisseMinime.statut, 'CONFORME', caisseMinime.diagnostic);
+
+  // Fournisseur légèrement débiteur (80 DA) : sous le seuil, ne doit pas être atypique.
+  const fournisseurMinime = verifyAccountNature('401', 80, 0);
+  assert.equal(fournisseurMinime.statut, 'CONFORME', fournisseurMinime.diagnostic);
+});
+
+test('un solde anormal significatif (≥ 100 DA) reste signalé', () => {
+  // Caisse nettement créditrice (500 DA) : anomalie réelle, doit rester détectée.
+  const caisseAnormale = verifyAccountNature('53', 0, 500);
+  assert.equal(caisseAnormale.statut, 'ANOMALIE', caisseAnormale.diagnostic);
+
+  // Fournisseur nettement débiteur (150 DA) : atypique réel, doit rester détecté.
+  const fournisseurAnormal = verifyAccountNature('401', 150, 0);
+  assert.equal(fournisseurAnormal.statut, 'ATYPIQUE', fournisseurAnormal.diagnostic);
+});
+
+test('un compte mixte (44) sous le seuil est traité comme apuré, pas comme créance/dette', () => {
+  const solde30DA = verifyAccountNature('444', 30, 0);
+  assert.equal(solde30DA.statut, 'CONFORME');
+  assert.match(solde30DA.diagnostic, /apuré/i);
+
+  const solde200DA = verifyAccountNature('444', 200, 0);
+  assert.match(solde200DA.diagnostic, /créance fiscale/i);
 });
 
 test('un export à milliers pointés sans décimales n\'est plus divisé par 1000', () => {
