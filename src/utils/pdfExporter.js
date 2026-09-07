@@ -112,7 +112,7 @@ function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left', badgeImg = null
 
   doc.setDrawColor(...T.navy);
   doc.setLineWidth(0.3);
-  doc.line(textX, y + badgeSize * 0.66, textX + sigW, y + badgeSize * 0.66);
+  doc.line(textX, y + badgeSize * 0.66, textX + wordmarkW, y + badgeSize * 0.66);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(badgeSize * 0.26);
@@ -368,7 +368,11 @@ function drawBooktabsTable(doc, head, body, startY, opts = {}) {
     head,
     body,
     startY,
-    margin: { left: m, right: m },
+    // margin.top : quand une table se poursuit d'elle-même sur une nouvelle page
+    // (dépassement interne d'autoTable, indépendant des sauts de page manuels),
+    // sa ligne d'en-tête redémarre à cette hauteur — sans cette valeur, elle
+    // chevauchait le bandeau d'en-tête dessiné après coup par applyLatexHeaderFooter.
+    margin: { left: m, right: m, top: 22 },
     theme: 'grid',
     styles: {
       font: 'helvetica',
@@ -473,6 +477,23 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     return `${sign}${formattedInt}${decPart ? ',' + decPart : ''} ${docCurrency}`;
   };
+  // Variante sans le suffixe de devise, réservée aux cellules de tableaux dont
+  // l'en-tête de colonne porte déjà la devise (ex. "NET N (DZD)") — évite de la
+  // répéter sur chaque ligne.
+  const fmtDZDTable = (v) => {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    const num = Number(v);
+    const sign = num < 0 ? '-' : '';
+    const [intPart, decPart] = Math.abs(num).toFixed(docRounding).split('.');
+    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${sign}${formattedInt}${decPart ? ',' + decPart : ''}`;
+  };
+
+  // Année réelle de l'exercice (à défaut d'un champ dédié dans le profil du
+  // dossier, l'année civile en cours) — remplace le générique "EXERCICE N" des
+  // en-têtes de tableaux et du bandeau de page par une année lisible (ex. 2026).
+  const exerciceCourant = new Date().getFullYear();
+  const exerciceAnterieur = exerciceCourant - 1;
 
   const dossierName   = profil?.nomEntreprise || 'Entité Anonyme';
   const secteurLabel  = profil?.secteurId ? profil.secteurId.replace(/_/g, ' ').toUpperCase() : 'INDUSTRIE / NON SPÉCIFIÉ';
@@ -683,7 +704,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const amortOf = (line) => line?.amortProv || 0;
   // Amortissements/dépréciations affichés entre parenthèses (convention comptable de
   // présentation d'une déduction), même logique que l'écran États Financiers (SCF).
-  const fmtAmort = (v) => (v ? `(${fmtDZD(v)})` : fmtDZD(0));
+  const fmtAmort = (v) => (v ? `(${fmtDZDTable(v)})` : fmtDZDTable(0));
   // Total Brut/Amort./Net d'une section : somme de toutes ses rubriques hors la clé
   // "total" elle-même — même calcul que sumLines() dans EtatsFinanciersView.jsx, pour
   // que le PDF et l'écran affichent des totaux identiques.
@@ -701,20 +722,20 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   // Ordre demandé : Brut N, puis Amort./Prov. N, puis Net N, puis Net N-1 — identique à
   // l'écran États Financiers (SCF) et au modèle officiel "BILAN ACTIF (présentation)".
-  const actifHead = [['ACTIF', 'BRUT N', 'AMORT./PROV.', 'NET N', bScf1 ? 'NET N-1' : ''].filter(Boolean)];
+  const actifHead = [['ACTIF', `BRUT ${exerciceCourant} (${docCurrency})`, `AMORT./PROV. (${docCurrency})`, `NET ${exerciceCourant} (${docCurrency})`, bScf1 ? `NET ${exerciceAnterieur} (${docCurrency})` : ''].filter(Boolean)];
   const actifRow = (label, line, line1) => [
     label,
-    fmtDZD(brutOf(line)),
+    fmtDZDTable(brutOf(line)),
     fmtAmort(amortOf(line)),
-    fmtDZD(netOf(line)),
-    bScf1 ? fmtDZD(netOf(line1)) : '',
+    fmtDZDTable(netOf(line)),
+    bScf1 ? fmtDZDTable(netOf(line1)) : '',
   ].filter((_, i) => bScf1 || i < 4);
   const actifTotalRow = (label, tot, tot1) => [
     label,
-    fmtDZD(tot.brut),
+    fmtDZDTable(tot.brut),
     fmtAmort(tot.amortProv),
-    fmtDZD(tot.net),
-    bScf1 ? fmtDZD(tot1?.net || 0) : '',
+    fmtDZDTable(tot.net),
+    bScf1 ? fmtDZDTable(tot1?.net || 0) : '',
   ].filter((_, i) => bScf1 || i < 4);
   const actifBody = [
     ['ACTIF NON COURANT', '', '', '', ''].filter((_, i) => bScf1 || i < 4),
@@ -761,11 +782,11 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const cp1 = bScf1?.capitauxPropres || null;
   const pnc1 = bScf1?.passifNonCourant || null;
   const pc1 = bScf1?.passifCourant || null;
-  const passifValRow = (label, val, val1) => [label, fmtDZD(val || 0), bScf1 ? fmtDZD(val1 || 0) : ''].filter((_, i) => bScf1 || i < 2);
+  const passifValRow = (label, val, val1) => [label, fmtDZDTable(val || 0), bScf1 ? fmtDZDTable(val1 || 0) : ''].filter((_, i) => bScf1 || i < 2);
 
   y = latexSubSection(doc, '1.2. Bilan Passif — Rubriques Officielles', y);
 
-  const passifHead = [['PASSIF', 'NET N (DZD)', bScf1 ? 'NET N-1 (DZD)' : ''].filter(Boolean)];
+  const passifHead = [['PASSIF', `NET ${exerciceCourant} (${docCurrency})`, bScf1 ? `NET ${exerciceAnterieur} (${docCurrency})` : ''].filter(Boolean)];
   const passifBody = [
     ['CAPITAUX PROPRES', '', ''].filter((_, i) => bScf1 || i < 2),
     passifValRow('Capital émis', cp.capitalEmis, cp1?.capitalEmis),
@@ -775,20 +796,20 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
     passifValRow('Résultat net', cp.resultatNet, cp1?.resultatNet),
     passifValRow('Résultat en instance d\'affectation', cp.resultatEnInstance, cp1?.resultatEnInstance),
     passifValRow('Autres capitaux propres — Report à nouveau', cp.autresCapitauxPropres, cp1?.autresCapitauxPropres),
-    ['TOTAL I — CAPITAUX PROPRES', fmtDZD(cp.total || 0), bScf1 ? fmtDZD(cp1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL I — CAPITAUX PROPRES', fmtDZDTable(cp.total || 0), bScf1 ? fmtDZDTable(cp1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
     ['PASSIFS NON COURANTS', '', ''].filter((_, i) => bScf1 || i < 2),
     passifValRow('Emprunts et dettes financières', pnc.empruntsDettesFinancieres, pnc1?.empruntsDettesFinancieres),
     passifValRow('Impôts (différés et provisionnés)', pnc.impotsDifferesPassif, pnc1?.impotsDifferesPassif),
     passifValRow('Autres dettes non courantes', pnc.autresDettesNonCourantes, pnc1?.autresDettesNonCourantes),
     passifValRow('Provisions et produits constatés d\'avance', pnc.provisionsEtProduitsConstatesAvance, pnc1?.provisionsEtProduitsConstatesAvance),
-    ['TOTAL II — PASSIFS NON COURANTS', fmtDZD(pnc.total || 0), bScf1 ? fmtDZD(pnc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL II — PASSIFS NON COURANTS', fmtDZDTable(pnc.total || 0), bScf1 ? fmtDZDTable(pnc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
     ['PASSIFS COURANTS', '', ''].filter((_, i) => bScf1 || i < 2),
     passifValRow('Fournisseurs et comptes rattachés', pc.fournisseurs, pc1?.fournisseurs),
     passifValRow('Impôts', pc.impotsEtAssimilesPassif, pc1?.impotsEtAssimilesPassif),
     passifValRow('Autres dettes', pc.autresDettes, pc1?.autresDettes),
     passifValRow('Trésorerie passif', pc.tresoreriePassif, pc1?.tresoreriePassif),
-    ['TOTAL III — PASSIFS COURANTS', fmtDZD(pc.total || 0), bScf1 ? fmtDZD(pc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
-    ['TOTAL GÉNÉRAL DU PASSIF (I + II + III)', fmtDZD(bilanSCF.totalPassif || 0), bScf1 ? fmtDZD(bScf1.totalPassif || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL III — PASSIFS COURANTS', fmtDZDTable(pc.total || 0), bScf1 ? fmtDZDTable(pc1?.total || 0) : ''].filter((_, i) => bScf1 || i < 2),
+    ['TOTAL GÉNÉRAL DU PASSIF (I + II + III)', fmtDZDTable(bilanSCF.totalPassif || 0), bScf1 ? fmtDZDTable(bScf1.totalPassif || 0) : ''].filter((_, i) => bScf1 || i < 2),
   ];
 
   y = drawBooktabsTable(doc, passifHead, passifBody, y, {
@@ -812,10 +833,10 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   y = latexSubSection(doc, '1.3. Compte de Résultat par Nature — Numérotation Officielle (I à X)', y);
 
   const tcrRowsData = buildTCRRows(s);
-  const tcrHead = [['CODE', 'RUBRIQUE', 'MONTANT N (DZD)']];
+  const tcrHead = [['CODE', 'RUBRIQUE', `MONTANT ${exerciceCourant} (${docCurrency})`]];
   const tcrBody = tcrRowsData.map(row => {
     const val = row.isCharge && row.val > 0 ? -row.val : (row.val || 0);
-    return [row.code, row.label, fmtDZD(val)];
+    return [row.code, row.label, fmtDZDTable(val)];
   });
   const tcrTotalIndices = tcrRowsData.reduce((acc, row, idx) => (row.type !== 'compte' ? [...acc, idx] : acc), []);
 
@@ -879,18 +900,18 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y = latexSubSection(doc, '3.1. Tableau Synthétique des Masses Fonctionnelles', y);
 
-  const bilanHead = [['MASSE FONCTIONNELLE', 'EXERCICE N (DZD)', b1 ? 'EXERCICE N-1 (DZD)' : '', b1 ? 'VARIATION (DZD)' : ''].filter(Boolean)];
+  const bilanHead = [['MASSE FONCTIONNELLE', `EXERCICE ${exerciceCourant} (${docCurrency})`, b1 ? `EXERCICE ${exerciceAnterieur} (${docCurrency})` : '', b1 ? `VARIATION (${docCurrency})` : ''].filter(Boolean)];
   const bilanBody = [
     ['ACTIF DU BILAN (EMPLOIS)', '', b1 ? '' : '', b1 ? '' : ''].filter(Boolean),
-    ['Emplois Stables (Actifs non courants bruts)', fmtDZD(b.emploisStables), b1 ? fmtDZD(b1.emploisStables) : '', b1 ? fmtDZD((b.emploisStables || 0) - (b1.emploisStables || 0)) : ''].filter(Boolean),
-    ['Actif Circulant d\'Exploitation (Stocks + Créances)', fmtDZD(b.actifCirculant), b1 ? fmtDZD(b1.actifCirculant) : '', b1 ? fmtDZD((b.actifCirculant || 0) - (b1.actifCirculant || 0)) : ''].filter(Boolean),
-    ['Trésorerie Active (Disponibilités & Banques débitrices)', fmtDZD(b.tresorerieActive), b1 ? fmtDZD(b1.tresorerieActive) : '', b1 ? fmtDZD((b.tresorerieActive || 0) - (b1.tresorerieActive || 0)) : ''].filter(Boolean),
-    ['TOTAL GÉNÉRAL DE L\'ACTIF', fmtDZD((b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0)), b1 ? fmtDZD((b1.emploisStables || 0) + (b1.actifCirculant || 0) + (b1.tresorerieActive || 0)) : '', ''].filter(Boolean),
+    ['Emplois Stables (Actifs non courants bruts)', fmtDZDTable(b.emploisStables), b1 ? fmtDZDTable(b1.emploisStables) : '', b1 ? fmtDZDTable((b.emploisStables || 0) - (b1.emploisStables || 0)) : ''].filter(Boolean),
+    ['Actif Circulant d\'Exploitation (Stocks + Créances)', fmtDZDTable(b.actifCirculant), b1 ? fmtDZDTable(b1.actifCirculant) : '', b1 ? fmtDZDTable((b.actifCirculant || 0) - (b1.actifCirculant || 0)) : ''].filter(Boolean),
+    ['Trésorerie Active (Disponibilités & Banques débitrices)', fmtDZDTable(b.tresorerieActive), b1 ? fmtDZDTable(b1.tresorerieActive) : '', b1 ? fmtDZDTable((b.tresorerieActive || 0) - (b1.tresorerieActive || 0)) : ''].filter(Boolean),
+    ['TOTAL GÉNÉRAL DE L\'ACTIF', fmtDZDTable((b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0)), b1 ? fmtDZDTable((b1.emploisStables || 0) + (b1.actifCirculant || 0) + (b1.tresorerieActive || 0)) : '', ''].filter(Boolean),
     ['PASSIF DU BILAN (RESSOURCES)', '', b1 ? '' : '', ''].filter(Boolean),
-    ['Ressources Stables (Capitaux Propres + Dettes LT + Amort.)', fmtDZD(b.ressourcesStables), b1 ? fmtDZD(b1.ressourcesStables) : '', b1 ? fmtDZD((b.ressourcesStables || 0) - (b1.ressourcesStables || 0)) : ''].filter(Boolean),
-    ['Passif Circulant d\'Exploitation (Dettes CT Fournisseurs/Fiscales)', fmtDZD(b.passifCirculant), b1 ? fmtDZD(b1.passifCirculant) : '', b1 ? fmtDZD((b.passifCirculant || 0) - (b1.passifCirculant || 0)) : ''].filter(Boolean),
-    ['Trésorerie Passive (Concours bancaires courants & soldes créditeurs)', fmtDZD(b.tresoreriePassive), b1 ? fmtDZD(b1.tresoreriePassive) : '', b1 ? fmtDZD((b.tresoreriePassive || 0) - (b1.tresoreriePassive || 0)) : ''].filter(Boolean),
-    ['TOTAL GÉNÉRAL DU PASSIF', fmtDZD((b.ressourcesStables || 0) + (b.passifCirculant || 0) + (b.tresoreriePassive || 0)), b1 ? fmtDZD((b1.ressourcesStables || 0) + (b1.passifCirculant || 0) + (b1.tresoreriePassive || 0)) : '', ''].filter(Boolean),
+    ['Ressources Stables (Capitaux Propres + Dettes LT + Amort.)', fmtDZDTable(b.ressourcesStables), b1 ? fmtDZDTable(b1.ressourcesStables) : '', b1 ? fmtDZDTable((b.ressourcesStables || 0) - (b1.ressourcesStables || 0)) : ''].filter(Boolean),
+    ['Passif Circulant d\'Exploitation (Dettes CT Fournisseurs/Fiscales)', fmtDZDTable(b.passifCirculant), b1 ? fmtDZDTable(b1.passifCirculant) : '', b1 ? fmtDZDTable((b.passifCirculant || 0) - (b1.passifCirculant || 0)) : ''].filter(Boolean),
+    ['Trésorerie Passive (Concours bancaires courants & soldes créditeurs)', fmtDZDTable(b.tresoreriePassive), b1 ? fmtDZDTable(b1.tresoreriePassive) : '', b1 ? fmtDZDTable((b.tresoreriePassive || 0) - (b1.tresoreriePassive || 0)) : ''].filter(Boolean),
+    ['TOTAL GÉNÉRAL DU PASSIF', fmtDZDTable((b.ressourcesStables || 0) + (b.passifCirculant || 0) + (b.tresoreriePassive || 0)), b1 ? fmtDZDTable((b1.ressourcesStables || 0) + (b1.passifCirculant || 0) + (b1.tresoreriePassive || 0)) : '', ''].filter(Boolean),
   ];
 
   y = drawBooktabsTable(doc, bilanHead, bilanBody, y, {
@@ -933,21 +954,21 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   y = latexSubSection(doc, '4.1. Tableau des Comptes de Résultats (TCR Officiel)', y);
 
-  const sigHead = [['POSTE / SOLDE INTERMÉDIAIRE', 'COMPTES SCF', 'EXERCICE N (DZD)', s1 ? 'EXERCICE N-1' : '', s1 ? 'VARIATION (%)' : ''].filter(Boolean)];
+  const sigHead = [['POSTE / SOLDE INTERMÉDIAIRE', 'COMPTES SCF', `EXERCICE ${exerciceCourant} (${docCurrency})`, s1 ? `EXERCICE ${exerciceAnterieur}` : '', s1 ? 'VARIATION (%)' : ''].filter(Boolean)];
   const sigBody = [
-    ['Chiffre d\'Affaires (Ventes de biens et services)', '700 à 709', fmtDZD(ca), s1 ? fmtDZD(s1.chiffreAffaires) : '', s1 ? fmtPct(safeDiv(ca - (s1.chiffreAffaires || 0), s1.chiffreAffaires || 1)) : ''].filter(Boolean),
-    ['Production de l\'exercice (Ventes + Var. Stocks + Immo)', '70, 72, 73', fmtDZD(s.productionExercice), s1 ? fmtDZD(s1.productionExercice) : '', ''].filter(Boolean),
-    ['Consommation de l\'exercice (Achats + Serv. Ext.)', '601..603, 61, 62', fmtDZD(s.consommationExercice), s1 ? fmtDZD(s1.consommationExercice) : '', ''].filter(Boolean),
-    ['VALEUR AJOUTÉE D\'EXPLOITATION (VA)', 'Marge brute', fmtDZD(va), s1 ? fmtDZD(s1.valeurAjoutee) : '', s1 ? fmtPct(safeDiv(va - (s1.valeurAjoutee || 0), s1.valeurAjoutee || 1)) : ''].filter(Boolean),
-    ['Charges de personnel', '631 à 638', fmtDZD(s.chargesPersonnel), s1 ? fmtDZD(s1.chargesPersonnel) : '', ''].filter(Boolean),
-    ['Impôts, taxes et versements assimilés', '641 à 648', fmtDZD(s.impotsTaxes), s1 ? fmtDZD(s1.impotsTaxes) : '', ''].filter(Boolean),
-    ['EXCÉDENT BRUT D\'EXPLOITATION (EBE)', 'Agrégat cash', fmtDZD(ebe), s1 ? fmtDZD(s1.ebe) : '', s1 ? fmtPct(safeDiv(ebe - (s1.ebe || 0), s1.ebe || 1)) : ''].filter(Boolean),
-    ['Dotations aux amortissements et provisions nettes', '681, 685 - 781', fmtDZD(s.dotationsAmortissements), s1 ? fmtDZD(s1.dotationsAmortissements) : '', ''].filter(Boolean),
-    ['RÉSULTAT OPÉRATIONNEL / D\'EXPLOITATION', 'Activité pure', fmtDZD(re), s1 ? fmtDZD(s1.resultatExploitation) : '', s1 ? fmtPct(safeDiv(re - (s1.resultatExploitation || 0), s1.resultatExploitation || 1)) : ''].filter(Boolean),
-    ['Charges financières nettes des produits financiers', '66x - 76x', fmtDZD(s.chargesFinancieres), s1 ? fmtDZD(s1.chargesFinancieres) : '', ''].filter(Boolean),
-    ['RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', 'Résultat courant', fmtDZD((re || 0) - (s.chargesFinancieres || 0)), s1 ? fmtDZD((s1.resultatExploitation || 0) - (s1.chargesFinancieres || 0)) : '', ''].filter(Boolean),
-    ['Impôt sur les bénéfices des sociétés (IBS exigible)', '695, 698', fmtDZD(s.impotsSurResultats), s1 ? fmtDZD(s1.impotsSurResultats) : '', ''].filter(Boolean),
-    ['RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', 'Solde final', fmtDZD(rn), s1 ? fmtDZD(s1.resultatNet) : '', s1 ? fmtPct(safeDiv(rn - (s1.resultatNet || 0), Math.abs(s1.resultatNet || 1))) : ''].filter(Boolean),
+    ['Chiffre d\'Affaires (Ventes de biens et services)', '700 à 709', fmtDZDTable(ca), s1 ? fmtDZDTable(s1.chiffreAffaires) : '', s1 ? fmtPct(safeDiv(ca - (s1.chiffreAffaires || 0), s1.chiffreAffaires || 1)) : ''].filter(Boolean),
+    ['Production de l\'exercice (Ventes + Var. Stocks + Immo)', '70, 72, 73', fmtDZDTable(s.productionExercice), s1 ? fmtDZDTable(s1.productionExercice) : '', ''].filter(Boolean),
+    ['Consommation de l\'exercice (Achats + Serv. Ext.)', '601..603, 61, 62', fmtDZDTable(s.consommationExercice), s1 ? fmtDZDTable(s1.consommationExercice) : '', ''].filter(Boolean),
+    ['VALEUR AJOUTÉE D\'EXPLOITATION (VA)', 'Marge brute', fmtDZDTable(va), s1 ? fmtDZDTable(s1.valeurAjoutee) : '', s1 ? fmtPct(safeDiv(va - (s1.valeurAjoutee || 0), s1.valeurAjoutee || 1)) : ''].filter(Boolean),
+    ['Charges de personnel', '631 à 638', fmtDZDTable(s.chargesPersonnel), s1 ? fmtDZDTable(s1.chargesPersonnel) : '', ''].filter(Boolean),
+    ['Impôts, taxes et versements assimilés', '641 à 648', fmtDZDTable(s.impotsTaxes), s1 ? fmtDZDTable(s1.impotsTaxes) : '', ''].filter(Boolean),
+    ['EXCÉDENT BRUT D\'EXPLOITATION (EBE)', 'Agrégat cash', fmtDZDTable(ebe), s1 ? fmtDZDTable(s1.ebe) : '', s1 ? fmtPct(safeDiv(ebe - (s1.ebe || 0), s1.ebe || 1)) : ''].filter(Boolean),
+    ['Dotations aux amortissements et provisions nettes', '681, 685 - 781', fmtDZDTable(s.dotationsAmortissements), s1 ? fmtDZDTable(s1.dotationsAmortissements) : '', ''].filter(Boolean),
+    ['RÉSULTAT OPÉRATIONNEL / D\'EXPLOITATION', 'Activité pure', fmtDZDTable(re), s1 ? fmtDZDTable(s1.resultatExploitation) : '', s1 ? fmtPct(safeDiv(re - (s1.resultatExploitation || 0), s1.resultatExploitation || 1)) : ''].filter(Boolean),
+    ['Charges financières nettes des produits financiers', '66x - 76x', fmtDZDTable(s.chargesFinancieres), s1 ? fmtDZDTable(s1.chargesFinancieres) : '', ''].filter(Boolean),
+    ['RÉSULTAT ORDINAIRE AVANT IMPÔTS (RCAI)', 'Résultat courant', fmtDZDTable((re || 0) - (s.chargesFinancieres || 0)), s1 ? fmtDZDTable((s1.resultatExploitation || 0) - (s1.chargesFinancieres || 0)) : '', ''].filter(Boolean),
+    ['Impôt sur les bénéfices des sociétés (IBS exigible)', '695, 698', fmtDZDTable(s.impotsSurResultats), s1 ? fmtDZDTable(s1.impotsSurResultats) : '', ''].filter(Boolean),
+    ['RÉSULTAT NET DE L\'EXERCICE (BÉNÉFICE / PERTE)', 'Solde final', fmtDZDTable(rn), s1 ? fmtDZDTable(s1.resultatNet) : '', s1 ? fmtPct(safeDiv(rn - (s1.resultatNet || 0), Math.abs(s1.resultatNet || 1))) : ''].filter(Boolean),
   ];
 
   y = drawBooktabsTable(doc, sigHead, sigBody, y, {
@@ -1066,19 +1087,19 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   } else {
     y = latexSubSection(doc, '6.1. Tableau des Variations Structurelles et de Rentabilité', y);
 
-    const compHead = [['AGRÉGAT MAJEUR', 'EXERCICE N (DZD)', 'EXERCICE N-1 (DZD)', 'VARIATION ABS. (DZD)', 'VARIATION REL. (%)']];
+    const compHead = [['AGRÉGAT MAJEUR', `EXERCICE ${exerciceCourant} (${docCurrency})`, `EXERCICE ${exerciceAnterieur} (${docCurrency})`, `VARIATION ABS. (${docCurrency})`, 'VARIATION REL. (%)']];
     const diffVal = (a, b) => (a || 0) - (b || 0);
     const diffPct = (a, b) => safeDiv(diffVal(a, b), Math.abs(b || 1));
 
     const compBody = [
-      ['Chiffre d\'Affaires Net HT', fmtDZD(ca), fmtDZD(s1.chiffreAffaires), fmtDZD(diffVal(ca, s1.chiffreAffaires)), fmtPct(diffPct(ca, s1.chiffreAffaires))],
-      ['Valeur Ajoutée (VA)', fmtDZD(va), fmtDZD(s1.valeurAjoutee), fmtDZD(diffVal(va, s1.valeurAjoutee)), fmtPct(diffPct(va, s1.valeurAjoutee))],
-      ['Excédent Brut d\'Exploitation (EBE)', fmtDZD(ebe), fmtDZD(s1.ebe), fmtDZD(diffVal(ebe, s1.ebe)), fmtPct(diffPct(ebe, s1.ebe))],
-      ['Résultat d\'Exploitation', fmtDZD(re), fmtDZD(s1.resultatExploitation), fmtDZD(diffVal(re, s1.resultatExploitation)), fmtPct(diffPct(re, s1.resultatExploitation))],
-      ['Résultat Net de l\'Exercice', fmtDZD(rn), fmtDZD(s1.resultatNet), fmtDZD(diffVal(rn, s1.resultatNet)), fmtPct(diffPct(rn, s1.resultatNet))],
-      ['Fonds de Roulement Net Global (FRNG)', fmtDZD(frng), fmtDZD(b1.frng), fmtDZD(diffVal(frng, b1.frng)), fmtPct(diffPct(frng, b1.frng))],
-      ['Besoin en Fonds de Roulement (BFR)', fmtDZD(bfr), fmtDZD(b1.bfr), fmtDZD(diffVal(bfr, b1.bfr)), fmtPct(diffPct(bfr, b1.bfr))],
-      ['Trésorerie Nette (TN)', fmtDZD(tn), fmtDZD(b1.tn), fmtDZD(diffVal(tn, b1.tn)), fmtPct(diffPct(tn, b1.tn))],
+      ['Chiffre d\'Affaires Net HT', fmtDZDTable(ca), fmtDZDTable(s1.chiffreAffaires), fmtDZDTable(diffVal(ca, s1.chiffreAffaires)), fmtPct(diffPct(ca, s1.chiffreAffaires))],
+      ['Valeur Ajoutée (VA)', fmtDZDTable(va), fmtDZDTable(s1.valeurAjoutee), fmtDZDTable(diffVal(va, s1.valeurAjoutee)), fmtPct(diffPct(va, s1.valeurAjoutee))],
+      ['Excédent Brut d\'Exploitation (EBE)', fmtDZDTable(ebe), fmtDZDTable(s1.ebe), fmtDZDTable(diffVal(ebe, s1.ebe)), fmtPct(diffPct(ebe, s1.ebe))],
+      ['Résultat d\'Exploitation', fmtDZDTable(re), fmtDZDTable(s1.resultatExploitation), fmtDZDTable(diffVal(re, s1.resultatExploitation)), fmtPct(diffPct(re, s1.resultatExploitation))],
+      ['Résultat Net de l\'Exercice', fmtDZDTable(rn), fmtDZDTable(s1.resultatNet), fmtDZDTable(diffVal(rn, s1.resultatNet)), fmtPct(diffPct(rn, s1.resultatNet))],
+      ['Fonds de Roulement Net Global (FRNG)', fmtDZDTable(frng), fmtDZDTable(b1.frng), fmtDZDTable(diffVal(frng, b1.frng)), fmtPct(diffPct(frng, b1.frng))],
+      ['Besoin en Fonds de Roulement (BFR)', fmtDZDTable(bfr), fmtDZDTable(b1.bfr), fmtDZDTable(diffVal(bfr, b1.bfr)), fmtPct(diffPct(bfr, b1.bfr))],
+      ['Trésorerie Nette (TN)', fmtDZDTable(tn), fmtDZDTable(b1.tn), fmtDZDTable(diffVal(tn, b1.tn)), fmtPct(diffPct(tn, b1.tn))],
       ['Liquidité Générale', fmtNum(liqGen), fmtNum(dataN1.ratios?.liquiditeGenerale), fmtNum(liqGen - (dataN1.ratios?.liquiditeGenerale || 0)), '—'],
     ];
 
@@ -1295,7 +1316,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       c.libelle || c.verification.classeLabel,
       `${c.verification.statut} — ${c.verification.nature}`,
       c.verification.diagnostic,
-      fmtDZD(Math.abs(c.netSolde)),
+      fmtDZDTable(Math.abs(c.netSolde)),
     ]);
 
   const conformiteScore = auditResult.scoreCoherence;
@@ -1317,7 +1338,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   } else {
     y = latexSubSection(doc, '8.1. Relevé Détaillé des Écritures et Soldes Inversés', y);
 
-    const auditHead = [['COMPTE', 'INTITULÉ DU COMPTE', 'NATURE DE L\'ANOMALIE', 'EXPLICATION NORMATIVE', 'MONTANT (DZD)']];
+    const auditHead = [['COMPTE', 'INTITULÉ DU COMPTE', 'NATURE DE L\'ANOMALIE', 'EXPLICATION NORMATIVE', `MONTANT (${docCurrency})`]];
     const auditBody = anomaliesList.slice(0, 30);
 
     y = drawBooktabsTable(doc, auditHead, auditBody, y, {
@@ -1359,7 +1380,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   // APPLICATION DES EN-TÊTES & PIEDS DE PAGE STYLE FANCYHDR
   // ──────────────────────────────────────────────────────────────────
   const totalPages = doc.internal.getNumberOfPages();
-  applyLatexHeaderFooter(doc, totalPages, dossierName, 'N', badgeImg);
+  applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceCourant, badgeImg);
 
   // Téléchargement du fichier
   const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
