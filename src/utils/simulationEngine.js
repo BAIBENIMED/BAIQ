@@ -1,4 +1,4 @@
-import { calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF } from './financeCalculations';
+import { analyserBalance } from './financeCalculations';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Simulation Comptable en Partie Double
@@ -383,19 +383,9 @@ export function recalculateSimulatedDataset(originalData, simulationEntries = []
   if (!simulationEntries || simulationEntries.length === 0) return originalData;
 
   const simRows = applySimulationToRows(originalData.rows, simulationEntries);
-  const payload = { isBalance: true, rows: simRows };
-
-  const simBilan    = calculateBilanFonctionnel(payload);
-  const simSIG      = calculateSIG(payload);
-  const simRatios   = calculateRatios(simBilan, simSIG, simRows);
-  const simBilanSCF = calculateBilanSCF(payload, simSIG);
 
   return {
-    rows: simRows,
-    bilan: simBilan,
-    sig: simSIG,
-    ratios: simRatios,
-    bilanSCF: simBilanSCF,
+    ...analyserBalance(simRows),
     profil: originalData.profil,
     dataN1: originalData.dataN1,
     isSimulationMode: true,

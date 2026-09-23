@@ -2376,6 +2376,43 @@ export const calculateRatios = (bilan, sig, rows) => {
 };
 
 /**
+ * Chaîne de calcul complète d'une balance : bilan fonctionnel, SIG, ratios et bilan
+ * officiel SCF. Point d'entrée unique (import, exemples, dossiers enregistrés,
+ * simulation) : un état calculé ajouté ici est disponible partout à la fois.
+ */
+export function analyserBalance(rows) {
+  const payload = { isBalance: true, rows };
+  const bilan = calculateBilanFonctionnel(payload);
+  const sig = calculateSIG(payload);
+  return {
+    rows,
+    bilan,
+    sig,
+    ratios: calculateRatios(bilan, sig, rows),
+    bilanSCF: calculateBilanSCF(payload, sig),
+  };
+}
+
+/** Dossier complet (N et, si fournie, N-1) entièrement calculé à partir des balances. */
+export function construireDossier(rowsN, rowsN1, profil) {
+  return {
+    ...analyserBalance(rowsN),
+    profil,
+    dataN1: rowsN1 && rowsN1.length > 0 ? analyserBalance(rowsN1) : null,
+  };
+}
+
+/**
+ * Rouvre un dossier enregistré en recalculant tous ses résultats depuis ses balances.
+ * Les résultats éventuellement enregistrés avec lui sont ignorés : ils figeraient les
+ * chiffres d'une version antérieure du moteur de calcul.
+ */
+export function rouvrirDossier(dossierEnregistre) {
+  const { rows, dataN1, profil } = dossierEnregistre.data;
+  return construireDossier(rows, dataN1?.rows, profil || dossierEnregistre.profil);
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * MOTEUR DE JOINTURE AUTOMATIQUE & INTELLIGENTE DES COMPTES (SCF Algérie)
  * ═══════════════════════════════════════════════════════════════════════════

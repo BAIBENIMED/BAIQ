@@ -32,6 +32,9 @@ import {
   applyTvaRegimeToRatios,
   calculateTotauxProduitsCharges,
   buildRatiosBenchmarkRows,
+  analyserBalance,
+  construireDossier,
+  rouvrirDossier,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
 import { SECTEUR_DEFAUT } from '../src/utils/secteurs.js';
@@ -485,4 +488,46 @@ test('la productivité et le statut du DPO dépendent des vraies valeurs', () =>
   assert.equal(statutDpo(BM.dpo.min - 1), 'TROP RAPIDE');
   assert.equal(statutDpo((BM.dpo.min + BM.dpo.max) / 2), 'ÉQUILIBRÉ');
   assert.equal(statutDpo(BM.dpo.max + 1), 'LENT');
+});
+
+// ── 11. Dossiers enregistrés ───────────────────────────────────────────────
+
+test('analyserBalance produit exactement la chaîne de calcul complète', () => {
+  const attendu = analyser(BALANCE_SAINE);
+  const obtenu = analyserBalance(BALANCE_SAINE);
+  assert.deepEqual(obtenu.bilan, attendu.bilan);
+  assert.deepEqual(obtenu.sig, attendu.sig);
+  assert.deepEqual(obtenu.ratios, attendu.ratios);
+  assert.deepEqual(obtenu.bilanSCF, attendu.scf);
+  assert.equal(obtenu.rows, BALANCE_SAINE);
+});
+
+test('un dossier enregistré avec des résultats figés est recalculé à l\'ouverture', () => {
+  const profil = { nomEntreprise: 'SARL Test', secteurId: 'industrie' };
+  const frais = construireDossier(BALANCE_SAINE, BALANCE_AVEC_COMPTE_12, profil);
+  // Ancien format : résultats enregistrés avec les balances, ici volontairement faux,
+  // comme ceux produits par une version antérieure du moteur.
+  const ancien = {
+    profil,
+    data: {
+      ...frais,
+      sig: { ...frais.sig, resultatNet: 123 },
+      ratios: { ...frais.ratios, delaiFournisseurs: 999 },
+      dataN1: { ...frais.dataN1, sig: { ...frais.dataN1.sig, resultatNet: 456 } },
+    },
+  };
+  const rouvert = rouvrirDossier(ancien);
+  assert.deepEqual(rouvert.sig, frais.sig);
+  assert.deepEqual(rouvert.ratios, frais.ratios);
+  assert.deepEqual(rouvert.dataN1.sig, frais.dataN1.sig);
+  assert.deepEqual(rouvert.profil, profil);
+});
+
+test('un dossier enregistré avec ses seules balances se rouvre à l\'identique', () => {
+  const profil = { nomEntreprise: 'SARL Test' };
+  const frais = construireDossier(BALANCE_SAINE, null, profil);
+  const enregistre = { profil, data: { rows: BALANCE_SAINE, profil, dataN1: null } };
+  const rouvert = rouvrirDossier(enregistre);
+  assert.deepEqual(rouvert, frais);
+  assert.equal(rouvert.dataN1, null);
 });

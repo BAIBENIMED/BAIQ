@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react';
-import { parseFile, calculateBilanFonctionnel, calculateSIG, calculateRatios, calculateBilanSCF, checkBalanceEquilibre } from '../utils/financeCalculations';
+import { parseFile, construireDossier, rouvrirDossier, checkBalanceEquilibre } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
 import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
 import { useEscapeKey } from '../utils/useEscapeKey';
@@ -50,14 +50,21 @@ export function ImportData({ onDataImported }) {
 
   const saveDossierToStorage = (payloadData) => {
     const dDate = new Date().toLocaleDateString('fr-FR');
-    const dossierTitle = `${profil.nomEntreprise || 'Dossier'} - ${dDate}`;
+    const dossierTitle = `${payloadData.profil?.nomEntreprise || 'Dossier'} - ${dDate}`;
+    // Seules les entrées sont enregistrées (balances + profil) : les résultats sont
+    // recalculés à l'ouverture, pour qu'un dossier bénéficie de toute correction
+    // ultérieure du moteur au lieu de figer d'anciens chiffres.
     const newDossier = {
       id: Date.now().toString(),
       nom: dossierTitle,
       date: dDate,
       savedAtTs: Date.now(),
-      profil,
-      data: payloadData,
+      profil: payloadData.profil,
+      data: {
+        rows: payloadData.rows,
+        profil: payloadData.profil,
+        dataN1: payloadData.dataN1 ? { rows: payloadData.dataN1.rows } : null,
+      },
     };
     const updated = [newDossier, ...savedDossiers];
     try {
@@ -91,7 +98,7 @@ export function ImportData({ onDataImported }) {
   };
 
   const loadSavedDossier = (dossier) => {
-    onDataImported(dossier.data);
+    onDataImported(rouvrirDossier(dossier));
   };
 
   // ── Handlers Exemples de Démonstration ──
@@ -121,32 +128,7 @@ export function ImportData({ onDataImported }) {
       secteurId: sample.secteurId,
       effectif: String(sample.effectif || ''),
     };
-    const payloadN = { isBalance: true, rows: sample.rowsN };
-    const bilanN    = calculateBilanFonctionnel(payloadN);
-    const sigN      = calculateSIG(payloadN);
-    const ratiosN   = calculateRatios(bilanN, sigN, sample.rowsN);
-    const bilanSCFN = calculateBilanSCF(payloadN, sigN);
-
-    let dataN1 = null;
-    if (sample.rowsN1 && sample.rowsN1.length > 0) {
-      const payloadN1 = { isBalance: true, rows: sample.rowsN1 };
-      const bilanN1    = calculateBilanFonctionnel(payloadN1);
-      const sigN1      = calculateSIG(payloadN1);
-      const ratiosN1   = calculateRatios(bilanN1, sigN1, sample.rowsN1);
-      const bilanSCFN1 = calculateBilanSCF(payloadN1, sigN1);
-      dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, bilanSCF: bilanSCFN1, rows: sample.rowsN1 };
-    }
-
-    const fullPayload = {
-      bilan: bilanN,
-      sig: sigN,
-      ratios: ratiosN,
-      bilanSCF: bilanSCFN,
-      rows: sample.rowsN,
-      profil: prof,
-      dataN1,
-    };
-
+    const fullPayload = construireDossier(sample.rowsN, sample.rowsN1, prof);
     saveDossierToStorage(fullPayload);
     onDataImported(fullPayload);
   };
@@ -206,34 +188,7 @@ export function ImportData({ onDataImported }) {
     if (!parsedN) return;
 
     setTimeout(() => {
-      // 1. Calcul Exercice N
-      const payloadN = { isBalance: true, rows: parsedN };
-      const bilanN    = calculateBilanFonctionnel(payloadN);
-      const sigN      = calculateSIG(payloadN);
-      const ratiosN   = calculateRatios(bilanN, sigN, parsedN);
-      const bilanSCFN = calculateBilanSCF(payloadN, sigN);
-
-      // 2. Calcul Exercice N-1 (si fourni)
-      let dataN1 = null;
-      if (parsedN1) {
-        const payloadN1 = { isBalance: true, rows: parsedN1 };
-        const bilanN1    = calculateBilanFonctionnel(payloadN1);
-        const sigN1      = calculateSIG(payloadN1);
-        const ratiosN1   = calculateRatios(bilanN1, sigN1, parsedN1);
-        const bilanSCFN1 = calculateBilanSCF(payloadN1, sigN1);
-        dataN1 = { bilan: bilanN1, sig: sigN1, ratios: ratiosN1, bilanSCF: bilanSCFN1, rows: parsedN1 };
-      }
-
-      const fullPayload = {
-        bilan: bilanN,
-        sig: sigN,
-        ratios: ratiosN,
-        bilanSCF: bilanSCFN,
-        rows: parsedN,
-        profil,
-        dataN1,
-      };
-
+      const fullPayload = construireDossier(parsedN, parsedN1, profil);
       saveDossierToStorage(fullPayload);
       onDataImported(fullPayload);
     }, 200);
