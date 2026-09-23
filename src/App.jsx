@@ -32,7 +32,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { PostImportConfigModal } from './components/PostImportConfigModal';
 
 import { exportFinancialWorkbook, generateFullPDF } from './utils/lazyExporters';
-import { calculateStockEvolution, applyTvaRegimeToRatios } from './utils/financeCalculations';
+import { calculateStockEvolution, applyTvaRegimeToRatios, calculateTotauxProduitsCharges } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
 import { clickable } from './utils/clickable';
@@ -229,23 +229,7 @@ export default function App() {
 
   /* ── Totaux Annuels Produits vs Charges (Sans détail) ── */
   const annualTotals = useMemo(() => {
-    let totP = 0, totC = 0;
-    if (activeData?.rows && activeData.rows.length > 0) {
-      activeData.rows.forEach(r => {
-        if (r.ignore || !r.compte) return;
-        const c = r.compte.toString().trim();
-        const deb = Number(r.soldeFinDebit !== undefined ? r.soldeFinDebit : r.debit) || 0;
-        const cred = Number(r.soldeFinCredit !== undefined ? r.soldeFinCredit : r.credit) || 0;
-        const v = r.solde !== undefined && r.solde !== null ? r.solde : (deb - cred);
-        const absV = Math.abs(v);
-        if (c.startsWith('7')) totP += absV;
-        else if (c.startsWith('6')) totC += absV;
-      });
-    } else {
-      totP = (activeData?.sig?.chiffreAffaires || 1200000) + 260000;
-      totC = totP - (activeData?.sig?.resultatNet || 150000);
-    }
-    const net = totP - totC;
+    const { produits: totP, charges: totC, resultat: net } = calculateTotauxProduitsCharges(activeData?.rows);
     return {
       totP,
       totC,

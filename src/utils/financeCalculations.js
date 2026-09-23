@@ -2066,6 +2066,27 @@ export const calculateSIG = (data) => {
 };
 
 /**
+ * Totaux de la classe 7 (produits) et de la classe 6 (charges) avec leur signe, selon
+ * la même règle que calculateSIG : un compte en sens inverse (709 RRR accordés, 603
+ * variation de stocks créditrice, 72 débiteur...) vient EN DÉDUCTION de sa classe au
+ * lieu de la gonfler. produits − charges est donc toujours égal à sig.resultatNet.
+ */
+export function calculateTotauxProduitsCharges(rows = []) {
+  let produits = 0;
+  let charges = 0;
+  (rows || []).forEach(row => {
+    if (row.ignore || !row.compte) return;
+    const c = row.compte.toString().trim();
+    const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+    const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+    const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
+    if (c.startsWith('7')) produits += -solde;
+    else if (c.startsWith('6')) charges += solde;
+  });
+  return { produits, charges, resultat: produits - charges };
+}
+
+/**
  * Construit les lignes officielles du Tableau des Comptes de Résultats (TCR) par Nature,
  * avec la numérotation romaine officielle SCF (I à IX). Source unique de vérité réutilisée
  * par SIGView (analyse) et EtatsFinanciersView (état financier officiel), pour éviter toute
@@ -2105,6 +2126,62 @@ export function buildTCRRows(sig) {
 }
 
 /**
+ * Lignes de la feuille « Ratios & Benchmarks » de l'export Excel :
+ * [Indicateur, Valeur mesurée, Norme sectorielle, Statut, Formule].
+ * Un ratio dont le dénominateur est nul (CA, consommations, achats ou charges de
+ * personnel) est affiché « — » / NON CALCULABLE : aucune valeur de repli ni statut
+ * figé ne doit passer pour une mesure.
+ *
+ * @param {object} sig    Résultat de calculateSIG
+ * @param {object} ratios Ratios affichés (après applyTvaRegimeToRatios)
+ * @param {object} bm     Benchmarks du secteur (getSecteur(id).benchmarks)
+ */
+export function buildRatiosBenchmarkRows(sig = {}, ratios = {}, bm) {
+  const NC = 'NON CALCULABLE';
+  const ca = sig.chiffreAffaires || 0;
+  const conso = sig.consommationExercice || ratios.achats || 0;
+  const achats = ratios.achats || 0;
+  const chargesPers = sig.chargesPersonnel || 0;
+  const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  const jours = (v) => `${Math.round(v || 0)} jours`;
+  const tva = ratios.tvaCorrectionAppliquee;
+
+  const margeEBE = ca ? (sig.ebe || 0) / ca : null;
+  const margeNette = ca ? (sig.resultatNet || 0) / ca : null;
+  const tauxVA = ca ? (sig.valeurAjoutee || 0) / ca : null;
+  const productivite = chargesPers > 0 ? (sig.valeurAjoutee || 0) / chargesPers : null;
+  const dso = ratios.delaiRecouvrement || 0;
+  const dpo = ratios.delaiFournisseurs || 0;
+  const rotation = ratios.rotationStocks || 0;
+  const bfrJours = ratios.bfrJoursCA || 0;
+
+  return [
+    ['Marge EBE (% du CA)', margeEBE === null ? '—' : pct(margeEBE), bm.margeEBE.norme,
+      margeEBE === null ? NC : (margeEBE >= bm.margeEBE.bon ? 'OPTIMAL' : 'À AMÉLIORER'), 'EBE / CA'],
+    ['Marge Nette (% du CA)', margeNette === null ? '—' : pct(margeNette), bm.margeNette.norme,
+      (sig.resultatNet || 0) > 0 ? 'CONFORME' : 'DÉFICIT', 'Résultat Net / CA'],
+    ['Taux de Valeur Ajoutée', tauxVA === null ? '—' : pct(tauxVA), bm.tauxVA.norme,
+      tauxVA === null ? NC : (tauxVA >= bm.tauxVA.bon ? 'OPTIMAL' : 'MOYEN'), 'Valeur Ajoutée / CA'],
+    ['Liquidité Générale', `${(ratios.liquiditeGenerale || 0).toFixed(2)}x`, bm.liquiditeGenerale.norme,
+      (ratios.liquiditeGenerale || 0) >= bm.liquiditeGenerale.bon ? 'SOLIDE' : 'ATTENTION', '(Actif Circulant + Trésorerie) / Passif Court Terme'],
+    ['Autonomie Financière', pct(ratios.autonomieFinanciere || 0), bm.autonomieFinanciere.norme,
+      (ratios.autonomieFinanciere || 0) >= bm.autonomieFinanciere.bon ? 'SOLIDE' : 'VULNÉRABLE', 'Capitaux Propres / Total Bilan'],
+    ['Délai Recouvrement Clients (DSO)', ca ? jours(dso) : '—', bm.dso.norme,
+      !ca ? NC : (dso <= bm.dso.bon ? 'OPTIMAL' : 'LENT'),
+      `(Créances Clients / CA${tva && !tva.ventesFranchisees ? ` TTC ${tva.tauxTva}%` : ''}) × 360`],
+    ['Délai Paiement Fournisseurs (DPO)', conso ? jours(dpo) : '—', bm.dpo.norme,
+      !conso ? NC : (dpo < bm.dpo.min ? 'TROP RAPIDE' : dpo > bm.dpo.max ? 'LENT' : 'ÉQUILIBRÉ'),
+      `(Dettes Fournisseurs / Consommations${tva && !tva.achatsFranchises ? ` TTC ${tva.tauxTva}%` : ''}) × 360`],
+    ['Rotation des Stocks', achats ? jours(rotation) : '—', bm.rotationStocks.norme,
+      !achats ? NC : (rotation <= bm.rotationStocks.bon ? 'OPTIMAL' : 'LENT'), '(Stock Moyen / Achats) × 360'],
+    ['BFR en Jours de CA', ca ? `${Math.round(bfrJours)} j CA` : '—', bm.bfrJoursCA.norme,
+      !ca ? NC : (bfrJours <= bm.bfrJoursCA.bon ? 'MAÎTRISÉ' : 'ÉLEVÉ'), '(BFR / CA) × 360'],
+    ['Productivité du Travail', productivite === null ? '—' : `${productivite.toFixed(2)}x`, bm.productivite.norme,
+      productivite === null ? NC : (productivite >= bm.productivite.bon ? 'OPTIMAL' : 'À AMÉLIORER'), 'Valeur Ajoutée / Charges de Personnel'],
+  ];
+}
+
+/**
  * Corrige le biais TVA (TTC/HT) sur les délais clients & fournisseurs.
  *
  * Les soldes de balance "Créances clients" (compte 41) et "Dettes fournisseurs"
@@ -2112,10 +2189,11 @@ export function buildTCRRows(sig) {
  * et les Achats/Consommation du TCR sont HT. Diviser un TTC par un HT surestime
  * mécaniquement le délai d'environ [taux de TVA] % si l'activité est soumise à TVA.
  *
- * Par défaut (non franchisé), on reconstitue un CA/Achats "TTC" pour neutraliser
- * ce biais. Si l'activité est déclarée en franchise de TVA (exonérée), la créance/
- * dette ne porte pas de TVA : la formule HT/HT d'origine est alors la bonne et n'est
- * pas modifiée.
+ * Par défaut (non franchisé), on ramène le dénominateur en TTC pour neutraliser ce
+ * biais : délai TTC = délai HT / (1 + taux). Le délai HT de départ est celui de
+ * calculateRatios, donc sur la même base (Consommations 60+61+62 pour le DPO) que
+ * partout ailleurs. Si l'activité est déclarée en franchise de TVA (exonérée), la
+ * créance/dette ne porte pas de TVA : le délai HT est alors le bon et n'est pas modifié.
  *
  * @param {object} ratios   Objet retourné par calculateRatios (non muté)
  * @param {object} tvaRegime { ventesFranchisees, achatsFranchises, tauxTva }
@@ -2128,19 +2206,17 @@ export function applyTvaRegimeToRatios(ratios = {}, tvaRegime = {}) {
   } = tvaRegime || {};
 
   const coef = 1 + (Number(tauxTva) || 0) / 100;
-  const ca = ratios.chiffreAffaires || 0;
-  const achats = ratios.achats || 0;
-
-  const caTTC = ventesFranchisees ? ca : ca * coef;
-  const achatsTTC = achatsFranchises ? achats : achats * coef;
-
-  const delaiRecouvrement = caTTC === 0 ? 0 : ((ratios.creancesClients || 0) / caTTC) * 360;
-  const delaiFournisseurs = achatsTTC === 0 ? 0 : ((ratios.dettesFournisseurs || 0) / achatsTTC) * 360;
+  // Les délais HT d'origine sont conservés : réappliquer la correction (changement de
+  // régime dans les Paramètres) repart toujours d'eux au lieu de la cumuler.
+  const delaiRecouvrementHT = ratios.delaiRecouvrementHT ?? ratios.delaiRecouvrement ?? 0;
+  const delaiFournisseursHT = ratios.delaiFournisseursHT ?? ratios.delaiFournisseurs ?? 0;
 
   return {
     ...ratios,
-    delaiRecouvrement,
-    delaiFournisseurs,
+    delaiRecouvrementHT,
+    delaiFournisseursHT,
+    delaiRecouvrement: ventesFranchisees ? delaiRecouvrementHT : delaiRecouvrementHT / coef,
+    delaiFournisseurs: achatsFranchises ? delaiFournisseursHT : delaiFournisseursHT / coef,
     tvaCorrectionAppliquee: {
       ventesFranchisees: !!ventesFranchisees,
       achatsFranchises: !!achatsFranchises,

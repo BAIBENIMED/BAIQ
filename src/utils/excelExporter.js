@@ -16,7 +16,7 @@
 import * as XLSX from 'xlsx';
 import { getSecteur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
-import { auditBalanceAccounts, auditCrossAccountMovements, calculateVariationCapitauxPropres, buildTCRRows, calculateTFT } from './financeCalculations';
+import { auditBalanceAccounts, auditCrossAccountMovements, calculateVariationCapitauxPropres, buildTCRRows, buildRatiosBenchmarkRows, calculateTFT } from './financeCalculations';
 
 export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx', cur) {
   if (!data) return false;
@@ -297,16 +297,7 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
     ['Secteur de référence :', secteur.label],
     [],
     ['Indicateur / Ratio', 'Valeur Mesurée', 'Norme Sectorielle Algérie', 'Statut', 'Formule de Calcul'],
-    ['Marge EBE (% du CA)', `${(((sig.ebe || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, bm.margeEBE.norme, (sig.ebe || 0) / (sig.chiffreAffaires || 1) >= bm.margeEBE.bon ? 'OPTIMAL' : 'À AMÉLIORER', 'EBE / CA'],
-    ['Marge Nette (% du CA)', `${(((sig.resultatNet || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, bm.margeNette.norme, (sig.resultatNet || 0) > 0 ? 'CONFORME' : 'DÉFICIT', 'Résultat Net / CA'],
-    ['Taux de Valeur Ajoutée', `${(((sig.valeurAjoutee || 0) / (sig.chiffreAffaires || 1)) * 100).toFixed(1)}%`, bm.tauxVA.norme, (sig.valeurAjoutee || 0) / (sig.chiffreAffaires || 1) >= bm.tauxVA.bon ? 'OPTIMAL' : 'MOYEN', 'Valeur Ajoutée / CA'],
-    ['Liquidité Générale', `${(ratios.liquiditeGenerale || 0).toFixed(2)}x`, bm.liquiditeGenerale.norme, (ratios.liquiditeGenerale || 0) >= bm.liquiditeGenerale.bon ? 'SOLIDE' : 'ATTENTION', '(Actif Circulant + Trésorerie) / Passif Court Terme'],
-    ['Autonomie Financière', `${(((ratios.autonomieFinanciere || 0)) * 100).toFixed(1)}%`, bm.autonomieFinanciere.norme, (ratios.autonomieFinanciere || 0) >= bm.autonomieFinanciere.bon ? 'SOLIDE' : 'VULNÉRABLE', 'Capitaux Propres / Total Bilan'],
-    ['Délai Recouvrement Clients (DSO)', `${Math.round(ratios.delaiRecouvrement || 0)} jours`, bm.dso.norme, (ratios.delaiRecouvrement || 0) <= bm.dso.bon ? 'OPTIMAL' : 'LENT', `(Créances Clients / CA${ratios.tvaCorrectionAppliquee && !ratios.tvaCorrectionAppliquee.ventesFranchisees ? ` TTC ${ratios.tvaCorrectionAppliquee.tauxTva}%` : ''}) × 360`],
-    ['Délai Paiement Fournisseurs (DPO)', `${Math.round(ratios.delaiFournisseurs || 0)} jours`, bm.dpo.norme, 'CONFORME', `(Dettes Fournisseurs / Consommations${ratios.tvaCorrectionAppliquee && !ratios.tvaCorrectionAppliquee.achatsFranchises ? ` TTC ${ratios.tvaCorrectionAppliquee.tauxTva}%` : ''}) × 360`],
-    ['Rotation des Stocks', `${Math.round(ratios.rotationStocks || 0)} jours`, bm.rotationStocks.norme, (ratios.rotationStocks || 0) <= bm.rotationStocks.bon ? 'OPTIMAL' : 'LENT', '(Stock Moyen / Achats) × 360'],
-    ['BFR en Jours de CA', `${Math.round(ratios.bfrJoursCA || 0)} j CA`, bm.bfrJoursCA.norme, (ratios.bfrJoursCA || 0) <= bm.bfrJoursCA.bon ? 'MAÎTRISÉ' : 'ÉLEVÉ', '(BFR / CA) × 360'],
-    ['Productivité du Travail', `${(sig.valeurAjoutee && sig.chargesPersonnel ? (sig.valeurAjoutee / sig.chargesPersonnel).toFixed(2) : '1.50')}x`, bm.productivite.norme, 'ÉVALUÉ', 'Valeur Ajoutée / Charges de Personnel'],
+    ...buildRatiosBenchmarkRows(sig, ratios, bm),
   ];
   const ws4 = XLSX.utils.aoa_to_sheet(ws4Data);
   ws4['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 28 }, { wch: 18 }, { wch: 38 }];

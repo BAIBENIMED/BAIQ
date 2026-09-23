@@ -29,8 +29,12 @@ import {
   safeNum,
   verifyAccountNature,
   SEUIL_MATERIALITE_AUDIT,
+  applyTvaRegimeToRatios,
+  calculateTotauxProduitsCharges,
+  buildRatiosBenchmarkRows,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
+import { SECTEUR_DEFAUT } from '../src/utils/secteurs.js';
 
 /** Construit une ligne de balance au format produit par parseFile(). */
 const L = (compte, libelle, debit, credit) => ({
@@ -363,4 +367,122 @@ test('un export à milliers pointés sans décimales n\'est plus divisé par 100
     colonne.map(v => safeNum(v, sep)),
     [1234567, 5000, 250, 12500]
   );
+});
+
+// ── 8. Délais fournisseurs corrigés de la TVA ──────────────────────────────
+
+/** Commerce avec achats (60) ET services extérieurs (61/62). */
+const BALANCE_ACHATS_ET_SERVICES = [
+  L('101', 'Capital social', 0, 500_000),
+  L('401', 'Fournisseurs', 0, 500_000),
+  L('512', 'Banque', 2_000_000, 0),
+  L('601', 'Achats consommés', 1_000_000, 0),
+  L('611', 'Sous-traitance', 600_000, 0),
+  L('626', 'Télécommunications', 400_000, 0),
+  L('701', 'Ventes', 0, 3_000_000),
+];
+
+/** Société de services : aucun compte 60. */
+const BALANCE_SERVICES = [
+  L('101', 'Capital social', 0, 200_000),
+  L('401', 'Fournisseurs', 0, 100_000),
+  L('512', 'Banque', 1_300_000, 0),
+  L('611', 'Sous-traitance', 600_000, 0),
+  L('626', 'Télécommunications', 400_000, 0),
+  L('706', 'Prestations de services', 0, 2_000_000),
+];
+
+test('le DPO corrigé de la TVA garde la base Consommations (60+61+62)', () => {
+  assert.equal(checkBalanceEquilibre(BALANCE_ACHATS_ET_SERVICES).equilibre, true);
+  const { ratios } = analyser(BALANCE_ACHATS_ET_SERVICES);
+  assert.equal(Math.round(ratios.delaiFournisseurs), 90, 'DPO HT : 500 000 / 2 000 000 × 360');
+
+  // 90 j / 1,19 ≈ 75,6 j TTC — et non 151 j, qui divisait par le seul compte 60.
+  const ttc = applyTvaRegimeToRatios(ratios, { tauxTva: 19 });
+  assert.ok(Math.abs(ttc.delaiFournisseurs - 90 / 1.19) < 1e-9, `DPO TTC obtenu : ${ttc.delaiFournisseurs}`);
+
+  const franchise = applyTvaRegimeToRatios(ratios, { achatsFranchises: true, tauxTva: 19 });
+  assert.equal(franchise.delaiFournisseurs, ratios.delaiFournisseurs, 'achats franchisés : DPO HT inchangé');
+});
+
+test('une société de services sans compte 60 a un DPO réel, pas 0 j', () => {
+  assert.equal(checkBalanceEquilibre(BALANCE_SERVICES).equilibre, true);
+  const { ratios } = analyser(BALANCE_SERVICES);
+  const ttc = applyTvaRegimeToRatios(ratios, { tauxTva: 19 });
+  // 100 000 / (1 000 000 × 1,19) × 360 ≈ 30,3 j
+  assert.ok(Math.abs(ttc.delaiFournisseurs - 36 / 1.19) < 1e-9, `DPO TTC obtenu : ${ttc.delaiFournisseurs}`);
+});
+
+test('réappliquer la correction TVA ne la cumule pas', () => {
+  const { ratios } = analyser(BALANCE_SAINE);
+  const une = applyTvaRegimeToRatios(ratios, { tauxTva: 19 });
+  const deux = applyTvaRegimeToRatios(une, { tauxTva: 19 });
+  assert.equal(deux.delaiFournisseurs, une.delaiFournisseurs);
+  assert.equal(deux.delaiRecouvrement, une.delaiRecouvrement);
+
+  // Passer ensuite en franchise totale ramène exactement aux délais HT d'origine.
+  const retour = applyTvaRegimeToRatios(une, { ventesFranchisees: true, achatsFranchises: true });
+  assert.equal(retour.delaiFournisseurs, ratios.delaiFournisseurs);
+  assert.equal(retour.delaiRecouvrement, ratios.delaiRecouvrement);
+});
+
+// ── 9. Totaux produits / charges du tableau de bord ────────────────────────
+
+test('les totaux produits/charges retombent toujours sur le résultat net du SIG', () => {
+  for (const [nom, rows] of TOUTES) {
+    const { sig } = analyser(rows);
+    const totaux = calculateTotauxProduitsCharges(rows);
+    assert.ok(Math.abs(totaux.resultat - sig.resultatNet) < 0.01,
+      `« ${nom} » : ${totaux.resultat} au lieu de ${sig.resultatNet}`);
+  }
+});
+
+test('un compte de produits ou de charges en sens inverse vient en déduction', () => {
+  // 709 (RRR accordés) débiteur et 603 (variation de stocks) créditeur réduisent leur
+  // classe : les additionner en valeur absolue donnait 350 000 de résultat au lieu de 450 000.
+  const rows = [
+    L('512', 'Banque', 450_000, 0),
+    L('600', 'Achats de marchandises', 600_000, 0),
+    L('603', 'Variation des stocks', 0, 100_000),
+    L('700', 'Ventes de marchandises', 0, 1_000_000),
+    L('709', 'RRR accordés', 50_000, 0),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  assert.deepEqual(calculateTotauxProduitsCharges(rows), { produits: 950_000, charges: 500_000, resultat: 450_000 });
+  assert.equal(analyser(rows).sig.resultatNet, 450_000);
+});
+
+test('sans lignes de balance, aucun montant n\'est inventé', () => {
+  assert.deepEqual(calculateTotauxProduitsCharges([]), { produits: 0, charges: 0, resultat: 0 });
+  assert.deepEqual(calculateTotauxProduitsCharges(undefined), { produits: 0, charges: 0, resultat: 0 });
+});
+
+// ── 10. Feuille Ratios de l'export Excel ───────────────────────────────────
+
+const BM = SECTEUR_DEFAUT.benchmarks;
+const ligneRatio = (lignes, debut) => lignes.find(l => l[0].startsWith(debut));
+
+test('la feuille Ratios n\'affiche aucune valeur de repli quand un dénominateur est nul', () => {
+  const lignes = buildRatiosBenchmarkRows(
+    { chiffreAffaires: 0, ebe: -500_000, valeurAjoutee: 0, chargesPersonnel: 0 },
+    { delaiFournisseurs: 0, delaiRecouvrement: 0 },
+    BM
+  );
+  assert.equal(lignes.length, 10);
+  for (const debut of ['Marge EBE', 'Taux de Valeur', 'Délai Recouvrement', 'Délai Paiement', 'Rotation', 'BFR', 'Productivité']) {
+    const l = ligneRatio(lignes, debut);
+    assert.equal(l[1], '—', `${debut} : valeur ${l[1]}`);
+    assert.equal(l[3], 'NON CALCULABLE', `${debut} : statut ${l[3]}`);
+  }
+});
+
+test('la productivité et le statut du DPO dépendent des vraies valeurs', () => {
+  const sig = { chiffreAffaires: 5_000_000, consommationExercice: 2_000_000, valeurAjoutee: 3_200_000, chargesPersonnel: 2_000_000 };
+  const lignes = buildRatiosBenchmarkRows(sig, { achats: 1_000_000, delaiFournisseurs: 40 }, BM);
+  assert.equal(ligneRatio(lignes, 'Productivité')[1], '1.60x');
+
+  const statutDpo = (dpo) => ligneRatio(buildRatiosBenchmarkRows(sig, { achats: 1_000_000, delaiFournisseurs: dpo }, BM), 'Délai Paiement')[3];
+  assert.equal(statutDpo(BM.dpo.min - 1), 'TROP RAPIDE');
+  assert.equal(statutDpo((BM.dpo.min + BM.dpo.max) / 2), 'ÉQUILIBRÉ');
+  assert.equal(statutDpo(BM.dpo.max + 1), 'LENT');
 });
