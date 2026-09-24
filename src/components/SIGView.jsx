@@ -229,8 +229,8 @@ export function SIGView({ data, rows, formatCurrency }) {
                 const isSubtotal   = r.type === 'subtotal';
                 const isCompte     = r.type === 'compte';
                 let rowBg = 'transparent', fontWeight = 400, color = 'inherit';
-                if (isGrandTotal)  { rowBg = '#dceef2'; fontWeight = 800; color = '#124f66'; }
-                else if (isTotal)  { rowBg = '#f0f8fa'; fontWeight = 700; color = '#0b3446'; }
+                if (isGrandTotal)  { rowBg = 'var(--primary-lt)'; fontWeight = 800; color = 'var(--primary-dk)'; }
+                else if (isTotal)  { rowBg = 'var(--primary-lt2)'; fontWeight = 700; color = 'var(--ink)'; }
                 else if (isSubtotal){ rowBg = 'var(--surface-alt)'; fontWeight = 700; color = 'var(--text)'; }
                 const displayVal = r.isCharge && r.val > 0 ? -r.val : r.val;
                 return (
@@ -244,10 +244,10 @@ export function SIGView({ data, rows, formatCurrency }) {
                     style={{ background: rowBg, fontWeight, color, cursor: isCompte ? 'pointer' : 'default' }}
                   >
                     <td>
-                      <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: isCompte ? '#1b6e8c' : 'var(--text)' }}>{r.code}</span>
+                      <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: isCompte ? 'var(--primary)' : 'var(--text)' }}>{r.code}</span>
                     </td>
                     <td style={{ paddingLeft: isCompte ? 24 : 12 }}>
-                      {isTotal && <span style={{ color: '#1b6e8c', marginRight: 6 }}>►</span>}
+                      {isTotal && <span style={{ color: 'var(--primary)', marginRight: 6 }}>►</span>}
                       {r.label}
                       {isCompte && (
                         <span className="badge badge-blue" style={{ fontSize: '0.58rem', marginLeft: 8, padding: '2px 6px' }}>
@@ -255,7 +255,7 @@ export function SIGView({ data, rows, formatCurrency }) {
                         </span>
                       )}
                     </td>
-                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? '#dc2626' : (isGrandTotal ? '#124f66' : 'var(--text)') }}>
+                    <td className="right" style={{ fontFamily: 'JetBrains Mono, monospace', color: displayVal < 0 ? 'var(--red)' : (isGrandTotal ? 'var(--primary-dk)' : 'var(--text)') }}>
                       {fmt(displayVal)}
                     </td>
                   </tr>

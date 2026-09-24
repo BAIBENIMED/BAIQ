@@ -48,11 +48,11 @@ function MarkdownReportViewer({ content }) {
       <div key={`tbl-${key}`} style={{ overflowX: 'auto', maxWidth: '100%', margin: '14px 0', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.80rem' }}>
           <thead>
-            <tr style={{ background: '#f1f5f9', borderBottom: '2px solid var(--border)' }}>
+            <tr style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
               {headers.map((h, hIdx) => {
                 const isRight = hIdx > 0 && (h.includes('(DZD)') || h.includes('%') || h.includes('Montant') || h.includes('Valeur') || h.includes('Score') || h.includes('CA'));
                 return (
-                  <th key={hIdx} style={{ padding: '8px 12px', textAlign: isRight ? 'right' : 'left', fontWeight: 800, color: '#1e293b', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                  <th key={hIdx} style={{ padding: '8px 12px', textAlign: isRight ? 'right' : 'left', fontWeight: 800, color: 'var(--text)', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
                 );
@@ -68,7 +68,7 @@ function MarkdownReportViewer({ content }) {
                   {cells.map((c, cIdx) => {
                     const isNum = c.includes('DZD') || c.includes('%') || !isNaN(Number(c.replace(/\s/g, '')));
                     return (
-                      <td key={cIdx} style={{ padding: '7px 12px', textAlign: cIdx === 0 ? 'left' : (isNum ? 'right' : 'left'), color: '#334155', fontWeight: cIdx === 0 ? 600 : (isNum ? 700 : 400), fontFamily: isNum ? 'monospace' : 'inherit', whiteSpace: isNum ? 'nowrap' : 'normal' }}>
+                      <td key={cIdx} style={{ padding: '7px 12px', textAlign: cIdx === 0 ? 'left' : (isNum ? 'right' : 'left'), color: 'var(--text)', fontWeight: cIdx === 0 ? 600 : (isNum ? 700 : 400), fontFamily: isNum ? 'monospace' : 'inherit', whiteSpace: isNum ? 'nowrap' : 'normal' }}>
                         {renderInlineMarkdown(c)}
                       </td>
                     );
@@ -120,7 +120,7 @@ function MarkdownReportViewer({ content }) {
 
     if (trimmed.startsWith('### ')) {
       elements.push(
-        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', margin: '16px 0 8px', borderLeft: '4px solid #1b6e8c', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', margin: '16px 0 8px', borderLeft: '4px solid var(--primary)', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
           {trimmed.slice(4)}
         </h3>
       );
@@ -140,8 +140,8 @@ function MarkdownReportViewer({ content }) {
       const isCheck = trimmed.startsWith('✓');
       const isCross = trimmed.startsWith('✗');
       elements.push(
-        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.85rem', color: '#334155', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
-          <span style={{ color: isCheck ? '#059669' : isCross ? '#dc2626' : '#1b6e8c', fontWeight: 800, flexShrink: 0 }}>
+        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.85rem', color: 'var(--text)', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
+          <span style={{ color: isCheck ? 'var(--green)' : isCross ? 'var(--red)' : 'var(--primary)', fontWeight: 800, flexShrink: 0 }}>
             {isCheck ? '✓' : isCross ? '✗' : '•'}
           </span>
           <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
@@ -153,7 +153,7 @@ function MarkdownReportViewer({ content }) {
     }
 
     elements.push(
-      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.85rem', color: '#334155', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
         {renderInlineMarkdown(trimmed)}
       </p>
     );

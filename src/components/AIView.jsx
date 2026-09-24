@@ -251,11 +251,11 @@ export function AIView({ data, geminiKey }) {
     const lines = text.split('\n');
     return lines.map((line, i) => {
       if (line.startsWith('## '))   return <h4 key={i} style={{ fontWeight: 800, fontSize: '0.95rem', margin: '12px 0 4px', color: 'var(--text)' }}>{line.slice(3)}</h4>;
-      if (line.startsWith('### '))  return <h5 key={i} style={{ fontWeight: 700, fontSize: '0.85rem', margin: '8px 0 4px', color: '#1b6e8c' }}>{line.slice(4)}</h5>;
+      if (line.startsWith('### '))  return <h5 key={i} style={{ fontWeight: 700, fontSize: '0.85rem', margin: '8px 0 4px', color: 'var(--primary)' }}>{line.slice(4)}</h5>;
       if (line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontWeight: 800, margin: '4px 0', fontSize: '0.85rem' }}>{line.slice(2, -2)}</p>;
-      if (line.startsWith('- ') || line.startsWith('• ')) return <li key={i} style={{ marginLeft: 16, fontSize: '0.85rem', lineHeight: 1.6, color: '#334155' }}>{renderBold(line.slice(2))}</li>;
+      if (line.startsWith('- ') || line.startsWith('• ')) return <li key={i} style={{ marginLeft: 16, fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text)' }}>{renderBold(line.slice(2))}</li>;
       if (line.startsWith('|') && line.includes('---')) return null;
-      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.80rem', fontFamily: 'monospace', borderBottom: '1px solid #e2e8f0', padding: '3px 0' }}>{line}</div>;
+      if (line.startsWith('|'))     return <div key={i} style={{ fontSize: '0.80rem', fontFamily: 'monospace', borderBottom: '1px solid var(--border)', padding: '3px 0' }}>{line}</div>;
       if (line === '')              return <br key={i} />;
       return <p key={i} style={{ margin: '3px 0', fontSize: '0.85rem', lineHeight: 1.6 }}>{renderBold(line)}</p>;
     });
@@ -426,7 +426,7 @@ export function AIView({ data, geminiKey }) {
 
                 {/* Décomposition du Partage de la Valeur Ajoutée */}
                 <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 8 }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>
                     Répartition de la Richesse Créée (100% de la VA) :
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.74rem' }}>
@@ -531,7 +531,7 @@ export function AIView({ data, geminiKey }) {
 
                 <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155' }}>Capacité d'Extinction de la Dette</span>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)' }}>Capacité d'Extinction de la Dette</span>
                     <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 900, color: diag.ratioDetteSurCAF <= 3.5 ? '#059669' : '#dc2626' }}>
                       {diag.ratioDetteSurCAF ? `${diag.ratioDetteSurCAF.toFixed(1)} an(s)` : '0 an'}
                     </span>
@@ -573,7 +573,7 @@ export function AIView({ data, geminiKey }) {
                 </div>
 
                 <div style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', marginBottom: 4 }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>
                     Détail des 4 Piliers Banque d'Algérie :
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
@@ -696,7 +696,7 @@ export function AIView({ data, geminiKey }) {
                   </div>
                 </div>
 
-                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.6, margin: '0 0 14px' }}>{rec.detail}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.6, margin: '0 0 14px' }}>{rec.detail}</p>
 
                 {rec.etapes && rec.etapes.length > 0 && (
                   <div style={{ background: 'var(--surface-alt)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border)' }}>
@@ -766,7 +766,7 @@ export function AIView({ data, geminiKey }) {
                   )}
                   <div style={{
                     maxWidth: '80%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                    background: msg.role === 'user' ? '#1b6e8c' : '#fff',
+                    background: msg.role === 'user' ? '#1b6e8c' : 'var(--surface)',
                     color: msg.role === 'user' ? '#fff' : 'var(--text)',
                     boxShadow: 'var(--shadow-sm)',
                     border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
@@ -870,7 +870,7 @@ export function AIView({ data, geminiKey }) {
                 onKeyDown={handleKey}
                 placeholder={data ? '💬 Posez n\'importe quelle question sur votre balance...' : 'Importez des données pour commencer'}
                 disabled={!data || isLoading}
-                style={{ flex: 1, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: '0.85rem', outline: 'none', background: data ? '#fff' : 'var(--surface-alt)', color: 'var(--text)' }}
+                style={{ flex: 1, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10, fontSize: '0.85rem', outline: 'none', background: data ? 'var(--surface)' : 'var(--surface-alt)', color: 'var(--text)' }}
               />
               <button
                 onClick={sendMessage}
