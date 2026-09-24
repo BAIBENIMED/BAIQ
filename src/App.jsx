@@ -32,7 +32,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { PostImportConfigModal } from './components/PostImportConfigModal';
 
 import { exportFinancialWorkbook, generateFullPDF } from './utils/lazyExporters';
-import { calculateStockEvolution, applyTvaRegimeToRatios, calculateTotauxProduitsCharges } from './utils/financeCalculations';
+import { calculateStockEvolution, applyTvaRegimeToRatios, calculateTotauxProduitsCharges, auditBalanceAccounts } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
 import { clickable } from './utils/clickable';
@@ -306,262 +306,20 @@ export default function App() {
     };
   }, [activeData]);
 
-  /* ── Détection des soldes anormaux — SCF (Système Comptable Financier, Algérie) ──────
-   *
-   *  CLASSE 1 — Comptes de capitaux                   → normalement CRÉDITEURS
-   *    10 Capital                                      → CRÉDITEUR
-   *    11 Réserves                                     → CRÉDITEUR
-   *    12 Résultat net                                 → CRÉDITEUR (bénéfice) | DÉBITEUR (perte) ✓ admis
-   *    13 Report à nouveau                             → CRÉDITEUR (excédent) | DÉBITEUR (déficit) ✓ admis
-   *    14 Résultat en instance d'affectation           → CRÉDITEUR
-   *    15 Provisions & produits constatés d'avance     → CRÉDITEUR
-   *    16 Emprunts & dettes financières                → CRÉDITEUR
-   *    17 Dettes rattachées à des participations       → CRÉDITEUR
-   *    19 Amortissements dérogatoires/fonds propres    → CRÉDITEUR
-   *
-   *  CLASSE 2 — Comptes d'immobilisations             → normalement DÉBITEURS
-   *    20 Immob. incorporelles                        → DÉBITEUR
-   *    21 Immob. corporelles                          → DÉBITEUR
-   *    22 Immob. mises en concession                  → DÉBITEUR
-   *    23 Immob. en cours                             → DÉBITEUR
-   *    25 Titres mis en équivalence                   → DÉBITEUR
-   *    26 Participations & créances rattachées        → DÉBITEUR
-   *    27 Autres immob. financières                   → DÉBITEUR
-   *    28 Amortissements des immobilisations          → CRÉDITEUR (comptes soustractifs)
-   *    29 Pertes de valeur sur immobilisations        → CRÉDITEUR (comptes soustractifs)
-   *
-   *  CLASSE 3 — Comptes de stocks                    → normalement DÉBITEURS
-   *    30-38 Stocks divers                            → DÉBITEUR
-   *    39 Pertes de valeur sur stocks                 → CRÉDITEUR (comptes soustractifs)
-   *
-   *  CLASSE 4 — Comptes de tiers
-   *    40 Fournisseurs & comptes rattachés            → CRÉDITEUR  (anormal si débiteur)
-   *    41 Clients & comptes rattachés                 → DÉBITEUR   (anormal si créditeur)
-   *    42 Personnel & comptes rattachés               → CRÉDITEUR  (anormal si débiteur)
-   *    43 Organismes sociaux                          → CRÉDITEUR  (anormal si débiteur)
-   *    44 État & collectivités publiques              → variable
-   *       441 Impôts sur bénéfices                   → CRÉDITEUR
-   *       444 État - TVA collectée                   → CRÉDITEUR
-   *       445 État - TVA déductible/remboursable      → DÉBITEUR   ✓ admis
-   *       447 Autres impôts & taxes                  → CRÉDITEUR
-   *    45 Groupe & associés                           → variable selon sens
-   *    46 Débiteurs divers                            → DÉBITEUR   (anormal si créditeur)
-   *    47 Comptes transitoires / d'attente            → à solder (toujours alerté)
-   *    48 Comptes de régularisation                   → variable
-   *    49 Pertes de valeur sur comptes de tiers       → CRÉDITEUR (soustractifs)
-   *
-   *  CLASSE 5 — Comptes financiers                   → normalement DÉBITEURS
-   *    50 Valeurs mobilières de placement             → DÉBITEUR
-   *    51 Banques, établissements financiers          → DÉBITEUR   (anormal si créditeur)
-   *    532 Caisse dinars                              → DÉBITEUR   (JAMAIS créditeur !)
-   *    534 Caisse devises                             → DÉBITEUR   (JAMAIS créditeur !)
-   *    54 Régies d'avances & accréditifs              → DÉBITEUR
-   *    58 Virements internes                          → soldé en fin de période (alerté si solde)
-   *    59 Pertes de valeur sur actifs financiers      → CRÉDITEUR (soustractifs)
-   *
-   *  CLASSE 6 — Comptes de charges                   → normalement DÉBITEURS
-   *  CLASSE 7 — Comptes de produits                  → normalement CRÉDITEURS
-   * ──────────────────────────────────────────────────────────────────────────── */
-  const detectAnomaly = (compte, soldeDebit, soldeCredit) => {
-    if (!compte) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-    const c   = compte.toString().replace(/\s/g, '');
-    const cl  = c[0];
-    const p2  = c.slice(0, 2);  // 2 premiers chiffres
-    const p3  = c.slice(0, 3);  // 3 premiers chiffres
-    const p4  = c.slice(0, 4);  // 4 premiers chiffres
-    const sd  = Math.abs(soldeDebit  || 0);
-    const sc  = Math.abs(soldeCredit || 0);
-    const isD = sd > 0.01 && sc < 0.01;   // solde débiteur
-    const isC = sc > 0.01 && sd < 0.01;   // solde créditeur
-    const R   = (s, m, mt, cls) => ({ anomalie: true, sens: s, motif: m, montant: mt, cls });
-
-    // ── COMPTES MIXTES ET FLUIDES (DÉBITEUR OU CRÉDITEUR ADMIS) → IGNORER ──────
-    // 133, 134 : Subventions d'investissement/équipement (transférées / reportées)
-    // 444 : État - Impôts sur les bénéfices / Liquidation IBS (crédit ou dette)
-    // 455 : Associés - Comptes courants (apports ou retraits autorisés)
-    // 467 : Autres comptes de régularisation / créances et dettes transitoires
-    // 517 : Autres organismes financiers / comptes spécifiques
-    // 69x : Impôts sur les résultats (692, 693, 695, 698, 699, etc. - charge ou produit d'impôt différé/régul)
-    // 723, 724, 725 : Variation des stocks (déstockage = débiteur, stockage = créditeur)
-    if (p2 === '69' || ['133','134','444','455','467','517','603','723','724','725'].includes(p3) || p4 === '6992') {
-      return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-    }
-
-    // ── CLASSE 1 : Capitaux ──────────────────────────────────────────────────
-    if (cl === '1') {
-      // 12 Résultat & 13 Report à nouveau : peuvent légitimement être débiteurs
-      if (['12','13'].includes(p2)) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-      // Tous les autres comptes de classe 1 → créditeurs
-      if (isD) return R('DÉBITEUR ANORMAL', `Capital/réserves/emprunts (${p2}x) : normalement créditeur`, sd, 'badge-red');
-    }
-
-    // ── CLASSE 2 : Immobilisations ───────────────────────────────────────────
-    if (cl === '2') {
-      if (['28','29'].includes(p2)) {
-        // Amortissements & pertes de valeur → créditeurs (soustractifs)
-        if (isD) return R('DÉBITEUR ANORMAL', `Amortissement/perte de valeur (${p2}x) : normalement créditeur`, sd, 'badge-amber');
-      } else {
-        // Immobilisations → débiteurs
-        if (isC) return R('CRÉDITEUR ANORMAL', `Immobilisation (${p2}x) : normalement débitrice`, sc, 'badge-red');
-      }
-    }
-
-    // ── CLASSE 3 : Stocks ────────────────────────────────────────────────────
-    if (cl === '3') {
-      if (p2 === '39') {
-        // Pertes de valeur sur stocks → créditeurs
-        if (isD) return R('DÉBITEUR ANORMAL', 'Perte de valeur sur stock (39x) : normalement créditrice', sd, 'badge-amber');
-      } else {
-        if (isC) return R('CRÉDITEUR ANORMAL', `Stock (${p2}x) : normalement débiteur — rupture ou erreur de saisie ?`, sc, 'badge-red');
-      }
-    }
-
-    // ── CLASSE 4 : Tiers ─────────────────────────────────────────────────────
-    if (cl === '4') {
-
-      // ── 40x — Fournisseurs ──
-      if (p2 === '40') {
-        // EXCEPTION 406 : Fournisseurs - Retenues de garantie (débiteur admis)
-        if (p3 === '406') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-        // EXCEPTION 409 : Fournisseurs débiteurs — Avances & acomptes versés (débiteur normal)
-        if (p3 === '409') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-        // Tous les autres 40x → normalement créditeurs
-        if (isD) return R('DÉBITEUR ANORMAL', 'Fournisseur (40x) : normalement créditeur — acompte versé ou trop-payé ? (vérifier si 406/409)', sd, 'badge-amber');
-      }
-
-      // ── 41x — Clients ──
-      if (p2 === '41') {
-        // EXCEPTION 419 : Clients créditeurs — Avances & acomptes reçus (créditeur normal)
-        if (p3 === '419') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-        // Tous les autres 41x → normalement débiteurs
-        if (isC) return R('CRÉDITEUR ANORMAL', 'Client (41x) : normalement débiteur — avoir non imputé ou trop-perçu ? (vérifier si 419)', sc, 'badge-amber');
-      }
-
-      // ── 42x — Personnel ──
-      if (p2 === '42') {
-        // EXCEPTION 425 : Personnel - Avances et acomptes versés → NATURE DÉBITRICE (débiteur normal)
-        if (p3 === '425') {
-          if (isC) return R('CRÉDITEUR ANORMAL', 'Personnel - Avances (425x) : de nature débitrice (anormal si créditeur)', sc, 'badge-amber');
-          return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-        }
-        // 421/427 Rémunérations dues → normalement créditeurs
-        if (isD) return R('DÉBITEUR ANORMAL', 'Personnel (42x) : normalement créditeur — avance non régularisée ? (vérifier si 425)', sd, 'badge-amber');
-      }
-
-      // ── 43x — Organismes sociaux : normalement créditeurs ──
-      if (p2 === '43') {
-        if (isD) return R('DÉBITEUR ANORMAL', 'Organisme social (43x) : normalement créditeur — trop-versé de cotisations ?', sd, 'badge-amber');
-      }
-
-      // ── 44x — État ──
-      if (p2 === '44') {
-        // 445 TVA déductible / remboursable → légitimement débitrice
-        if (p3 === '445') { /* admis */ }
-        else if (isD) {
-          return R('DÉBITEUR ANORMAL', `Compte d'État (${p3}) : normalement créditeur — trop-versé d'impôt ou crédit TVA ?`, sd, 'badge-amber');
-        }
-      }
-
-      // ── 46x — Débiteurs divers (hors 467 ignoré) : normalement débiteurs ──
-      if (p2 === '46') {
-        if (isC) return R('CRÉDITEUR ANORMAL', 'Débiteurs divers (46x) : normalement débiteur', sc, 'badge-amber');
-      }
-
-      // ── 47x — Comptes transitoires/d'attente : doivent être soldés ──
-      if (p2 === '47') {
-        const mt = sd + sc;
-        if (mt > 0.01) return R('SOLDE EN SUSPENS', "Compte d'attente (47x) : doit être soldé — régularisation en attente", mt, 'badge-amber');
-      }
-
-      // ── 49x — Pertes de valeur sur tiers : créditeurs (soustractifs) ──
-      if (p2 === '49') {
-        if (isD) return R('DÉBITEUR ANORMAL', 'Perte de valeur sur tiers (49x) : normalement créditrice', sd, 'badge-amber');
-      }
-    }
-
-    // ── CLASSE 5 : Comptes financiers ────────────────────────────────────────
-    if (cl === '5') {
-
-      // ── 59x — Pertes de valeur : créditeurs (soustractifs) ──
-      if (p2 === '59') {
-        if (isD) return R('DÉBITEUR ANORMAL', 'Perte de valeur sur actif financier (59x) : normalement créditrice', sd, 'badge-amber');
-      }
-
-      // ── 58x — Virements internes : doivent être soldés en fin de période ──
-      if (p2 === '58') {
-        const mt = sd + sc;
-        if (mt > 0.01) return R('SOLDE EN SUSPENS', 'Virement interne (58x) : doit être soldé en fin de période', mt, 'badge-amber');
-      }
-
-      // ── 532/534/531/533 — Caisse : JAMAIS créditrice ──
-      if (['531','532','533','534'].includes(p3)) {
-        if (isC) return R('CRÉDITEUR ANORMAL — CAISSE', '⚠ La caisse ne peut physiquement pas être créditrice — erreur de saisie majeure !', sc, 'badge-red');
-      }
-
-      // ── 512x — Banques & comptes assimilés ──
-      if (p3 === '512' || c.startsWith('512')) {
-        if (isC) return R('FACILITÉ DE CAISSE ?', '512 créditeur : découvert autorisé (facilité de caisse) ou à reclasser en 5186 si non contractuel', sc, 'badge-amber');
-      }
-
-      // ── 51x (hors 512) & 50x & 54x — Trésorerie : normalement débiteurs ──
-      if (['50','54'].includes(p2) || (p2 === '51' && !c.startsWith('512'))) {
-        if (isC) return R('CRÉDITEUR ANORMAL', `Trésorerie (${p2}x) : normalement débitrice — vérifier convention bancaire`, sc, 'badge-red');
-      }
-    }
-
-    // ── CLASSE 6 : Charges ───────────────────────────────────────────────────
-    if (cl === '6') {
-      // EXCEPTION 609/619/629 : RRR obtenus (créditeur normal)
-      if (p3 === '609' || p3 === '619' || p3 === '629') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-      // EXCEPTION 692 : Participation salariés (MIXTE — créditeur admis : extourne, résultat déficitaire)
-      if (c.startsWith('692')) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-      // Tous les autres comptes de classe 6 → normalement débiteurs
-      if (isC) return R('CRÉDITEUR ANORMAL', `Charge (${p2}x) : normalement débitrice — extourne, OD ou erreur d'imputation ? (vérifier si RRR 609)`, sc, 'badge-amber');
-    }
-
-    // ── CLASSE 7 : Produits ──────────────────────────────────────────────────
-    if (cl === '7') {
-      // EXCEPTION 709 : RRR accordés (débiteur normal)
-      if (p3 === '709') return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-      // EXCEPTION 724 : Production immobilisée corporelle (MIXTE — débiteur admis : annulation, correction)
-      if (c.startsWith('724')) return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-      // Tous les autres comptes de classe 7 → normalement créditeurs
-      if (isD) return R('DÉBITEUR ANORMAL', `Produit (${p2}x) : normalement créditeur — extourne ou erreur d'imputation ? (vérifier si RRR 709)`, sd, 'badge-red');
-    }
-
-    return { anomalie: false, sens: null, motif: '', montant: 0, cls: 'badge-green' };
-  };
-
-  /* ── Comptes à alerter (SCF) ── */
+  /* ── Alertes — soldes anormaux (même moteur et même seuil que l'écran Audit, le PDF et l'Excel) ── */
   const notableRows = useMemo(() => {
-    return activeData?.rows
-      ? (() => {
-          const anomalies = activeData.rows
-            .filter(r => !r.isTotal && r.compte)
-            .map(r => {
-              const result = detectAnomaly(r.compte, r.soldeFinDebit, r.soldeFinCredit);
-              return { ...r, ...result };
-            })
-            .filter(r => r.anomalie)
-            .sort((a, b) => (b.montant || 0) - (a.montant || 0))
-            .slice(0, 10);
-          if (anomalies.length === 0) {
-            return activeData.rows
-              .filter(r => !r.isTotal && r.compte)
-              .sort((a,b) => Math.abs(b.solde) - Math.abs(a.solde))
-              .slice(0, 5)
-              .map(r => ({ ...r, anomalie: false, sens: 'CONFORME', motif: 'Solde conforme aux règles SCF', cls: 'badge-green' }));
-          }
-          return anomalies;
-        })()
-      : [
-          { compte:'411200', libelle:'Clients ordinaires - Avoirs non imputés',  soldeFinDebit:0,     soldeFinCredit:38500, anomalie:true, sens:'CRÉDITEUR ANORMAL',          motif:'Client (41x) : normalement débiteur — avoir non imputé ou trop-perçu ?',          montant:38500, cls:'badge-amber' },
-          { compte:'401500', libelle:'Fournisseurs - Acomptes sur commandes',    soldeFinDebit:12450, soldeFinCredit:0,     anomalie:true, sens:'DÉBITEUR ANORMAL',           motif:'Fournisseur (40x) : normalement créditeur — acompte versé ou trop-payé ?',         montant:12450, cls:'badge-amber' },
-          { compte:'512000', libelle:'Banque BNA - Compte courant',              soldeFinDebit:0,     soldeFinCredit:9800,  anomalie:true, sens:'CRÉDITEUR ANORMAL',          motif:'Trésorerie (51x) : normalement débitrice — découvert bancaire non reclassé en 52x ?', montant:9800, cls:'badge-red'   },
-          { compte:'532000', libelle:'Caisse principale (dinars)',               soldeFinDebit:0,     soldeFinCredit:3200,  anomalie:true, sens:'CRÉDITEUR ANORMAL — CAISSE', motif:'⚠ Caisse ne peut physiquement pas être créditrice — erreur comptable majeure !',    montant:3200, cls:'badge-red'   },
-          { compte:'471000', libelle:"Compte d'attente - Opérations à répartir", soldeFinDebit:5600,  soldeFinCredit:0,     anomalie:true, sens:'SOLDE EN SUSPENS',           motif:"Compte d'attente (47x) : doit être soldé — régularisation en attente",              montant:5600, cls:'badge-amber' },
-          { compte:'706000', libelle:'Produits des activités annexes',           soldeFinDebit:1800,  soldeFinCredit:0,     anomalie:true, sens:'DÉBITEUR ANORMAL',           motif:"Produit (70x) : normalement créditeur — extourne ou erreur d'imputation ?",         montant:1800, cls:'badge-red'   },
-        ];
+    if (!activeData?.rows) return [];
+    return auditBalanceAccounts(activeData.rows).comptesAudit
+      .filter(c => c.verification.statut !== 'CONFORME')
+      .map(c => ({
+        ...c,
+        sens: c.verification.statut,
+        motif: c.verification.diagnostic,
+        montant: Math.abs(c.netSolde),
+        cls: c.verification.statut === 'ANOMALIE' ? 'badge-red' : 'badge-amber',
+      }))
+      .sort((a, b) => b.montant - a.montant)
+      .slice(0, 10);
   }, [activeData]);
 
   const screenTitle = NAV.find(n => n.id === tab)?.label.toUpperCase() || 'BAIQ — BALANCE AND FINANCIAL ANALYTICS';
@@ -974,11 +732,11 @@ export default function App() {
               Balance complète
             </button>
           </div>
-          {notableRows.filter(r => r.anomalie !== false).length === 0 ? (
+          {notableRows.length === 0 ? (
             <div style={{ padding:'28px', textAlign:'center', color:'var(--green)', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
               <span className="material-symbols-outlined" style={{ fontSize:36 }}>check_circle</span>
               <span style={{ fontWeight:700, fontSize:'0.92rem' }}>Aucun solde anormal détecté</span>
-              <span style={{ color:'var(--text-muted)', fontSize:'0.80rem' }}>Tous les comptes ont un solde conforme aux règles du PCG.</span>
+              <span style={{ color:'var(--text-muted)', fontSize:'0.80rem' }}>Tous les comptes ont un solde conforme aux règles du SCF.</span>
             </div>
           ) : (
             <div style={{ overflowX:'auto' }}>

@@ -35,6 +35,7 @@ import {
   analyserBalance,
   construireDossier,
   rouvrirDossier,
+  auditBalanceAccounts,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
 import { SECTEUR_DEFAUT } from '../src/utils/secteurs.js';
@@ -530,4 +531,39 @@ test('un dossier enregistré avec ses seules balances se rouvre à l\'identique'
   const rouvert = rouvrirDossier(enregistre);
   assert.deepEqual(rouvert, frais);
   assert.equal(rouvert.dataN1, null);
+});
+
+// ── 12. Audit de balance (source unique de l'écran Audit, du PDF, de l'Excel,
+//        du tableau de bord et du moteur IA) ─────────────────────────────────
+
+const statutAudit = (rows, compte) =>
+  auditBalanceAccounts(rows).comptesAudit.find(c => c.compte === compte).verification.statut;
+
+test('l\'audit de balance applique le sens normal de chaque compte', () => {
+  const rows = [
+    L('519', 'Concours bancaires courants', 0, 3_000_000), // créditeur par nature
+    L('131', 'Subvention d\'équipement', 200_000, 0),       // débiteur : anomalie
+    L('531', 'Caisse', 0, 5_000),                            // caisse créditrice
+    L('471', 'Compte d\'attente', 12_000, 0),                // non soldé
+    L('401', 'Fournisseurs', 0, 800_000),                    // sens normal
+    L('512', 'Banque', 3_988_000, 0),
+    L('101', 'Capital', 0, 395_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  assert.equal(statutAudit(rows, '519'), 'CONFORME');
+  assert.equal(statutAudit(rows, '131'), 'ANOMALIE');
+  assert.equal(statutAudit(rows, '531'), 'ANOMALIE');
+  assert.equal(statutAudit(rows, '471'), 'ATYPIQUE');
+  assert.equal(statutAudit(rows, '401'), 'CONFORME');
+});
+
+test('l\'audit de balance ignore les lignes exclues et les soldes immatériels', () => {
+  const rows = [
+    L('531', 'Caisse', 0, 60),                                              // < 100 DA
+    { ...L('531', 'Caisse (ligne exclue)', 0, 50_000), ignore: true },
+  ];
+  const audit = auditBalanceAccounts(rows);
+  assert.equal(audit.total, 1, 'la ligne exclue n\'est pas auditée');
+  assert.equal(audit.anomalies, 0);
+  assert.equal(audit.scoreCoherence, 100);
 });

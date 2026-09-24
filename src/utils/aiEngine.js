@@ -7,6 +7,7 @@
 
 import { getSecteur, scorerIndicateur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
+import { auditBalanceAccounts } from './financeCalculations';
 
 const safe = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 const pct  = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
@@ -123,32 +124,14 @@ export function runAIAnalysis(data) {
     };
   }
 
-  // ── 10. Audit de Conformité SCF Rapide ──
-  let anomaliesComptablesCount = 0;
-  let caisseCreditrice = false;
-  let comptesAttenteBloques = 0;
-
-  if (rows && rows.length > 0) {
-    rows.forEach(r => {
-      if (!r || !r.compte || r.ignore) return;
-      const c = r.compte.toString().trim();
-      const p3 = c.slice(0, 3);
-      const p2 = c.slice(0, 2);
-      const sd = Math.abs(r.soldeFinDebit || 0);
-      const sc = Math.abs(r.soldeFinCredit || 0);
-
-      if (['531','532','533','534'].includes(p3) && sc > 0.01) {
-        anomaliesComptablesCount++;
-        caisseCreditrice = true;
-      }
-      if (p2 === '47' && (sd + sc) > 0.01) {
-        anomaliesComptablesCount++;
-        comptesAttenteBloques += (sd + sc);
-      }
-      if (p2 === '40' && !['406','409'].includes(p3) && sd > 0.01) anomaliesComptablesCount++;
-      if (p2 === '41' && p3 !== '419' && sc > 0.01) anomaliesComptablesCount++;
-    });
-  }
+  // ── 10. Audit de Conformité SCF (même moteur et même seuil que l'écran Audit) ──
+  const nonConformes = auditBalanceAccounts(rows || []).comptesAudit
+    .filter(c => c.verification.statut !== 'CONFORME');
+  const anomaliesComptablesCount = nonConformes.length;
+  const caisseCreditrice = nonConformes.some(c => String(c.compte).trim().startsWith('53'));
+  const comptesAttenteBloques = nonConformes
+    .filter(c => String(c.compte).trim().startsWith('47'))
+    .reduce((total, c) => total + Math.abs(c.netSolde), 0);
 
   // ── 11. Scoring Sectoriel par Catégorie (0-100) ──
   const scoreRentabilite = Math.max(0, Math.min(100,
