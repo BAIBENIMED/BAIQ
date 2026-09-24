@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { runAIAnalysis, buildGeminiContext } from '../utils/aiEngine';
+import { runAIAnalysis, buildGeminiContext, restaurerNomEntreprise } from '../utils/aiEngine';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Assistant & Diagnostic IA Financier Approfondi
@@ -114,7 +114,7 @@ export function AIView({ data, geminiKey }) {
       if (proxyRes.ok) {
         const json = await proxyRes.json();
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) return restaurerNomEntreprise(text, data?.profil?.nomEntreprise);
       } else if (proxyRes.status !== 404) {
         return null; // le relais existe mais a échoué (ex: clé serveur manquante) → pas la peine de tenter le mode direct
       }
@@ -137,7 +137,7 @@ export function AIView({ data, geminiKey }) {
         }
       );
       const json = await res.json();
-      return json?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      return restaurerNomEntreprise(json?.candidates?.[0]?.content?.parts?.[0]?.text, data?.profil?.nomEntreprise) || null;
     } catch {
       return null;
     }

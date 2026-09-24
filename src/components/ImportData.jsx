@@ -328,7 +328,8 @@ export function ImportData({ onDataImported }) {
               <div style={{ display: 'flex', gap: 8, padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, marginBottom: 10 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#d97706', flexShrink: 0 }}>lock</span>
                 <p style={{ fontSize: '0.65rem', color: '#92400e', margin: 0, lineHeight: 1.45 }}>
-                  Ces dossiers sont conservés <strong>uniquement dans ce navigateur</strong> (non chiffrés, non envoyés à un serveur).
+                  Ces dossiers sont conservés <strong>uniquement dans ce navigateur</strong> (non chiffrés) et ne sont stockés sur aucun serveur.
+                  Seule l'IA (Assistant, rapports Gemini) transmet des agrégats financiers à Google, sans le nom de l'entreprise.
                   Toute personne ayant accès à ce poste peut les consulter. Ils sont supprimés automatiquement après {DUREE_RETENTION_JOURS} jours,
                   ou <button
                     type="button"

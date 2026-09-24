@@ -1327,10 +1327,12 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: '0.74rem', color: '#92400e', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>privacy_tip</span>
             <span>
-              <strong>Confidentialité :</strong> lorsque l'Assistant IA ou les rapports Gemini sont utilisés, les données financières du dossier actif
-              (chiffres du bilan, du compte de résultat, ratios) sont transmises à l'API Google Gemini pour générer l'analyse. N'activez pas cette
-              fonctionnalité sur des dossiers confidentiels sans l'accord de votre client. Le reste de l'application (calculs, ratios, PDF/Excel) fonctionne
-              entièrement en local, sans aucun envoi de données.
+              <strong>Confidentialité :</strong> lorsque l'Assistant IA ou les rapports Gemini sont utilisés, les agrégats financiers du dossier actif
+              (bilan, compte de résultat, ratios, effectif) sont transmis à l'API Google Gemini pour générer l'analyse — jamais le nom de l'entreprise
+              ni le détail des comptes. Selon l'offre Gemini utilisée, Google peut conserver ces données, les faire relire par des personnes et
+              s'en servir pour améliorer ses services : c'est le cas de l'offre gratuite. N'activez pas cette fonctionnalité sur des dossiers
+              confidentiels sans l'accord de votre client. Le reste de l'application (calculs, ratios, PDF/Excel) fonctionne entièrement en local,
+              sans aucun envoi de données.
             </span>
           </div>
 

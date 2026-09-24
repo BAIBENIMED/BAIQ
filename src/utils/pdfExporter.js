@@ -520,11 +520,7 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   const rotStock     = r.rotationStocks || 0;
   const bfrJours     = r.bfrJoursCA || 0;
 
-  // Solvabilité : calculer depuis le bilan si non disponible dans les ratios
-  const totalActif      = (b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0);
-  const totalDettesExig = (b.passifCirculant || 0) + (b.tresoreriePassive || 0) + (b.dettesMoyenLongTerme || 0);
-  const solvabiliteCalc = totalDettesExig > 0.01 ? safeDiv(totalActif, totalDettesExig) : 0;
-  const solvabiliteVal  = (r.solvabilite && r.solvabilite > 0) ? r.solvabilite : solvabiliteCalc;
+  const solvabiliteVal = r.solvabilite || 0;
 
   // Capture pixel-parfaite du badge réel de l'interface (voir captureBaiqBadge ci-dessus) —
   // avant toute manipulation du document, pour ne pas dépendre d'un état DOM qui changerait.

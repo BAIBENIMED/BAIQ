@@ -55,11 +55,11 @@ export function CapitauxPropresView({ data, fmt }) {
     const clo = lignes.find(l => l.id === 'cloture') || {};
 
     return [
-      { name: 'Capital (101)',   Ouverture: Math.max(0, ouv.capital || 0),   Cloture: Math.max(0, clo.capital || 0) },
-      { name: 'Réserves (106)',  Ouverture: Math.max(0, ouv.reserves || 0),  Cloture: Math.max(0, clo.reserves || 0) },
-      { name: 'Report (11)',     Ouverture: Math.max(0, ouv.ran || 0),       Cloture: Math.max(0, clo.ran || 0) },
-      { name: 'Résultat (12)',   Ouverture: Math.max(0, ouv.resultat || 0),  Cloture: Math.max(0, clo.resultat || 0) },
-      { name: 'Subv./Prov (13)', Ouverture: Math.max(0, ouv.subventions || 0), Cloture: Math.max(0, clo.subventions || 0) },
+      { name: 'Capital (10)',      Ouverture: Math.max(0, ouv.capital || 0),   Cloture: Math.max(0, clo.capital || 0) },
+      { name: 'Primes & réserves', Ouverture: Math.max(0, ouv.reserves || 0),  Cloture: Math.max(0, clo.reserves || 0) },
+      { name: 'Écarts (105)',      Ouverture: Math.max(0, ouv.ecarts || 0),    Cloture: Math.max(0, clo.ecarts || 0) },
+      { name: 'Report (11)',       Ouverture: Math.max(0, ouv.ran || 0),       Cloture: Math.max(0, clo.ran || 0) },
+      { name: 'Résultat (12 + N)', Ouverture: Math.max(0, ouv.resultat || 0),  Cloture: Math.max(0, clo.resultat || 0) },
     ];
   }, [lignes]);
 

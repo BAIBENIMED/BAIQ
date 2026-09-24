@@ -60,7 +60,8 @@ app.use(express.json({ limit: '256kb' }));
 
 const PORT = process.env.PORT || 8787;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const DELAI_MAX_GEMINI_MS = 60_000;
+// Une analyse approfondie (jusqu'à 16 000 jetons) peut prendre plus de deux minutes.
+const DELAI_MAX_GEMINI_MS = 180_000;
 
 // ── Garde-fou anti-abus côté serveur (rate limiting en mémoire) ────────────
 // Les quotas affichés côté interface (1 rapport/dossier, 10 messages/dossier)

@@ -1,6 +1,6 @@
 // Extension .js explicite : permet d'exécuter ce moteur en Node pur (harness de test)
 // en plus du bundler Vite, qui accepte les deux formes.
-import { computeCapitauxPropres } from './financeCalculations.js';
+import { computeCapitauxPropres, calculateTotalActifNet } from './financeCalculations.js';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Solvabilité, Rating & Score de Risque
@@ -20,7 +20,8 @@ import { computeCapitauxPropres } from './financeCalculations.js';
  * X4 = Valeur Comptable des Capitaux Propres / Total Dettes (Passif Circulant + Dettes LT)
  */
 export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
-  const totalBilan = (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0) || 1;
+  // Total actif NET (valeur comptable des actifs, comme dans le modèle d'Altman).
+  const totalBilan = calculateTotalActifNet(bilan, rows) || 1;
   const frng = bilan.frng || 0;
   const ebit = sig.resultatExploitation || (sig.ebe || 0) - (sig.dotationsExploitation || sig.c68_expl || 0);
   const ebe  = sig.ebe || 0;
@@ -127,8 +128,10 @@ export function calculateAltmanZScore(bilan = {}, sig = {}, rows = []) {
     risqueDefaillance = 'Critique';
   }
 
-  // Capacité de Remboursement Bancaire (Dettes Nettes / EBE)
-  const dettesNettes = Math.max(0, (dettesFinancieresLT + dettesCourtTerme) - (bilan.tresorerieActive || 0));
+  // Capacité de Remboursement Bancaire (Dettes Nettes / EBE) : dettes FINANCIÈRES uniquement
+  // (emprunts + concours bancaires courants), sous déduction de la trésorerie active. Les
+  // dettes d'exploitation (fournisseurs, fiscales, sociales) ne sont pas de l'endettement.
+  const dettesNettes = Math.max(0, (dettesFinancieresLT + (bilan.tresoreriePassive || 0)) - (bilan.tresorerieActive || 0));
   const ratioDetteSurEBE = ebe > 0 ? dettesNettes / ebe : (dettesNettes === 0 ? 0 : 99);
   
   // Capacité d'endettement théorique supplémentaire (Règle bancaire : Dettes LT ≤ 3.5 × EBE)

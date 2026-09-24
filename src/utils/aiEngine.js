@@ -5,9 +5,12 @@
    solvabilité Banque d'Algérie, Altman Z'' et plan d'action stratégique chiffré.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { getSecteur, scorerIndicateur } from './secteurs';
-import { calculateAltmanZScore } from './solvabiliteEngine';
-import { auditBalanceAccounts } from './financeCalculations';
+import { getSecteur, scorerIndicateur } from './secteurs.js';
+import { calculateAltmanZScore } from './solvabiliteEngine.js';
+import {
+  auditBalanceAccounts, auditCrossAccountMovements, buildTCRRows,
+  calculateStockEvolution, calculateTFT, calculateVariationCapitauxPropres,
+} from './financeCalculations.js';
 
 const safe = (a, b) => (b && b !== 0 && isFinite(a / b) ? a / b : 0);
 const pct  = (v, d = 1) => `${(v * 100).toFixed(d)} %`;
@@ -76,10 +79,9 @@ export function runAIAnalysis(data) {
   const partActionnaires = safe(rnet, va);             // Rémunération des capitaux propres
 
   // ── 5. Rentabilité des Capitaux & Effet de Levier Financier ──
-  const capitauxPropres = solv.bancaire?.capitauxPropres || (b.ressourcesStables ? b.ressourcesStables * 0.6 : 1);
-  const actifTotal = (b.emploisStables || 0) + (b.actifCirculant || 0) + (b.tresorerieActive || 0) || 1;
-  const roe = safe(rnet, capitauxPropres); // Return on Equity (Rentabilité Financière)
-  const roa = safe(reop, actifTotal);     // Return on Assets (Rentabilité Économique)
+  // Mêmes ratios que l'écran Ratios (calculateRatios : total actif net, capitaux propres du bilan SCF).
+  const roe = r.roe || 0;                 // Return on Equity (Rentabilité Financière)
+  const roa = r.roa || 0;                 // Return on Assets (Rentabilité Économique)
   const effetLevier = roe - roa;          // Effet de levier financier
 
   // ── 6. Équilibre Fonctionnel & Trésorerie ──
@@ -465,6 +467,8 @@ function buildResume({ scoreGlobal, niveau, ca, ebe, rnet, frng, bfr, tn, dso, r
 /* ─── Générateur de Rapports Structurés Locaux Immédiats (Exhaustifs & Riches) ─── */
 export function generateLocalStructuredReport(data, reportType = 'audit_diagnostic') {
   if (!data) return '';
+  // Sans IA, l'analyse approfondie s'appuie sur le rapport d'audit local, le plus complet.
+  if (reportType === 'analyse_approfondie') reportType = 'audit_diagnostic';
   try {
     const a = runAIAnalysis(data);
     if (!a) return '';
@@ -784,74 +788,218 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
   }
 }
 
+// Le nom de l'entreprise n'est jamais transmis à Gemini : le prompt la désigne par ce nom
+// d'emprunt, remplacé par le vrai nom dans la réponse, sur le poste de l'utilisateur.
+// Un nom propre est repris tel quel par le modèle, ce qui n'est pas le cas d'un repère
+// entre crochets (« [ENTREPRISE] » revenait sous la forme « l'ENTREPRISE »).
+export const REPERE_ENTREPRISE = 'ZETACORP';
+export const restaurerNomEntreprise = (texte, nom) =>
+  typeof texte === 'string' ? texte.replace(/zetacorp/gi, nom || "l'entreprise") : texte;
+
 /* ─── Construction du Contexte pour Gemini ─── */
+// Dossier complet transmis à l'IA : tous les indicateurs calculés par BAIQ (états officiels,
+// bilan fonctionnel, ratios et normes sectorielles, solvabilité, TVCP/TFT, stocks, audit),
+// en tableaux compacts. Jamais le nom de l'entreprise ni les libellés de comptes.
 export function buildGeminiContext(data, analysisResult) {
   if (!data || !analysisResult) return '';
-  const { sig: s = {}, bilan: b = {} } = data;
-  const m = analysisResult.metriques;
-  const diag = analysisResult.diagnosticAvance || {};
-  const p = analysisResult.profil || {};
-  const sec = analysisResult.secteur || {};
-  const solv = analysisResult.solvabilite || {};
-  const fmt = (v) => {
-    const num = Math.round(Number(v || 0));
-    const sign = num < 0 ? '-' : '';
-    return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
+  const { sig: s = {}, bilan: b = {}, ratios: r = {}, bilanSCF: scf = {}, rows = [], dataN1: n1 = null, profil: p = {} } = data;
+  const a = analysisResult;
+  const m = a.metriques || {};
+  const diag = a.diagnosticAvance || {};
+  const sec = a.secteur || {};
+  const bm = sec.benchmarks || {};
+  const solv = a.solvabilite || {};
+  const ba = solv.bancaire || {};
+  const devise = p.currency || 'DZD';
+  const b1 = n1?.bilan || null;
+  const r1 = n1?.ratios || null;
+  const scf1 = n1?.bilanSCF || null;
+
+  const nombre = (v) => {
+    if (v === null || v === undefined || !isFinite(v)) return 'N/D';
+    const n = Math.round(Number(v));
+    return `${n < 0 ? '-' : ''}${Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`;
   };
-  const pct_ = (v) => `${(v * 100).toFixed(1)}%`;
+  const pc = (v) => (v === null || v === undefined || !isFinite(v) ? 'N/D' : `${(v * 100).toFixed(1)} %`);
+  const x = (v, d = 2) => (v === null || v === undefined || !isFinite(v) ? 'N/D' : Number(v).toFixed(d));
+  const jours = (v) => (v === null || v === undefined || !isFinite(v) ? 'N/D' : `${Math.round(v)} j`);
+  const norme = (cle) => bm?.[cle]?.norme || '—';
+  const cellule = (c) => String(c ?? '').replace(/\|/g, '/');
+  const tableau = (entetes, lignes) => [
+    `| ${entetes.join(' | ')} |`,
+    `| ${entetes.map(() => '---').join(' | ')} |`,
+    ...lignes.map(l => `| ${l.map(cellule).join(' | ')} |`),
+  ].join('\n');
+  const avecN1 = (entetes) => (n1 ? entetes : entetes.filter(e => e !== 'N-1'));
+  const cellulesN1 = (cells, valeurN1) => (n1 ? [...cells, valeurN1] : cells);
 
-  return `Tu es un Directeur Financier (DAF) et Commissaire aux Comptes de premier rang, expert incontesté du Système Comptable Financier algérien (SCF, Loi 07-11 / Décret 08-156) et des pratiques bancaires en Algérie (Banque d'Algérie).
+  // ── Bilan officiel SCF ──
+  const ACTIF_NC = [
+    ["Écart d'acquisition", 'ecartAcquisition'], ['Immobilisations incorporelles', 'immobilisationsIncorporelles'],
+    ['Terrains', 'terrains'], ['Bâtiments', 'batiments'], ['Autres immobilisations corporelles', 'autresImmoCorp'],
+    ['Immobilisations en concession', 'immobilisationsEnConcession'], ['Immobilisations en cours', 'immobilisationsEnCours'],
+    ['Immobilisations financières', 'immobilisationsFinancieres'], ['Impôts différés actif', 'impotsDifferesActif'],
+  ];
+  const ACTIF_C = [
+    ['Stocks et en-cours', 'stocks'], ['Clients', 'clients'], ['Autres débiteurs', 'autresDebiteurs'],
+    ['Impôts et assimilés', 'impotsEtAssimilesActif'], ['Autres créances et emplois assimilés', 'autresCreancesEmploisAssimiles'],
+    ['Placements', 'placements'], ['Trésorerie', 'tresorerie'],
+  ];
+  const lignesActif = (groupe, groupe1, liste) => liste
+    .map(([libelle, cle]) => {
+      const l = groupe?.[cle] || {};
+      const net1 = groupe1?.[cle]?.net;
+      if (!l.brut && !l.net && !net1) return null;
+      return cellulesN1([libelle, nombre(l.brut), nombre(l.amortProv), nombre(l.net)], nombre(net1));
+    })
+    .filter(Boolean);
+  const actif = [
+    ...lignesActif(scf.actifNonCourant, scf1?.actifNonCourant, ACTIF_NC),
+    cellulesN1(['**Total actif non courant**', '', '', `**${nombre(scf.actifNonCourant?.total)}**`], nombre(scf1?.actifNonCourant?.total)),
+    ...lignesActif(scf.actifCourant, scf1?.actifCourant, ACTIF_C),
+    cellulesN1(['**Total actif courant**', '', '', `**${nombre(scf.actifCourant?.total)}**`], nombre(scf1?.actifCourant?.total)),
+    cellulesN1(['**TOTAL ACTIF**', '', '', `**${nombre(scf.totalActif)}**`], nombre(scf1?.totalActif)),
+  ];
+  const PASSIF = [
+    ['capitauxPropres', [['Capital émis', 'capitalEmis'], ['Capital non appelé', 'capitalNonAppele'], ['Primes et réserves', 'primesEtReserves'],
+      ['Écarts de réévaluation', 'ecartsReevaluation'], ['Résultat net', 'resultatNet'], ["Résultat en instance d'affectation", 'resultatEnInstance'],
+      ['Report à nouveau', 'autresCapitauxPropres']], 'Total capitaux propres'],
+    ['passifNonCourant', [['Emprunts et dettes financières', 'empruntsDettesFinancieres'], ['Impôts différés et provisionnés', 'impotsDifferesPassif'],
+      ['Autres dettes non courantes', 'autresDettesNonCourantes'], ['Provisions et produits constatés d\'avance', 'provisionsEtProduitsConstatesAvance']], 'Total passifs non courants'],
+    ['passifCourant', [['Fournisseurs et comptes rattachés', 'fournisseurs'], ['Impôts', 'impotsEtAssimilesPassif'], ['Autres dettes', 'autresDettes'],
+      ['Trésorerie passif', 'tresoreriePassif']], 'Total passifs courants'],
+  ];
+  const passif = PASSIF.flatMap(([groupe, liste, libelleTotal]) => [
+    ...liste
+      .filter(([, cle]) => scf[groupe]?.[cle] || scf1?.[groupe]?.[cle])
+      .map(([libelle, cle]) => cellulesN1([libelle, nombre(scf[groupe]?.[cle])], nombre(scf1?.[groupe]?.[cle]))),
+    cellulesN1([`**${libelleTotal}**`, `**${nombre(scf[groupe]?.total)}**`], nombre(scf1?.[groupe]?.total)),
+  ]);
+  passif.push(cellulesN1(['**TOTAL PASSIF**', `**${nombre(scf.totalPassif)}**`], nombre(scf1?.totalPassif)));
 
-Effectue une analyse financière approfondie, critique, chiffrée et ultra-rigoureuse sur la base des données financières exhaustives ci-dessous :
+  // ── Compte de résultat officiel (TCR I à X) ──
+  const tcr = buildTCRRows(s);
+  const tcr1 = n1?.sig ? buildTCRRows(n1.sig) : null;
+  const signe = (row) => (row.isCharge && row.val > 0 ? -row.val : row.val);
+  const lignesTcr = tcr.map((row, i) => {
+    const gras = row.type !== 'compte';
+    const libelle = gras ? `**${row.label}**` : row.label;
+    return cellulesN1([row.code, libelle, nombre(signe(row))], tcr1 ? nombre(signe(tcr1[i])) : 'N/D');
+  });
 
-## I. FICHE SIGNALÉTIQUE & SECTEUR D'ACTIVITÉ
-- Entité : ${p.nomEntreprise || 'Entité sous revue d\'audit'}
-- Forme Juridique : ${p.formeJuridique || 'Non spécifiée'}
-- Secteur : ${sec.label || 'Industrie / Général'} (Taux IBS applicable : ${sec.tauxIBS || '19%'})
-- Description secteur : ${sec.description || ''}
-- Effectif Salarié : ${p.effectif || 'N/D'} ETP
+  // ── Bilan fonctionnel ──
+  const fonctionnel = [
+    ['Emplois stables (bruts)', 'emploisStables'], ['Ressources stables', 'ressourcesStables'], ["Actif circulant d'exploitation", 'actifCirculant'],
+    ["Passif circulant d'exploitation", 'passifCirculant'], ['Trésorerie active', 'tresorerieActive'], ['Trésorerie passive', 'tresoreriePassive'],
+    ['**FRNG**', 'frng'], ['**BFR**', 'bfr'], ['**Trésorerie nette**', 'tn'],
+  ].map(([libelle, cle]) => cellulesN1([libelle, nombre(b[cle])], nombre(b1?.[cle])));
 
-## II. ÉQUILIBRE FONCTIONNEL & GESTION DE LA TRÉSORERIE (BILAN SCF)
-- Fonds de Roulement Net Global (FRNG) : ${fmt(b.frng)} (${(b.frng || 0) >= 0 ? 'Positif / Excédentaire' : 'Négatif / Déséquilibre structurel'})
-- Besoin en Fonds de Roulement (BFR) : ${fmt(b.bfr)} (${Math.round(m.bfrJCA)} jours de CA - Norme secteur : ${sec.benchmarks?.bfrJoursCA?.norme})
-- Trésorerie Nette (TN = FRNG - BFR) : ${fmt(b.tn)} (${(b.tn || 0) >= 0 ? 'Excédentaire' : 'Tension / Découvert'})
-- Capacité d'Autofinancement (CAF) : ${fmt(diag.caf)} (${pct_(diag.tauxCAF)} du CA)
-- Capacité de Remboursement de la Dette (Dettes LT / CAF) : ${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' ans' : 'N/D'} (${diag.capaciteRemboursementLabel || ''})
+  // ── Ratios, avec normes sectorielles ──
+  const ratio = (libelle, v, v1, fmt, cleNorme) => cellulesN1([libelle, fmt(v)], fmt(v1)).concat(norme(cleNorme));
+  const couverture = (v) => (v >= 99 ? 'sans charges financières' : `${x(v)} x`);
+  const lignesRatios = [
+    ratio('Liquidité générale', r.liquiditeGenerale, r1?.liquiditeGenerale, x, 'liquiditeGenerale'),
+    ratio('Liquidité réduite', r.liquiditeReduite, r1?.liquiditeReduite, x),
+    ratio('Liquidité immédiate', r.liquiditeImmediate, r1?.liquiditeImmediate, x),
+    ratio('Autonomie financière (CP / total actif net)', r.autonomieFinanciere, r1?.autonomieFinanciere, pc, 'autonomieFinanciere'),
+    ratio('Solvabilité générale (actif net / dettes)', r.solvabilite, r1?.solvabilite, x),
+    ratio('Couverture des charges financières (EBE / CF)', r.couvertureChargesFin, r1?.couvertureChargesFin, couverture),
+    ratio('Taux de valeur ajoutée (VA / CA)', r.tauxVA, r1?.tauxVA, pc, 'tauxVA'),
+    ratio('Marge EBE (EBE / CA)', r.margeEBE, r1?.margeEBE, pc, 'margeEBE'),
+    ratio("Marge d'exploitation (RE / CA)", m.margeOper, null, pc),
+    ratio('Marge nette (RN / CA)', r.rentabiliteNette, r1?.rentabiliteNette, pc, 'margeNette'),
+    ratio('ROE (RN / capitaux propres)', r.roe, r1?.roe, pc),
+    ratio('ROA (RE / total actif net)', r.roa, r1?.roa, pc),
+    ratio('Effet de levier (ROE - ROA)', diag.effetLevier, null, pc),
+    ratio('Poids du personnel (charges de personnel / VA)', r.poidsPersonnel, r1?.poidsPersonnel, pc),
+    ratio('Productivité (VA / charges de personnel)', m.productivite, null, (v) => `${x(v)} x`, 'productivite'),
+    ratio('DSO — délai clients', r.delaiRecouvrement, r1?.delaiRecouvrement, jours, 'dso'),
+    ratio('DPO — délai fournisseurs', r.delaiFournisseurs, r1?.delaiFournisseurs, jours, 'dpo'),
+    ratio('Rotation des stocks', r.rotationStocks, r1?.rotationStocks, jours, 'rotationStocks'),
+    ratio('BFR en jours de CA', r.bfrJoursCA, r1?.bfrJoursCA, jours, 'bfrJoursCA'),
+  ];
+  const tva = r.tvaCorrectionAppliquee;
 
-## III. CYCLE D'EXPLOITATION & POTENTIEL DE CASH DÉBLOCABLE
-- Délai de Recouvrement Clients (DSO) : ${Math.round(m.dso)} jours (Norme sectorielle : ${sec.benchmarks?.dso?.norme})
-- Délai de Paiement Fournisseurs (DPO) : ${Math.round(m.dpo)} jours (Norme sectorielle : ${sec.benchmarks?.dpo?.norme})
-- Rotation Moyenne des Stocks : ${Math.round(m.rotS)} jours (Norme sectorielle : ${sec.benchmarks?.rotationStocks?.norme})
-- Cash potentiel mobilisable par optimisation du BFR : ${fmt(diag.totalCashLibérable)} (DSO : ${fmt(diag.gainDSO)}, Stocks : ${fmt(diag.gainStock)})
+  // ── États complémentaires ──
+  const tvcp = calculateVariationCapitauxPropres(rows, n1, s).kpis || {};
+  const tft = calculateTFT(data);
+  const stocks = calculateStockEvolution(rows);
+  const audit = auditBalanceAccounts(rows);
+  const flux = auditCrossAccountMovements(rows);
+  const nonConformes = audit.comptesAudit
+    .filter(c => c.verification.statut !== 'CONFORME')
+    .sort((c1, c2) => Math.abs(c2.netSolde) - Math.abs(c1.netSolde))
+    .slice(0, 15);
+  const reglesFlux = (flux.regles || []).filter(regle => regle.statut !== 'NON_MOUVEMENTE');
+  const evol = a.evolutions;
 
-## IV. RENTABILITÉ ÉCONOMIQUE, MARGES & PARTAGE DE LA VALEUR AJOUTÉE
-- Chiffre d'Affaires Net HT : ${fmt(s.chiffreAffaires)}
-- Valeur Ajoutée (VA) : ${fmt(s.valeurAjoutee)} (${pct_(m.tauxVA)} du CA - Norme : ${sec.benchmarks?.tauxVA?.norme})
-- Partage de la Valeur Ajoutée :
-  * Part du Personnel (63) : ${pct_(diag.partPersonnel)}
-  * Part de l'État (64 + 695) : ${pct_(diag.partEtat)}
-  * Part des Prêteurs (66) : ${pct_(diag.partPreteurs)}
-  * Part de l'Autofinancement (CAF) : ${pct_(diag.partEntreprise)}
-  * Part du Résultat Net : ${pct_(diag.partActionnaires)}
-- Excédent Brut d'Exploitation (EBE) : ${fmt(s.ebe)} (${pct_(m.margeEBE)} du CA - Norme : ${sec.benchmarks?.margeEBE?.norme})
-- Résultat d'Exploitation (EBIT) : ${fmt(s.resultatExploitation)} (${pct_(m.margeOper)} du CA)
-- Résultat Net Final : ${fmt(s.resultatNet)} (${pct_(m.margeNette)} du CA - Norme : ${sec.benchmarks?.margeNette?.norme})
-- Rentabilité des Capitaux Propres (ROE) : ${pct_(diag.roe)} | Rentabilité Économique (ROA) : ${pct_(diag.roa)}
-- Effet de Levier Financier (ROE - ROA) : ${pct_(diag.effetLevier)}
+  const sections = [
+`Tu es un Directeur Financier (DAF) et Commissaire aux Comptes de premier rang, expert du Système Comptable Financier algérien (SCF, Loi 07-11 / Décret 08-156) et des pratiques bancaires en Algérie (Banque d'Algérie).
 
-## V. SOLVABILITÉ, RATING BANQUE D'ALGÉRIE & RISQUE DE DÉFAILLANCE
-- Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA || 14} / 20 (Rating : ${solv.bancaire?.ratingBA || 'Favorable'})
-- Score Altman Z'' (Modèle EM-Score) : ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'} — Rating synthétique : ${solv.rating || 'N/D'})
-- Niveau de risque de défaillance indicatif (zone Altman Z'') : ${solv.risqueDefaillance || 'Faible'}
-- Liquidité Générale : ${m.liq.toFixed(2)}x (Norme : ${sec.benchmarks?.liquiditeGenerale?.norme})
-- Autonomie Financière : ${pct_(m.autFin)} (Norme : ${sec.benchmarks?.autonomieFinanciere?.norme})
+Voici le dossier financier COMPLET calculé par BAIQ à partir de la balance. Tous les montants sont en ${devise}. Toutes les valeurs sont déjà calculées : ne les recalcule pas, exploite-les et croise-les.
 
-## VI. AUDIT DES ANOMALIES DE BALANCES (SCF)
-- Nombre d'irrégularités détectées : ${diag.anomaliesComptablesCount || 0}
-- Caisse créditrice : ${diag.caisseCreditrice ? 'OUI (Anomalie critique)' : 'NON (Conforme)'}
+## I. FICHE SIGNALÉTIQUE
+- Entité : ${REPERE_ENTREPRISE} (nom d'emprunt de l'entité : utilise-le toujours pour la désigner)
+- Secteur : ${sec.label || 'Non spécifié'} (IBS applicable : ${sec.tauxIBS || '19 %'}) — ${sec.description || ''}
+- Effectif : ${p.effectif || 'non communiqué'}
+- Régime TVA : ventes ${tva?.ventesFranchisees ? 'en franchise' : 'soumises à TVA'}, achats ${tva?.achatsFranchises ? 'en franchise' : 'soumis à TVA'}${tva ? ` (taux ${tva.tauxTva} %, délais clients/fournisseurs calculés TTC)` : ''}
+- Exercice N-1 : ${n1 ? 'disponible (colonnes N-1 ci-dessous)' : 'non fourni'}`,
 
-## VII. SCORE GLOBAL MULTIDIMENSIONNEL : ${analysisResult.scoreGlobal} / 100 — Situation ${analysisResult.niveau.label}
-`;
+`## II. BILAN OFFICIEL SCF — ACTIF
+${tableau(avecN1(['Rubrique', 'Brut', 'Amort./Prov.', 'Net', 'N-1']), actif)}
+
+## III. BILAN OFFICIEL SCF — PASSIF
+${tableau(avecN1(['Rubrique', 'Montant', 'N-1']), passif)}`,
+
+`## IV. COMPTE DE RÉSULTAT PAR NATURE (TCR OFFICIEL, I À X)
+${tableau(avecN1(['Code', 'Rubrique', 'N', 'N-1']), lignesTcr)}
+- Capacité d'autofinancement (CAF) : ${nombre(diag.caf)} (${pc(diag.tauxCAF)} du CA) — dettes financières LT / CAF : ${ba.dettesFinancieresLT > 0 ? `${x(diag.ratioDetteSurCAF)} ans (${diag.capaciteRemboursementLabel})` : 'aucune dette financière à long terme'}
+- Partage de la valeur ajoutée : personnel ${pc(diag.partPersonnel)}, État ${pc(diag.partEtat)}, prêteurs ${pc(diag.partPreteurs)}, autofinancement ${pc(diag.partEntreprise)}, résultat net ${pc(diag.partActionnaires)}
+- CA par salarié : ${nombre(m.caParSalarie)} — VA par salarié : ${nombre(m.vaParSalarie)}`,
+
+`## V. BILAN FONCTIONNEL & ÉQUILIBRE FINANCIER
+${tableau(avecN1(['Masse', 'N', 'N-1']), fonctionnel)}`,
+
+`## VI. RATIOS (avec normes du secteur)
+${tableau(avecN1(['Ratio', 'N', 'N-1', 'Norme secteur']), lignesRatios)}
+- Cash mobilisable par optimisation du BFR : ${nombre(diag.totalCashLibérable)} (clients : ${nombre(diag.gainDSO)}, stocks : ${nombre(diag.gainStock)}, fournisseurs : ${nombre(diag.gainDPO)})`,
+
+`## VII. SOLVABILITÉ, NOTATION & ENDETTEMENT
+- Altman Z'' (modèle marchés émergents) : ${x(solv.zScore)} — ${solv.zoneLabel || 'N/D'} — rating ${solv.rating || 'N/D'}, risque ${solv.risqueDefaillance || 'N/D'}
+${tableau(['Composante Altman', 'Définition', 'Valeur', 'Poids'], Object.values(solv.ratios || {}).map(c => [c.desc, c.label, x(c.val, 3), c.poids]))}
+- Score Banque d'Algérie : ${x(ba.scoreBA, 1)} / 20 — ${ba.ratingBA || 'N/D'}
+${tableau(['Critère', 'Valeur observée', 'Points / 5'], Object.values(ba.detailsBA || {}).map(c => [c.label, c.displayVal, c.score]))}
+- Endettement : dettes financières LT ${nombre(ba.dettesFinancieresLT)}, provisions pour risques ${nombre(ba.provisionsRisques)}, dettes nettes ${nombre(ba.dettesNettes)}, dettes nettes / EBE ${x(ba.ratioDetteSurEBE)}, capacité d'endettement résiduelle ${nombre(ba.capaciteEndettementMax)} — statut crédit ${ba.statutCredit || 'N/D'}${solv.estimationPartielle ? '\n- ⚠ Capitaux propres ESTIMÉS (structure du capital non détaillée dans la balance)' : ''}`,
+
+`## VIII. CAPITAUX PROPRES (TVCP) ET FLUX DE TRÉSORERIE (TFT)
+- TVCP : ouverture ${nombre(tvcp.totalDebut)} → clôture ${nombre(tvcp.totalFin)} (variation ${nombre(tvcp.variationNette)}) ; résultat antérieur ${nombre(tvcp.resultatNetAnterieur)} dont mis en réserve ${nombre(tvcp.affectationReserves)}, reporté ${nombre(tvcp.affectationRAN)}, encore en instance ${nombre(tvcp.resultatEnInstance)}, dividendes estimés ${nombre(tvcp.dividendesEstimes)} ; variation de capital ${nombre(tvcp.varCapital)} ; résultat de l'exercice ${nombre(tvcp.resultatNetN)}
+- TFT : ${tft.hasN1
+  ? `flux d'activité ${nombre(tft.activite.total)} (CAF ${nombre(tft.activite.caf)}, variation BFR ${nombre(tft.activite.variationBFR)}), flux d'investissement ${nombre(tft.investissement.total)}, flux de financement ${nombre(tft.financement.total)} (capital ${nombre(tft.financement.augmentationCapital)}, dette ${nombre(tft.financement.variationDette)}, dividendes ${nombre(-tft.financement.dividendesVerses)}) ; variation de trésorerie ${nombre(tft.variationTresorerie)}, trésorerie ${nombre(tft.tresorerieOuverture)} → ${nombre(tft.tresorerieClotureReelle)} (écart de rapprochement ${nombre(tft.ecartRapprochement)})`
+  : 'non calculable sans exercice N-1'}`,
+
+`## IX. ÉVOLUTION DES STOCKS
+- Global : ${nombre(stocks.totalInitial)} → ${nombre(stocks.totalFinal)} (${nombre(stocks.totalVariation)}, ${x(stocks.totalPctVariation, 1)} %) — ${stocks.globalMouvement || 'N/D'}
+${(stocks.categories || []).length ? tableau(['Catégorie', 'Début', 'Fin', 'Variation', 'Mouvement'], stocks.categories.map(c => [c.label, nombre(c.stockInitial), nombre(c.stockFinal), `${nombre(c.variation)} (${x(c.pctVariation, 1)} %)`, c.mouvement])) : ''}`,
+
+`## X. QUALITÉ DES COMPTES (AUDIT DE LA BALANCE)
+- Comptes audités : ${audit.total} — conformes ${audit.conformes}, atypiques ${audit.atypiques}, anomalies ${audit.anomalies} — score de cohérence ${audit.scoreCoherence} / 100 (seuil de matérialité : 100 ${devise})
+${nonConformes.length ? tableau(['Compte', 'Statut', 'Nature', 'Montant', 'Diagnostic'], nonConformes.map(c => [c.compte, c.verification.statut, c.verification.nature, nombre(Math.abs(c.netSolde)), c.verification.diagnostic])) : '- Aucun solde anormal significatif.'}
+- Contrôles de flux croisés : score ${flux.scoreFlux ?? 'N/D'} / 100 — ${flux.totalConformesFlux ?? 0} conformes, ${flux.totalAtypiquesFlux ?? 0} atypiques, ${flux.totalAnomaliesFlux ?? 0} anomalies
+${reglesFlux.length ? tableau(['Cycle', 'Contrôle', 'Statut', 'Écart'], reglesFlux.map(regle => [regle.cycle, regle.titre, regle.statut, nombre(regle.ecart)])) : ''}`,
+
+`## XI. ÉVOLUTION N / N-1
+${evol
+  ? `- CA ${evol.caGrowth === null ? 'N/D' : pc(evol.caGrowth)}, EBE ${evol.ebeGrowth === null ? 'N/D' : pc(evol.ebeGrowth)}, résultat net ${evol.rnetGrowth === null ? 'N/D' : pc(evol.rnetGrowth)} ; FRNG ${nombre(evol.frngDelta)}, BFR ${nombre(evol.bfrDelta)}, trésorerie nette ${nombre(evol.tnDelta)}`
+  : "- Exercice N-1 non fourni : aucune comparaison possible. Ne fais aucune hypothèse sur l'évolution."}`,
+
+`## XII. PRÉ-DIAGNOSTIC DU MOTEUR BAIQ (à confirmer ou à contredire)
+- Score global : ${a.scoreGlobal} / 100 (${a.niveau?.label || 'N/D'}) — par pilier : ${Object.entries(a.scores || {}).map(([k, v]) => `${k} ${Math.round(v)}`).join(', ')}
+- Forces : ${(a.forces || []).map(f => f.titre).join(' ; ') || 'aucune'}
+- Faiblesses : ${(a.faiblesses || []).map(f => `${f.titre} [${f.severite}]`).join(' ; ') || 'aucune'}
+- Actions proposées : ${(a.recommandations || []).map(rec => rec.action).join(' ; ') || 'aucune'}`,
+  ];
+
+  return sections.filter(Boolean).join('\n\n');
 }
 
 /* ─── Générateur de Rapports Approfondis avec Gemini ─── */
@@ -867,7 +1015,65 @@ export async function generateGeminiReport(data, reportType = 'audit_diagnostic'
   const context  = buildGeminiContext(data, analysis);
 
   let promptFocus = '';
-  if (reportType === 'audit_diagnostic') {
+  if (reportType === 'analyse_approfondie') {
+    promptFocus = `
+## MISSION : ANALYSE FINANCIÈRE APPROFONDIE ET INTÉGRALE
+Rédige l'analyse la plus complète possible de ${REPERE_ENTREPRISE} en exploitant TOUS les indicateurs du dossier ci-dessus, sans en omettre aucun.
+Pour chaque indicateur : cite la valeur exacte, compare-la à la norme du secteur (et à N-1 si disponible), puis interprète-la.
+Croise systématiquement les indicateurs entre eux pour détecter les incohérences et les signaux faibles (exemples : marge élevée mais CAF faible, délais clients courts mais BFR lourd, rentabilité hors normes sur des actifs très amortis, écarts de flux croisés, soldes atypiques qui faussent un ratio).
+Si un chiffre paraît anormal ou peu plausible, dis-le explicitement, indique sa cause probable (y compris une erreur de saisie ou d'imputation) et son effet sur la fiabilité de l'analyse.
+Vérifie chaque affirmation contre le dossier (par exemple, la rubrique exacte où figure un montant) avant de l'écrire.
+
+Règles de longueur, pour que le rapport tienne en entier :
+- Traite obligatoirement les 13 sections, dans l'ordre, sans en sauter.
+- Ne recopie PAS les tableaux du dossier : le lecteur dispose déjà des états. Cite seulement les chiffres utiles à ton raisonnement.
+- Un tableau n'est justifié que s'il apporte un calcul nouveau (ex. degré d'amortissement) ; sinon, rédige.
+- Vise 150 à 350 mots par section.
+
+Structure impérative :
+# 🔬 ANALYSE FINANCIÈRE APPROFONDIE — ${REPERE_ENTREPRISE}
+**Référentiel** : Système Comptable Financier (SCF Algérie — Loi 07-11) | **Date** : ${new Date().toLocaleDateString('fr-FR')}
+
+### 1. Synthèse exécutive
+Verdict global argumenté, puis les 5 constats majeurs chiffrés (positifs et négatifs).
+
+### 2. Qualité et fiabilité des comptes
+Audit des soldes (comptes atypiques ou en anomalie, montants en jeu), contrôles de flux croisés, et impact de ces constats sur les indicateurs qui suivent.
+
+### 3. Structure du bilan officiel
+Composition de l'actif (poids et degré d'amortissement des immobilisations, stocks, créances, trésorerie) et du passif (capitaux propres détaillés, dettes, provisions).
+
+### 4. Équilibre financier
+FRNG, BFR, trésorerie nette ; lecture croisée bilan fonctionnel / bilan officiel ; couverture des emplois stables.
+
+### 5. Formation du résultat
+TCR ligne par ligne (I à X), poids de chaque charge, résultat financier, impôt, CAF et partage de la valeur ajoutée.
+
+### 6. Rentabilité
+Marges (VA, EBE, exploitation, nette), ROE, ROA, effet de levier — valeur, norme, lecture critique.
+
+### 7. Cycle d'exploitation et trésorerie
+DSO, DPO, rotation et évolution des stocks par catégorie, BFR en jours, cash mobilisable et comment le libérer.
+
+### 8. Solvabilité et risque
+Liquidités (générale, réduite, immédiate), autonomie, solvabilité générale, Altman Z'' composante par composante, score Banque d'Algérie critère par critère, endettement net et capacité d'endettement.
+
+### 9. Capitaux propres et flux
+TVCP (affectation du résultat, dividendes, résultat en instance) et TFT si disponible.
+
+### 10. Évolution N / N-1
+Tendances et ruptures (si N-1 fourni ; sinon, le signaler en une phrase).
+
+### 11. Incohérences et signaux faibles
+Liste numérotée des anomalies, contradictions entre indicateurs et points de vigilance, avec leur gravité.
+
+### 12. Plan d'action priorisé
+Actions chiffrées à 0-30 jours, 1-3 mois et 3-12 mois : pour chacune, l'indicateur visé, la valeur actuelle et l'objectif.
+
+### 13. Tableau de bord de suivi
+Tableau des 10 indicateurs clés à suivre : valeur actuelle, norme, objectif, seuil d'alerte.
+`;
+  } else if (reportType === 'audit_diagnostic') {
     promptFocus = `
 ## MISSION : RAPPORT D'AUDIT ET DE DIAGNOSTIC FINANCIER STRATÉGIQUE (NIVEAU DAF / EXPERT-COMPTABLE)
 Rédige un rapport exhaustif, analytique et approfondi destiné au Conseil d'Administration et à la Direction Générale.
@@ -935,7 +1141,7 @@ Rédige une note de crédit bancaire rigoureuse, impartiale et technique selon l
 
 Structure impérative :
 # 🏦 NOTE D'INSTRUCTION DE CRÉDIT & ANALYSE DU RISQUE EMPRUNTEUR
-**Dossier** : ${analysis?.profil?.nomEntreprise || 'Entreprise sous revue'} | **Référentiel** : Banque d'Algérie (Centrale des Risques)
+**Dossier** : ${REPERE_ENTREPRISE} | **Référentiel** : Banque d'Algérie (Centrale des Risques)
 
 ### 1. SCORE BANQUE D'ALGÉRIE & PROFIL DE RISQUE
 - Score officiel sur 20 points : **${analysis?.solvabilite?.bancaire?.scoreBA || 14} / 20** (Profil : **${analysis?.solvabilite?.bancaire?.ratingBA || 'Favorable'}**)
@@ -964,7 +1170,8 @@ Structure impérative :
       contents: [{ parts: [{ text: fullPrompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 4000,
+        // L'analyse approfondie couvre 13 sections : elle a besoin d'une réponse plus longue.
+        maxOutputTokens: reportType === 'analyse_approfondie' ? 16384 : 4000,
       }
     };
 
@@ -984,7 +1191,7 @@ Structure impérative :
           const json = await proxyResponse.json();
           const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (generatedText && generatedText.trim().length > 50) {
-            return generatedText;
+            return restaurerNomEntreprise(generatedText, data?.profil?.nomEntreprise);
           }
         } else {
           const errorData = await proxyResponse.json().catch(() => ({}));
@@ -1025,7 +1232,7 @@ Structure impérative :
         const json = await response.json();
         const generatedText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (generatedText && generatedText.trim().length > 50) {
-          return generatedText;
+          return restaurerNomEntreprise(generatedText, data?.profil?.nomEntreprise);
         }
       } catch (err) {
         lastError = err;

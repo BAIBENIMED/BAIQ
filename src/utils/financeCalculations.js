@@ -2225,8 +2225,30 @@ export function applyTvaRegimeToRatios(ratios = {}, tvaRegime = {}) {
   };
 }
 
+/**
+ * Total de l'actif en valeurs NETTES, dénominateur « total bilan » des ratios (autonomie,
+ * ROA, solvabilité, Altman) : un numérateur net (capitaux propres, résultat) rapporté à un
+ * total brut sous-estimait ces ratios. Le bilan fonctionnel porte les emplois en brut et
+ * range amortissements/dépréciations (28, 29, 39, 49, 59) et impôts différés actif (133
+ * débiteur) dans ses ressources : on les rétablit pour retrouver le total actif du bilan SCF.
+ */
+export function calculateTotalActifNet(bilan = {}, rows = []) {
+  const brut = (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0);
+  let ajustement = 0;
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    if (row.ignore || !row.compte) return;
+    const c = row.compte.toString().trim();
+    const deb = safeNum(row.soldeFinDebit !== undefined ? row.soldeFinDebit : row.debit);
+    const cred = safeNum(row.soldeFinCredit !== undefined ? row.soldeFinCredit : row.credit);
+    const solde = (row.solde !== undefined && row.solde !== null && !isNaN(row.solde)) ? row.solde : (deb - cred);
+    if (/^(28|29|39|49|59)/.test(c)) ajustement += solde;            // solde créditeur (négatif) : en déduction
+    else if (c.startsWith('133') && solde > 0) ajustement += solde;   // impôts différés actif
+  });
+  return brut + ajustement;
+}
+
 export const calculateRatios = (bilan, sig, rows) => {
-  const totalBilan = (bilan.emploisStables || 0) + (bilan.actifCirculant || 0) + (bilan.tresorerieActive || 0);
+  const totalBilan = calculateTotalActifNet(bilan, rows);
   const denomLiquidite = (bilan.passifCirculant || 0) + (bilan.tresoreriePassive || 0);
 
   let creancesClients = 0;
@@ -2340,8 +2362,13 @@ export const calculateRatios = (bilan, sig, rows) => {
   const autonomieFinanciere = totalBilan === 0 ? 0 : capitauxPropres / totalBilan;
   const poidsPersonnel = va === 0 ? 0 : chargesPers / va;
   const couvertureChargesFin = chargesFin > 0 ? ebe / chargesFin : 99;
+  // Solvabilité générale = Total actif net / Total des dettes (court terme, financières LT, provisions)
+  const totalDettes = denomLiquidite + dettesFinancieresLT + provisionsRisques;
+  const solvabilite = totalDettes > 0 ? totalBilan / totalDettes : 0;
 
   return {
+    totalActifNet: totalBilan,
+    solvabilite,
     liquiditeGenerale,
     liquiditeReduite,
     liquiditeImmediate,
@@ -2614,7 +2641,12 @@ export function autoMatchAccounts(sourceAccounts = [], targetAccounts = [], sour
 /**
  * ═══════════════════════════════════════════════════════════════
  * TABLEAU DE VARIATION DES CAPITAUX PROPRES (TVCP — SCF Algérie Loi 07-11 / IAS 1)
- * Calcul matriciel des mouvements de capitaux propres entre l'ouverture et la clôture.
+ * Mouvements des capitaux propres entre l'ouverture et la clôture de l'exercice.
+ *
+ * Ouverture et clôture sont calculées par computeCapitauxPropres (soldes de début,
+ * puis soldes de fin) : mêmes comptes et mêmes rubriques que le Bilan Officiel SCF,
+ * dont le total de capitaux propres est donc toujours celui de la clôture du TVCP.
+ * Chaque colonne passe de son ouverture à sa clôture par les lignes de mouvement.
  * ═══════════════════════════════════════════════════════════════
  */
 // eslint-disable-next-line no-unused-vars -- dataN1 réservé pour une future comparaison N/N-1 du TVCP ; non encore exploité, mais fait partie de la signature publique de la fonction.
@@ -2628,235 +2660,91 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
     };
   }
 
-  // Filtrer les comptes de la classe 1 (Capitaux Propres & Dettes LT)
   const c1Rows = rows.filter(r => r.compte && !r.ignore && String(r.compte).trim().startsWith('1'));
 
-  // Extraction par famille de comptes SCF
-  const getSoldeDeb = (prefixes, exclude = []) => {
-    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
-    const exList = Array.isArray(exclude) ? exclude : [exclude];
-    return c1Rows.reduce((sum, r) => {
-      const c = String(r.compte).trim();
-      if (exList.some(ex => c.startsWith(ex))) return sum;
-      if (pList.some(p => c.startsWith(p))) {
-        // En classe 1, le sens normal est créditeur : Crédit - Débit
-        const sDeb = safeNum(r.soldeDebutCredit) - safeNum(r.soldeDebutDebit);
-        return sum + sDeb;
-      }
-      return sum;
-    }, 0);
-  };
+  // Mêmes lignes avec les soldes de début d'exercice, pour réutiliser computeCapitauxPropres.
+  const rowsOuverture = rows.map(r => ({
+    ...r,
+    soldeFinDebit: safeNum(r.soldeDebutDebit),
+    soldeFinCredit: safeNum(r.soldeDebutCredit),
+    debit: undefined,
+    credit: undefined,
+    solde: null,
+  }));
+  const cpOuverture = computeCapitauxPropres(rowsOuverture, { resultatNet: 0 });
+  const cpCloture = computeCapitauxPropres(rows, sig || calculateSIG({ isBalance: true, rows }));
 
-  const getSoldeFin = (prefixes, exclude = []) => {
-    const pList = Array.isArray(prefixes) ? prefixes : [prefixes];
-    const exList = Array.isArray(exclude) ? exclude : [exclude];
-    return c1Rows.reduce((sum, r) => {
-      const c = String(r.compte).trim();
-      if (exList.some(ex => c.startsWith(ex))) return sum;
-      if (pList.some(p => c.startsWith(p))) {
-        const sFin = safeNum(r.soldeFinCredit) - safeNum(r.soldeFinDebit);
-        return sum + sFin;
-      }
-      return sum;
-    }, 0);
-  };
+  const colonnesDe = (cp) => ({
+    capital: cp.capital,                                  // capital émis net du non appelé (109)
+    reserves: cp.primesEtReserves,                        // 104, 106, 14
+    ecarts: cp.ecartsReevaluation,                        // 105
+    ran: cp.reportANouveau,                               // 11
+    resultat: cp.resultatEnInstance + cp.resultatNet,     // 12 + résultat de l'exercice
+  });
+  const ouv = colonnesDe(cpOuverture);
+  const clo = colonnesDe(cpCloture);
 
-  // 1. Capital social (101) - Capital souscrit non appelé (109)
-  const cap101Deb = getSoldeDeb('101');
-  const cap109Deb = getSoldeDeb('109'); // négatif si débiteur
-  const capDeb = cap101Deb + cap109Deb;
+  // Réserves au sens strict (106) : seule base d'une mise en réserve du résultat — une
+  // prime ou un écart d'évaluation relève d'une autre opération que l'affectation.
+  const solde106 = (prefixe) => c1Rows
+    .filter(r => String(r.compte).trim().startsWith('106'))
+    .reduce((s, r) => s + safeNum(r[`${prefixe}Credit`]) - safeNum(r[`${prefixe}Debit`]), 0);
+  const varReserves106 = solde106('soldeFin') - solde106('soldeDebut');
 
-  const cap101Fin = getSoldeFin('101');
-  const cap109Fin = getSoldeFin('109');
-  const capFin = cap101Fin + cap109Fin;
-  const varCapital = capFin - capDeb;
+  // Affectation du résultat antérieur : ce qui a quitté la colonne Résultat pendant
+  // l'exercice. La part encore au compte 12 à la clôture n'est ni distribuée ni affectée.
+  const resultatAnterieur = ouv.resultat;
+  const resultatAffecte = resultatAnterieur - cpCloture.resultatEnInstance;
+  const affectationRAN = clo.ran - ouv.ran;
+  const affectationReserves = resultatAffecte > 0 ? Math.max(0, Math.min(varReserves106, resultatAffecte)) : 0;
+  const dividendes = Math.max(0, resultatAffecte - affectationReserves - affectationRAN);
 
-  // 2. Primes d'émission et réserves (103, 106)
-  const resDeb = getSoldeDeb(['103', '106']);
-  const resFin = getSoldeFin(['103', '106']);
-  const varRes = resFin - resDeb;
+  const varCapital = clo.capital - ouv.capital;
+  const autresReserves = (clo.reserves - ouv.reserves) - affectationReserves;
+  const varEcarts = clo.ecarts - ouv.ecarts;
 
-  // 2bis. Réserves seules (106), hors primes d'émission/fusion/apport (103).
-  // Le compte 103 correspond à une opération de capital (ex: augmentation de capital avec prime),
-  // sans lien avec l'affectation du résultat N-1. Le distinguer évite de confondre une entrée de
-  // capital frais avec une mise en réserve du résultat lors du calcul des dividendes ci-dessous.
-  const res106Deb = getSoldeDeb('106');
-  const res106Fin = getSoldeFin('106');
-  const varRes106 = res106Fin - res106Deb;
-
-  // 3. Écarts d'évaluation & de réévaluation (105)
-  const ecartDeb = getSoldeDeb('105');
-  const ecartFin = getSoldeFin('105');
-  const varEcart = ecartFin - ecartDeb;
-
-  // 4. Report à nouveau (110, 119, 11)
-  const ranDeb = getSoldeDeb('11');
-  const ranFin = getSoldeFin('11');
-  const varRan = ranFin - ranDeb;
-
-  // 5. Résultat net de l'exercice N-1 & N (120, 129, 12)
-  const resNetAnterieur = getSoldeDeb('12'); // Résultat N-1 en début d'exercice N
-  let resNetExercice;
-  if (sig && sig.resultatNet !== undefined && sig.resultatNet !== 0) {
-    resNetExercice = sig.resultatNet;
-  } else {
-    const computedSIG = calculateSIG({ isBalance: true, rows });
-    if (computedSIG && computedSIG.resultatNet !== undefined && computedSIG.resultatNet !== 0) {
-      resNetExercice = computedSIG.resultatNet;
-    } else {
-      const rFin = getSoldeFin('12');
-      resNetExercice = rFin !== 0 ? rFin : (getSoldeFin('120') - getSoldeFin('129'));
-    }
-  }
-
-  // 6. Subventions d'investissement & Provisions réglementées (13, 14)
-  const subvDeb = getSoldeDeb(['13', '14'], ['133']); // exclure 133 impôts différés
-  const subvFin = getSoldeFin(['13', '14'], ['133']);
-  const varSubv = subvFin - subvDeb;
-
-  // 7. Affectation du résultat antérieur (N-1)
-  // Le résultat antérieur est viré vers les réserves, le report à nouveau, et/ou distribué en dividendes.
-  // Basé uniquement sur la variation du compte 106 (réserves) — pas sur 103 (primes d'émission),
-  // qui relève d'une opération de capital distincte et n'a pas à être confondue avec une affectation de résultat.
-  const affectationReserves = Math.max(0, varRes106);
-  const affectationRAN = varRan;
-  // Dividendes = Résultat antérieur - Affectation aux réserves - Affectation au RAN (si positif)
-  let dividendes = 0;
-  if (resNetAnterieur > 0) {
-    const affecteInterne = affectationReserves + affectationRAN;
-    if (resNetAnterieur > affecteInterne && affecteInterne >= 0) {
-      dividendes = resNetAnterieur - affecteInterne;
-    }
-  }
-
-  // Définition des colonnes du TVCP SCF (optimisé pour affichage écran sans scroll horizontal)
-  const colonnes = [
-    { key: 'capital',      label: 'Capital (101)',          numCol: '#1e40af', bg: '#eff6ff' },
-    { key: 'reserves',     label: 'Réserves (106)',         numCol: '#047857', bg: '#ecfdf5' },
-    { key: 'ecarts',       label: 'Écarts (105)',           numCol: '#7c3aed', bg: '#f5f3ff' },
-    { key: 'ran',          label: 'Report (11)',            numCol: '#b45309', bg: '#fffbeb' },
-    { key: 'resultat',     label: 'Résultat (12)',          numCol: '#0369a1', bg: '#f0f9ff' },
-    { key: 'subventions',  label: 'Subv./Prov (13/14)',     numCol: '#475569', bg: '#f8fafc' },
-    { key: 'total',        label: 'TOTAL CAPITAUX',         numCol: '#0f172a', bg: '#f1f5f9', isTotal: true }
-  ];
-
-  // Construction des 6 lignes matricielles SCF
-  const soldeOuvTotal = capDeb + resDeb + ecartDeb + ranDeb + resNetAnterieur + subvDeb;
-
-  const rowOuverture = {
-    id: 'ouverture',
-    libelle: '1. Solde d\'ouverture au 1er Janvier (dont Résultat N-1)',
-    type: 'header_row',
-    capital: capDeb,
-    reserves: resDeb,
-    ecarts: ecartDeb,
-    ran: ranDeb,
-    resultat: resNetAnterieur,
-    subventions: subvDeb,
-    total: soldeOuvTotal
-  };
-
-  const rowAffectation = {
-    id: 'affectation',
-    libelle: '2. Affectation du résultat de N-1 (Réserves / RAN / Dividendes)',
-    type: 'movement_row',
-    capital: 0,
-    reserves: affectationReserves,
-    ecarts: 0,
-    ran: affectationRAN,
-    resultat: -resNetAnterieur,
-    subventions: 0,
-    total: -dividendes
-  };
-
-  const rowVarCapital = {
-    id: 'var_capital',
-    libelle: '3. Augmentation / Réduction de capital (N)',
-    type: 'movement_row',
-    capital: varCapital,
-    reserves: 0,
-    ecarts: 0,
-    ran: 0,
-    resultat: 0,
-    subventions: 0,
-    total: varCapital
-  };
-
-  const rowAutresVar = {
-    id: 'autres_var',
-    libelle: '4. Autres variations & Subventions nettes (N)',
-    type: 'movement_row',
-    capital: 0,
-    reserves: varRes - affectationReserves,
-    ecarts: varEcart,
-    ran: 0,
-    resultat: 0,
-    subventions: varSubv,
-    total: (varRes - affectationReserves) + varEcart + varSubv
-  };
-
-  const rowResultatN = {
-    id: 'resultat_n',
-    libelle: '5. Résultat net de l\'exercice (N)',
-    type: 'resultat_row',
-    capital: 0,
-    reserves: 0,
-    ecarts: 0,
-    ran: 0,
-    resultat: resNetExercice,
-    subventions: 0,
-    total: resNetExercice
-  };
-
-  const soldeClotTotal = capFin + resFin + ecartFin + ranFin + resNetExercice + subvFin;
-
-  const rowCloture = {
-    id: 'cloture',
-    libelle: '6. Solde de clôture au 31 Décembre (Passif Bilan N)',
-    type: 'total_row',
-    capital: capFin,
-    reserves: resFin,
-    ecarts: ecartFin,
-    ran: ranFin,
-    resultat: resNetExercice,
-    subventions: subvFin,
-    total: soldeClotTotal
+  const ligne = (id, libelle, type, valeurs) => {
+    const l = { id, libelle, type, capital: 0, reserves: 0, ecarts: 0, ran: 0, resultat: 0, ...valeurs };
+    l.total = l.capital + l.reserves + l.ecarts + l.ran + l.resultat;
+    return l;
   };
 
   const lignes = [
-    rowOuverture,
-    rowAffectation,
-    rowVarCapital,
-    rowAutresVar,
-    rowResultatN,
-    rowCloture
+    ligne('ouverture', '1. Solde d\'ouverture au 1er Janvier (dont Résultat N-1)', 'header_row', ouv),
+    ligne('affectation', '2. Affectation du résultat de N-1 (Réserves / RAN / Dividendes)', 'movement_row',
+      { reserves: affectationReserves, ran: affectationRAN, resultat: -resultatAffecte }),
+    ligne('var_capital', '3. Augmentation / Réduction de capital (N)', 'movement_row', { capital: varCapital }),
+    ligne('autres_var', '4. Autres variations (N)', 'movement_row', { reserves: autresReserves, ecarts: varEcarts }),
+    ligne('resultat_n', '5. Résultat net de l\'exercice (N)', 'resultat_row', { resultat: cpCloture.resultatNet }),
+    ligne('cloture', '6. Solde de clôture au 31 Décembre (Passif Bilan N)', 'total_row', clo),
   ];
 
-  const varNette = soldeClotTotal - soldeOuvTotal;
-  const pctVar = soldeOuvTotal !== 0 ? (varNette / Math.abs(soldeOuvTotal)) * 100 : 0;
-  const varOperations = (-dividendes) + varCapital + (varRes - affectationReserves) + varEcart + varSubv;
+  const colonnes = [
+    { key: 'capital',  label: 'Capital (10)',          numCol: '#1e40af', bg: '#eff6ff' },
+    { key: 'reserves', label: 'Primes & réserves',     numCol: '#047857', bg: '#ecfdf5' },
+    { key: 'ecarts',   label: 'Écarts (105)',          numCol: '#7c3aed', bg: '#f5f3ff' },
+    { key: 'ran',      label: 'Report (11)',           numCol: '#b45309', bg: '#fffbeb' },
+    { key: 'resultat', label: 'Résultat (12 + N)',     numCol: '#0369a1', bg: '#f0f9ff' },
+    { key: 'total',    label: 'TOTAL CAPITAUX',        numCol: '#0f172a', bg: '#f1f5f9', isTotal: true }
+  ];
 
-  // Liste détaillée des comptes classe 1 mouvementés
+  const totalDebut = cpOuverture.total;
+  const totalFin = cpCloture.total;
+  const varNette = totalFin - totalDebut;
+  const pctVar = totalDebut !== 0 ? (varNette / Math.abs(totalDebut)) * 100 : 0;
+  const varOperations = lignes[1].total + lignes[2].total + lignes[3].total;
+
   const comptesClasse1 = c1Rows.map(r => {
-    const c = String(r.compte).trim();
-    const deb = safeNum(r.soldeFinDebit);
-    const cred = safeNum(r.soldeFinCredit);
-    const debInit = safeNum(r.soldeDebutDebit);
-    const credInit = safeNum(r.soldeDebutCredit);
-    const mouvDeb = safeNum(r.mouvementDebit);
-    const mouvCred = safeNum(r.mouvementCredit);
-    const netSoldeInit = credInit - debInit;
-    const netSoldeFin  = cred - deb;
-    const varSolde = netSoldeFin - netSoldeInit;
-
+    const netSoldeInit = safeNum(r.soldeDebutCredit) - safeNum(r.soldeDebutDebit);
+    const netSoldeFin = safeNum(r.soldeFinCredit) - safeNum(r.soldeFinDebit);
     return {
-      compte: c,
+      compte: String(r.compte).trim(),
       libelle: r.libelle || '',
       soldeDebut: netSoldeInit,
-      mouvementDebit: mouvDeb,
-      mouvementCredit: mouvCred,
+      mouvementDebit: safeNum(r.mouvementDebit),
+      mouvementCredit: safeNum(r.mouvementCredit),
       soldeFin: netSoldeFin,
-      variation: varSolde
+      variation: netSoldeFin - netSoldeInit
     };
   });
 
@@ -2864,18 +2752,19 @@ export function calculateVariationCapitauxPropres(rows = [], dataN1 = null, sig 
     colonnes,
     lignes,
     kpis: {
-      totalDebut: soldeOuvTotal,
-      totalFin: soldeClotTotal,
+      totalDebut,
+      totalFin,
       variationNette: varNette,
       variationOperations: varOperations,
       pctVariation: pctVar,
-      resultatNetAnterieur: resNetAnterieur,
+      resultatNetAnterieur: resultatAnterieur,
+      resultatEnInstance: cpCloture.resultatEnInstance,
       affectationReserves,
       affectationRAN,
       dividendesEstimes: dividendes,
       varCapital,
-      resultatNetN: resNetExercice,
-      resultatNet: resNetExercice
+      resultatNetN: cpCloture.resultatNet,
+      resultatNet: cpCloture.resultatNet
     },
     comptesClasse1
   };
@@ -2907,7 +2796,6 @@ export function calculateTFT(data) {
   }
 
   const b1 = dataN1.bilan;
-  const s1 = dataN1.sig;
   const scf1 = dataN1.bilanSCF;
   const cp = bilanSCF.capitauxPropres || {};
   const cp1 = scf1.capitauxPropres || {};
@@ -2936,22 +2824,25 @@ export function calculateTFT(data) {
   const fluxInvestissement = -variationImmo;
 
   // ── C. FLUX LIÉS AUX OPÉRATIONS DE FINANCEMENT ──
-  const capitalN = cp.capitalEmis || 0;
-  const capitalN1 = cp1.capitalEmis || 0;
+  // Capital appelé uniquement : le capital souscrit non appelé (109, porté en négatif
+  // au bilan) n'a encore apporté aucune trésorerie.
+  const capitalN = (cp.capitalEmis || 0) + (cp.capitalNonAppele || 0);
+  const capitalN1 = (cp1.capitalEmis || 0) + (cp1.capitalNonAppele || 0);
   const augmentationCapital = capitalN - capitalN1;
 
   const detteN = pnc.empruntsDettesFinancieres || 0;
   const detteN1 = pnc1.empruntsDettesFinancieres || 0;
   const variationDette = detteN - detteN1;
 
-  // Dividendes versés (estimation) : la part du résultat N-1 qui n'a été ni mise en réserve
-  // ni reportée à nouveau a nécessairement été distribuée. Calculé directement à partir du
-  // Bilan Officiel SCF (N et N-1), sans dépendre du TVCP, pour rester autonome.
-  const resultatNetN1 = s1.resultatNet || 0;
+  // Dividendes versés (estimation) : le résultat qui restait à affecter fin N-1 (résultat
+  // de N-1 + part du compte 12 encore en instance), moins ce qui est resté dans les capitaux
+  // propres pendant N (mises en réserve, report à nouveau, part toujours en instance fin N).
+  // Calculé à partir du Bilan Officiel SCF (N et N-1), sans dépendre du TVCP.
+  const resultatAAffecter = (cp1.resultatNet || 0) + (cp1.resultatEnInstance || 0);
   const reservesN  = (cp.primesEtReserves || 0) + (cp.autresCapitauxPropres || 0);
   const reservesN1 = (cp1.primesEtReserves || 0) + (cp1.autresCapitauxPropres || 0);
-  const variationReserves = reservesN - reservesN1;
-  const dividendesVerses = Math.max(0, resultatNetN1 - variationReserves);
+  const resteDansCapitaux = (reservesN - reservesN1) + (cp.resultatEnInstance || 0);
+  const dividendesVerses = Math.max(0, resultatAAffecter - resteDansCapitaux);
 
   const fluxFinancement = augmentationCapital + variationDette - dividendesVerses;
 

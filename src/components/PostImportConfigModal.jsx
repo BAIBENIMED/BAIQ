@@ -64,7 +64,8 @@ export function PostImportConfigModal({ isOpen, onClose, data, cur, setCur, onUp
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)', flexShrink: 0 }}>lock</span>
             <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
               Ces informations servent uniquement à personnaliser vos <strong style={{ color: 'var(--text)' }}>documents imprimés
-              (PDF / Excel)</strong>. Elles restent stockées dans le cache de ce navigateur — jamais envoyées à un serveur.
+              (PDF / Excel)</strong>. Elles restent stockées dans ce navigateur. Si vous utilisez l'IA, seul l'effectif accompagne
+              les chiffres transmis à Google Gemini — jamais le nom de l'entreprise.
             </p>
           </div>
 

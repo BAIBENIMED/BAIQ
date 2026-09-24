@@ -17,7 +17,8 @@ export const MODELES_GEMINI_AUTORISES = new Set([
 // Le prompt légitime le plus long (contexte financier + question) fait moins de 10 000
 // caractères ; la marge couvre un historique de conversation.
 export const MAX_CARACTERES_PROMPT = 60_000;
-export const MAX_JETONS_REPONSE = 4096;
+// Assez pour l'analyse approfondie (13 sections) ; les autres rapports en demandent 4 000.
+export const MAX_JETONS_REPONSE = 16384;
 const MAX_MESSAGES = 20;
 const MAX_PARTIES_PAR_MESSAGE = 5;
 const ROLES_AUTORISES = new Set(['user', 'model']);

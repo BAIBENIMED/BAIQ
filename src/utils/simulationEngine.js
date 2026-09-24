@@ -1,4 +1,5 @@
-import { analyserBalance } from './financeCalculations';
+// Extension .js explicite : permet aussi d'exécuter ce moteur en Node pur (tests).
+import { analyserBalance } from './financeCalculations.js';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Simulation Comptable en Partie Double
@@ -281,10 +282,12 @@ export function applySimulationToRows(originalRows = [], simulationEntries = [])
   // Clone des lignes existantes
   const rowsCopy = originalRows.map(r => ({ ...r }));
 
-  // Indexation par numéro de compte
+  // Indexation par numéro de compte — uniquement les lignes prises en compte par les calculs :
+  // une ligne ignorée (sous-total du fichier, par exemple « 28 — Total amortissements »)
+  // absorberait l'écriture, dont la contrepartie disparaîtrait alors du bilan simulé.
   const accountMap = new Map();
   rowsCopy.forEach((r, idx) => {
-    if (r.compte) {
+    if (r.compte && !r.ignore) {
       accountMap.set(r.compte.toString().trim(), idx);
     }
   });

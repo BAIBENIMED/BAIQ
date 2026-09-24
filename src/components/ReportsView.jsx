@@ -171,7 +171,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
     const sign = num < 0 ? '-' : '';
     return `${sign}${Math.abs(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} DZD`;
   });
-  const [reportType, setReportType] = useState('audit_diagnostic');
+  const [reportType, setReportType] = useState('analyse_approfondie');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const [geminiError, setGeminiError] = useState('');
@@ -752,7 +752,8 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ color: 'var(--text-muted)' }}>Type de rapport :</span>
                     <strong style={{ color: 'var(--primary)' }}>
-                      {reportType === 'audit_diagnostic' ? '📊 Audit & Diagnostic Complet' :
+                      {reportType === 'analyse_approfondie' ? '🔬 Analyse Approfondie (tous indicateurs)' :
+                       reportType === 'audit_diagnostic' ? '📊 Audit & Diagnostic Complet' :
                        reportType === 'recommendations_plan' ? '🎯 Plan d\'Action Opérationnel' : '🏦 Note d\'Analyse Bancaire'}
                     </strong>
                   </div>
@@ -769,8 +770,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                 <div style={{ padding: '10px 14px', background: 'rgba(217, 119, 6, 0.08)', border: '1px solid rgba(217, 119, 6, 0.3)', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                   <span className="material-symbols-outlined" style={{ color: '#d97706', fontSize: 18, marginTop: 1, flexShrink: 0 }}>privacy_tip</span>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    Les données de ce dossier (comptes, montants, ratios) seront transmises à l'API Google Gemini pour générer ce rapport.
-                    Assurez-vous d'être autorisé à partager ces données avant de continuer.
+                    Les agrégats financiers de ce dossier (bilan, compte de résultat, ratios) seront transmis à Google Gemini, sans le nom
+                    de l'entreprise ni le détail des comptes. Avec l'offre gratuite de Gemini, Google peut conserver ces données et s'en servir
+                    pour améliorer ses services. Assurez-vous d'être autorisé à les partager avant de continuer.
                   </div>
                 </div>
               </div>
@@ -799,6 +801,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
         <div style={{ padding: '10px 24px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {[
+              { id: 'analyse_approfondie', label: '🔬 Analyse Approfondie (tous indicateurs)', desc: 'Tous les états, ratios, scores et contrôles analysés et croisés : incohérences, risques, plan d\'action et tableau de bord' },
               { id: 'audit_diagnostic', label: '📊 Audit & Diagnostic Complet', desc: 'Synthèse managériale, équilibre, rentabilité & risques' },
               { id: 'recommendations_plan', label: '🎯 Plan d\'Action & Recommandations', desc: 'Actions chiffrées 0-30j, 1-3m, 3-12m & KPIs' },
               { id: 'banque_credit', label: '🏦 Note d\'Analyse Bancaire', desc: 'Dossier crédit, solvabilité, garanties & avis comité' },

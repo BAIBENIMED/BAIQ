@@ -36,6 +36,9 @@ import {
   construireDossier,
   rouvrirDossier,
   auditBalanceAccounts,
+  calculateVariationCapitauxPropres,
+  calculateTFT,
+  calculateTotalActifNet,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
 import { SECTEUR_DEFAUT } from '../src/utils/secteurs.js';
@@ -566,4 +569,294 @@ test('l\'audit de balance ignore les lignes exclues et les soldes immatériels',
   assert.equal(audit.total, 1, 'la ligne exclue n\'est pas auditée');
   assert.equal(audit.anomalies, 0);
   assert.equal(audit.scoreCoherence, 100);
+});
+
+// ── 13. Tableau de variation des capitaux propres (TVCP) ───────────────────
+
+/** Ligne de balance avec soldes d'ouverture ET de clôture. */
+const LD = (compte, libelle, [debutD, debutC], [finD, finC]) => ({
+  ...L(compte, libelle, finD, finC),
+  soldeDebutDebit: debutD, soldeDebutCredit: debutC,
+});
+
+const tvcpDe = (rows) => {
+  const { sig } = analyser(rows);
+  return calculateVariationCapitauxPropres(rows, null, sig);
+};
+const COLONNES_TVCP = ['capital', 'reserves', 'ecarts', 'ran', 'resultat'];
+
+test('la clôture du TVCP est toujours égale aux capitaux propres du bilan SCF', () => {
+  for (const [nom, rows] of TOUTES) {
+    const { scf } = analyser(rows);
+    const tvcp = tvcpDe(rows);
+    assert.ok(Math.abs(tvcp.kpis.totalFin - scf.capitauxPropres.total) < 0.01,
+      `« ${nom} » : TVCP ${tvcp.kpis.totalFin} ≠ bilan ${scf.capitauxPropres.total}`);
+  }
+});
+
+test('chaque colonne du TVCP va de son ouverture à sa clôture par les mouvements', () => {
+  const rows = [
+    LD('101', 'Capital', [0, 10_000_000], [0, 12_000_000]),
+    LD('106', 'Réserves', [0, 0], [0, 600_000]),
+    LD('105', 'Écart de réévaluation', [0, 0], [0, 300_000]),
+    LD('110', 'Report à nouveau', [0, 0], [0, 100_000]),
+    LD('120', 'Résultat en instance', [0, 1_000_000], [0, 0]),
+    LD('512', 'Banque', [11_000_000, 0], [14_000_000, 0]),
+    LD('701', 'Ventes', [0, 0], [0, 1_000_000]),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { lignes } = tvcpDe(rows);
+  const ouverture = lignes.find(l => l.id === 'ouverture');
+  const cloture = lignes.find(l => l.id === 'cloture');
+  const mouvements = lignes.filter(l => !['ouverture', 'cloture'].includes(l.id));
+  for (const col of [...COLONNES_TVCP, 'total']) {
+    const somme = ouverture[col] + mouvements.reduce((s, l) => s + l[col], 0);
+    assert.ok(Math.abs(somme - cloture[col]) < 0.01, `colonne ${col} : ${somme} ≠ ${cloture[col]}`);
+  }
+  for (const l of lignes) {
+    const somme = COLONNES_TVCP.reduce((s, c) => s + l[c], 0);
+    assert.ok(Math.abs(somme - l.total) < 0.01, `ligne ${l.id} : total ${l.total} ≠ ${somme}`);
+  }
+});
+
+test('les subventions (classe 13) ne sont pas comptées dans les capitaux propres du TVCP', () => {
+  const rows = [
+    L('101', 'Capital', 0, 10_000_000),
+    L('131', 'Subvention d\'équipement', 0, 2_000_000),
+    L('512', 'Banque', 12_000_000, 0),
+  ];
+  const { scf } = analyser(rows);
+  assert.equal(tvcpDe(rows).kpis.totalFin, 10_000_000);
+  assert.equal(scf.capitauxPropres.total, 10_000_000);
+});
+
+test('un résultat antérieur resté au compte 12 n\'est pas compté comme des dividendes', () => {
+  // 1 M de résultat N-1 non affecté, à l'ouverture comme à la clôture, et 300 k de résultat N.
+  const rows = [
+    LD('101', 'Capital', [0, 10_000_000], [0, 10_000_000]),
+    LD('120', 'Résultat en instance', [0, 1_000_000], [0, 1_000_000]),
+    LD('512', 'Banque', [11_000_000, 0], [11_300_000, 0]),
+    LD('701', 'Ventes', [0, 0], [0, 300_000]),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { kpis, lignes } = tvcpDe(rows);
+  assert.equal(kpis.dividendesEstimes, 0);
+  assert.equal(kpis.totalFin, 11_300_000);
+  assert.equal(lignes.find(l => l.id === 'cloture').resultat, 1_300_000);
+});
+
+test('un résultat affecté en partie aux réserves fait apparaître le solde distribué', () => {
+  // 1 M de résultat N-1 : 600 k mis en réserve, 400 k versés (sortie de banque).
+  const rows = [
+    LD('101', 'Capital', [0, 10_000_000], [0, 10_000_000]),
+    LD('106', 'Réserves', [0, 0], [0, 600_000]),
+    LD('120', 'Résultat en instance', [0, 1_000_000], [0, 0]),
+    LD('512', 'Banque', [11_000_000, 0], [10_600_000, 0]),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { kpis } = tvcpDe(rows);
+  assert.equal(kpis.affectationReserves, 600_000);
+  assert.equal(kpis.dividendesEstimes, 400_000);
+  assert.equal(kpis.totalFin, 10_600_000);
+});
+
+// ── 14. Tableau des flux de trésorerie (TFT) ───────────────────────────────
+
+const tftDe = (rowsN, rowsN1) => calculateTFT({ ...analyserBalance(rowsN), dataN1: analyserBalance(rowsN1) });
+const BALANCE_N1_BENEFICE = [
+  L('101', 'Capital', 0, 10_000_000),
+  L('512', 'Banque', 11_000_000, 0),
+  L('701', 'Ventes', 0, 1_000_000),
+];
+
+test('TFT : un résultat N-1 resté au compte 12 n\'est pas un dividende versé', () => {
+  const rowsN = [
+    L('101', 'Capital', 0, 10_000_000),
+    L('120', 'Résultat en instance', 0, 1_000_000),
+    L('512', 'Banque', 11_300_000, 0),
+    L('701', 'Ventes', 0, 300_000),
+  ];
+  assert.equal(tftDe(rowsN, BALANCE_N1_BENEFICE).financement.dividendesVerses, 0);
+});
+
+test('TFT : la part du résultat N-1 ni mise en réserve ni en instance est distribuée', () => {
+  const rowsN = [
+    L('101', 'Capital', 0, 10_000_000),
+    L('106', 'Réserves', 0, 600_000),
+    L('512', 'Banque', 10_600_000, 0),
+  ];
+  assert.equal(tftDe(rowsN, BALANCE_N1_BENEFICE).financement.dividendesVerses, 400_000);
+});
+
+test('TFT : un capital souscrit mais non appelé n\'apporte pas de trésorerie', () => {
+  const rowsN1 = [L('101', 'Capital', 0, 10_000_000), L('512', 'Banque', 10_000_000, 0)];
+  const rowsN = [
+    L('101', 'Capital', 0, 12_000_000),
+    L('109', 'Capital souscrit non appelé', 2_000_000, 0),
+    L('512', 'Banque', 10_000_000, 0),
+  ];
+  assert.equal(tftDe(rowsN, rowsN1).financement.augmentationCapital, 0);
+});
+
+// ── 15. Base « total bilan » des ratios et endettement net ──────────────────
+
+test('le total bilan des ratios est le total actif net du bilan SCF', () => {
+  const avecImpotsDifferes = [
+    L('213', 'Constructions', 5_000_000, 0),
+    L('281', 'Amortissements', 0, 1_000_000),
+    L('133', 'Impôts différés actif', 300_000, 0),
+    L('512', 'Banque', 700_000, 0),
+    L('101', 'Capital', 0, 5_000_000),
+  ];
+  for (const [nom, rows] of [...TOUTES, ['impôts différés actif', avecImpotsDifferes]]) {
+    const { bilan, scf, ratios } = analyser(rows);
+    const net = calculateTotalActifNet(bilan, rows);
+    assert.ok(Math.abs(net - scf.totalActif) < 0.01, `« ${nom} » : ${net} ≠ ${scf.totalActif}`);
+    assert.ok(Math.abs(ratios.totalActifNet - scf.totalActif) < 0.01, `« ${nom} » (ratios)`);
+  }
+});
+
+test('autonomie, ROA, solvabilité et Altman divisent par le total actif net', () => {
+  // Immobilisations brutes 10 M amorties de 6 M : total actif net 7 M (et non 13 M brut).
+  const rows = [
+    L('213', 'Constructions', 10_000_000, 0),
+    L('281', 'Amortissements', 0, 6_000_000),
+    L('411', 'Clients', 2_000_000, 0),
+    L('512', 'Banque', 1_000_000, 0),
+    L('101', 'Capital', 0, 4_000_000),
+    L('401', 'Fournisseurs', 0, 2_000_000),
+    L('701', 'Ventes', 0, 1_000_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { bilan, ratios, solva, scf } = analyser(rows);
+  assert.equal(scf.totalActif, 7_000_000);
+  assert.ok(Math.abs(ratios.autonomieFinanciere - 5 / 7) < 1e-9, `autonomie ${ratios.autonomieFinanciere}`); // 71,4 % et non 38,5 %
+  assert.ok(Math.abs(ratios.roa - 1 / 7) < 1e-9, `ROA ${ratios.roa}`);
+  assert.ok(Math.abs(ratios.solvabilite - 7 / 2) < 1e-9, `solvabilité ${ratios.solvabilite}`);
+  assert.ok(Math.abs(solva.ratios.x1.val - bilan.frng / 7_000_000) < 1e-9, 'Altman X1');
+  assert.ok(Math.abs(solva.ratios.x3.val - 1 / 7) < 1e-9, 'Altman X3');
+});
+
+test('sans dette financière, les dettes fournisseurs ne dégradent pas le statut crédit', () => {
+  // Aucun emprunt ni concours bancaire ; 6 M de fournisseurs pour 1 M d'EBE.
+  const rows = [
+    L('411', 'Clients', 6_900_000, 0),
+    L('512', 'Banque', 100_000, 0),
+    L('401', 'Fournisseurs', 0, 6_000_000),
+    L('701', 'Ventes', 0, 1_000_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { bancaire } = analyser(rows).solva;
+  assert.equal(bancaire.dettesNettes, 0);
+  assert.equal(bancaire.ratioDetteSurEBE, 0);
+  assert.notEqual(bancaire.statutCredit, 'DÉFAVORABLE');
+});
+
+test('l\'endettement net compte les emprunts et les concours bancaires, moins la trésorerie', () => {
+  const rows = [
+    L('213', 'Constructions', 4_500_000, 0),
+    L('411', 'Clients', 1_000_000, 0),
+    L('512', 'Banque', 500_000, 0),
+    L('101', 'Capital', 0, 1_000_000),
+    L('164', 'Emprunts bancaires', 0, 3_000_000),
+    L('519', 'Concours bancaires courants', 0, 1_000_000),
+    L('701', 'Ventes', 0, 1_000_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { bancaire } = analyser(rows).solva;
+  assert.equal(bancaire.dettesNettes, 3_500_000);
+  assert.ok(Math.abs(bancaire.ratioDetteSurEBE - 3.5) < 1e-9);
+});
+
+// ── 16. Simulateur What-If ──────────────────────────────────────────────────
+
+test('une écriture simulée ne se perd pas dans une ligne de total ignorée', async () => {
+  const { recalculateSimulatedDataset } = await import('../src/utils/simulationEngine.js');
+  const totalIgnore = { ...L('28', 'Total amortissements', 0, 1_000_000), isTotal: true, ignore: true };
+  const rows = [
+    L('213', 'Constructions', 5_000_000, 0),
+    L('2813', 'Amortissements des constructions', 0, 1_000_000),
+    totalIgnore,
+    L('512', 'Banque', 1_000_000, 0),
+    L('101', 'Capital', 0, 5_000_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+
+  const sim = recalculateSimulatedDataset(analyserBalance(rows), [
+    { label: 'Dotation aux amortissements', montant: 500_000, debitCompte: '681', creditCompte: '28' },
+  ]);
+  assert.ok(Math.abs(sim.bilanSCF.totalActif - sim.bilanSCF.totalPassif) < 0.01,
+    `bilan simulé déséquilibré : actif ${sim.bilanSCF.totalActif}, passif ${sim.bilanSCF.totalPassif}`);
+  assert.equal(checkBalanceEquilibre(sim.rows).equilibre, true);
+  assert.equal(sim.rows.find(r => r.compte === '2813').soldeFinCredit, 1_500_000, 'le crédit va au sous-compte réel');
+  assert.equal(sim.rows.find(r => r.compte === '28').soldeFinCredit, 1_000_000, 'la ligne de total ignorée est intacte');
+  assert.equal(sim.sig.resultatNet, -500_000);
+});
+
+test('le simulateur conserve l\'équilibre du bilan sur les balances de référence', async () => {
+  const { recalculateSimulatedDataset } = await import('../src/utils/simulationEngine.js');
+  const ecritures = [
+    { label: 'Vente simulée', montant: 1_000_000, debitCompte: '411', creditCompte: '701' },
+    { label: 'Achat simulé', montant: 400_000, debitCompte: '601', creditCompte: '401' },
+  ];
+  for (const [nom, rows] of TOUTES) {
+    const sim = recalculateSimulatedDataset(analyserBalance(rows), ecritures);
+    assert.ok(Math.abs(sim.bilanSCF.totalActif - sim.bilanSCF.totalPassif) < 0.01, `« ${nom} » : bilan simulé déséquilibré`);
+    assert.ok(Math.abs(sim.sig.resultatNet - analyserBalance(rows).sig.resultatNet - 600_000) < 0.01, `« ${nom} » : résultat simulé`);
+  }
+});
+
+// ── 17. Confidentialité des requêtes Gemini ────────────────────────────────
+
+test('le nom de l\'entreprise n\'est jamais envoyé à Gemini et revient dans la réponse', async () => {
+  const { generateGeminiReport, buildGeminiContext, runAIAnalysis, REPERE_ENTREPRISE } = await import('../src/utils/aiEngine.js');
+  const NOM = 'SARL Très Confidentielle';
+  const dossier = construireDossier(BALANCE_SAINE, null, { nomEntreprise: NOM, secteurId: 'industrie', effectif: '12' });
+
+  assert.doesNotMatch(buildGeminiContext(dossier, runAIAnalysis(dossier)), /Très Confidentielle/);
+
+  const fetchReel = globalThis.fetch;
+  const envoyes = [];
+  globalThis.fetch = async (_url, options) => {
+    envoyes.push(options.body);
+    const texte = `Rapport de ${REPERE_ENTREPRISE} : situation financière saine et structure équilibrée, détaillée ci-dessous.`;
+    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: texte }] } }] }) };
+  };
+  try {
+    for (const type of ['analyse_approfondie', 'audit_diagnostic', 'recommendations_plan', 'banque_credit']) {
+      const rapport = await generateGeminiReport(dossier, type);
+      assert.match(rapport, /Rapport de SARL Très Confidentielle/, `${type} : nom restauré dans la réponse`);
+      assert.doesNotMatch(rapport, new RegExp(REPERE_ENTREPRISE, 'i'), `${type} : nom d'emprunt remplacé`);
+    }
+  } finally {
+    globalThis.fetch = fetchReel;
+  }
+  assert.equal(envoyes.length, 4);
+  for (const corps of envoyes) assert.doesNotMatch(corps, /Très Confidentielle/, 'nom présent dans une requête envoyée');
+});
+
+test('l\'analyse approfondie transmet tous les indicateurs et demande une réponse longue', async () => {
+  const { generateGeminiReport, buildGeminiContext, runAIAnalysis } = await import('../src/utils/aiEngine.js');
+  const dossier = construireDossier(BALANCE_SAINE, BALANCE_AVEC_COMPTE_12, { nomEntreprise: 'SARL Test', secteurId: 'industrie' });
+  const contexte = buildGeminiContext(dossier, runAIAnalysis(dossier));
+  for (const section of ['BILAN OFFICIEL SCF — ACTIF', 'BILAN OFFICIEL SCF — PASSIF', 'TCR OFFICIEL', 'BILAN FONCTIONNEL',
+    'RATIOS', 'Altman', 'Banque d\'Algérie', 'TVCP', 'TFT', 'ÉVOLUTION DES STOCKS', 'QUALITÉ DES COMPTES',
+    'ÉVOLUTION N / N-1', 'PRÉ-DIAGNOSTIC']) {
+    assert.ok(contexte.includes(section), `section absente du contexte : ${section}`);
+  }
+  assert.match(contexte, /\| N-1 \|/, 'colonnes N-1 présentes quand l\'exercice précédent est fourni');
+
+  const fetchReel = globalThis.fetch;
+  let corps = null;
+  globalThis.fetch = async (_url, options) => {
+    corps = JSON.parse(options.body);
+    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Analyse approfondie de ZETACORP : structure saine, rentabilité élevée, points de vigilance détaillés.' }] } }] }) };
+  };
+  try {
+    await generateGeminiReport(dossier, 'analyse_approfondie');
+  } finally {
+    globalThis.fetch = fetchReel;
+  }
+  assert.equal(corps.body.generationConfig.maxOutputTokens, 16384);
+  assert.match(corps.body.contents[0].parts[0].text, /ANALYSE FINANCIÈRE APPROFONDIE ET INTÉGRALE/);
 });
