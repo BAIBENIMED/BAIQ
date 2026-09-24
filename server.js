@@ -23,6 +23,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { preparerRequeteGemini, traduireErreurGemini } from './geminiRelais.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,22 +55,12 @@ const app = express();
 // fausse IP à chaque requête et traverser sans limite le plafond par IP ci-dessous.
 app.set('trust proxy', 1);
 
-app.use(express.json({ limit: '2mb' }));
+// Le plus gros corps légitime (prompt Gemini) fait quelques dizaines de ko.
+app.use(express.json({ limit: '256kb' }));
 
 const PORT = process.env.PORT || 8787;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-
-// ── Whitelist des modèles autorisés à traverser le relais ──────────────────
-// Empêche un appel direct à /api/gemini (hors navigateur, ex. curl/script) de
-// demander un modèle arbitraire plus coûteux que ceux réellement utilisés par
-// l'application.
-const ALLOWED_GEMINI_MODELS = new Set([
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-]);
+const DELAI_MAX_GEMINI_MS = 60_000;
 
 // ── Garde-fou anti-abus côté serveur (rate limiting en mémoire) ────────────
 // Les quotas affichés côté interface (1 rapport/dossier, 10 messages/dossier)
@@ -311,21 +302,23 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 }
 
 // ── Relais sécurisé vers l'API Gemini ──────────────────────────────────────
-app.post('/api/gemini', rateLimitGemini, async (req, res) => {
+// La validation passe AVANT le rate limiting : une requête vide ou mal formée
+// (qui n'atteindrait jamais Google) ne doit pas entamer le plafond horaire, sinon
+// quelques requêtes vides suffiraient à couper l'IA pour tous les utilisateurs.
+function validerRequeteGemini(req, res, next) {
   if (!GEMINI_API_KEY) {
     return res.status(503).json({
       error: "Clé API Gemini non configurée côté serveur. Définissez la variable d'environnement GEMINI_API_KEY sur votre hébergeur."
     });
   }
+  const requete = preparerRequeteGemini(req.body);
+  if (requete.erreur) return res.status(requete.statut).json({ error: requete.erreur });
+  res.locals.requeteGemini = requete;
+  next();
+}
 
-  const { modelName, body } = req.body || {};
-  if (!modelName || !body) {
-    return res.status(400).json({ error: 'Requête invalide : modelName et body sont requis.' });
-  }
-  if (!ALLOWED_GEMINI_MODELS.has(modelName)) {
-    return res.status(400).json({ error: `Modèle non autorisé : ${modelName}.` });
-  }
-
+app.post('/api/gemini', validerRequeteGemini, rateLimitGemini, async (req, res) => {
+  const { modelName, corps } = res.locals.requeteGemini;
   try {
     const upstream = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
@@ -335,13 +328,23 @@ app.post('/api/gemini', rateLimitGemini, async (req, res) => {
           'Content-Type': 'application/json',
           'x-goog-api-key': GEMINI_API_KEY, // header plutôt que ?key= dans l'URL : moins de risque de fuite via logs/historique
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(corps),
+        signal: AbortSignal.timeout(DELAI_MAX_GEMINI_MS),
       }
     );
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
+    const data = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) {
+      const { statut, erreur } = traduireErreurGemini(upstream.status, data);
+      console.error(`Relais Gemini : ${modelName} → HTTP ${upstream.status}`);
+      return res.status(statut).json({ error: erreur });
+    }
+    res.json(data);
   } catch (err) {
-    res.status(502).json({ error: 'Erreur de connexion au service Gemini.', detail: String(err?.message || err) });
+    console.error('Relais Gemini :', err?.name || 'Erreur', err?.message || '');
+    const delaiDepasse = err?.name === 'TimeoutError';
+    res.status(delaiDepasse ? 504 : 502).json({
+      error: delaiDepasse ? 'Le service Gemini n\'a pas répondu à temps.' : 'Erreur de connexion au service Gemini.'
+    });
   }
 });
 
