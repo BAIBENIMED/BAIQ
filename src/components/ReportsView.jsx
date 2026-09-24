@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { exportFinancialWorkbook } from '../utils/lazyExporters';
 import { calculateAltmanZScore } from '../utils/solvabiliteEngine';
-import { generateGeminiReport, generateLocalStructuredReport } from '../utils/aiEngine';
-import { generateFullPDF } from '../utils/lazyExporters';
+import { generateGeminiReport, generateLocalStructuredReport, runAIAnalysis, empreinteDossier } from '../utils/aiEngine';
+import { generateFullPDF, generateRapportIAPDF } from '../utils/lazyExporters';
+import { nettoyerLatex, niveauListe } from '../utils/markdownIA';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Rapport Financier Complet avec Diagnostic IA Gemini
@@ -20,13 +22,47 @@ const KpiRow = ({ label, value, sub, ok }) => (
 
 function renderInlineMarkdown(text) {
   if (!text) return '';
-  const parts = text.split(/(\*\*.*?\*\*)/g);
+  const parts = nettoyerLatex(text).split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g);
   return parts.map((part, idx) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return <strong key={idx} style={{ color: 'var(--text)', fontWeight: 800 }}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <em key={idx}>{part.slice(1, -1)}</em>;
     }
     return part;
   });
+}
+
+const STYLE_TEXTE = { fontSize: '0.85rem', color: 'var(--text)', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 };
+
+const TYPES_RAPPORT = [
+  { id: 'analyse_approfondie', label: '🔬 Analyse Approfondie (tous indicateurs)', desc: 'Tous les états, ratios, scores et contrôles analysés et croisés : incohérences, risques, plan d\'action et tableau de bord' },
+  { id: 'audit_diagnostic', label: '📊 Audit & Diagnostic Complet', desc: 'Synthèse managériale, équilibre, rentabilité & risques' },
+  { id: 'recommendations_plan', label: '🎯 Plan d\'Action & Recommandations', desc: 'Actions chiffrées 0-30j, 1-3m, 3-12m & KPIs' },
+  { id: 'banque_credit', label: '🏦 Note d\'Analyse Bancaire', desc: 'Dossier crédit, solvabilité, garanties & avis comité' },
+];
+const libelleType = (id) => TYPES_RAPPORT.find(t => t.id === id)?.label || TYPES_RAPPORT[0].label;
+
+const CLE_RAPPORTS_IA = 'baiq_saved_ai_reports';
+const MAX_RAPPORTS_IA = 15;
+
+// Enregistre les rapports IA en ne gardant que les plus récents : un rapport approfondi
+// pèse plusieurs dizaines de Ko et le stockage du navigateur est limité (~5 Mo). Si
+// l'écriture échoue quand même (stockage plein), les plus anciens sont retirés un à un.
+function enregistrerRapportsIA(rapports) {
+  let conserves = Object.entries(rapports)
+    .sort(([, a], [, b]) => String(b?.date || '').localeCompare(String(a?.date || '')))
+    .slice(0, MAX_RAPPORTS_IA);
+  while (conserves.length > 0) {
+    try {
+      localStorage.setItem(CLE_RAPPORTS_IA, JSON.stringify(Object.fromEntries(conserves)));
+      return { rapports: Object.fromEntries(conserves), enregistre: true };
+    } catch {
+      conserves = conserves.slice(0, -1);
+    }
+  }
+  return { rapports, enregistre: false };
 }
 
 function MarkdownReportViewer({ content }) {
@@ -53,7 +89,7 @@ function MarkdownReportViewer({ content }) {
                 const isRight = hIdx > 0 && (h.includes('(DZD)') || h.includes('%') || h.includes('Montant') || h.includes('Valeur') || h.includes('Score') || h.includes('CA'));
                 return (
                   <th key={hIdx} style={{ padding: '8px 12px', textAlign: isRight ? 'right' : 'left', fontWeight: 800, color: 'var(--text)', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
-                    {h}
+                    {renderInlineMarkdown(h)}
                   </th>
                 );
               })}
@@ -87,11 +123,9 @@ function MarkdownReportViewer({ content }) {
   lines.forEach((line, i) => {
     const trimmed = line.trim();
 
-    // Table row detection
+    // Lignes de tableau
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      if (trimmed.includes('---')) {
-        return; // separator row
-      }
+      if (/^\|[\s:|-]+\|$/.test(trimmed)) return; // ligne de séparation
       tableBuffer.push(trimmed);
       inTable = true;
       return;
@@ -104,56 +138,55 @@ function MarkdownReportViewer({ content }) {
       return;
     }
 
-    if (trimmed === '---') {
+    if (/^(-{3,}|\*{3,})$/.test(trimmed)) {
       elements.push(<hr key={`hr-${i}`} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />);
       return;
     }
 
-    if (trimmed.startsWith('# ')) {
+    const titre = trimmed.match(/^(#{1,4})\s+(.*)$/);
+    if (titre) {
+      const niveau = titre[1].length;
+      const styles = {
+        1: { fontSize: '1.3rem', fontWeight: 900, margin: '14px 0 6px' },
+        2: { fontSize: '1.08rem', fontWeight: 900, margin: '18px 0 8px' },
+        3: { fontSize: '0.95rem', fontWeight: 800, margin: '16px 0 8px', borderLeft: '4px solid var(--primary)', paddingLeft: 10 },
+        4: { fontSize: '0.90rem', fontWeight: 800, margin: '10px 0 4px' },
+      }[niveau];
+      const Balise = `h${Math.min(niveau + 1, 5)}`;
       elements.push(
-        <h2 key={`h1-${i}`} style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--text)', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-          {trimmed.slice(2)}
-        </h2>
+        <Balise key={`h-${i}`} style={{ color: 'var(--text)', wordBreak: 'break-word', overflowWrap: 'break-word', ...styles }}>
+          {renderInlineMarkdown(titre[2])}
+        </Balise>
       );
       return;
     }
 
-    if (trimmed.startsWith('### ')) {
+    if (trimmed.startsWith('>')) {
       elements.push(
-        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', margin: '16px 0 8px', borderLeft: '4px solid var(--primary)', paddingLeft: 10, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-          {trimmed.slice(4)}
-        </h3>
+        <div key={`q-${i}`} style={{ ...STYLE_TEXTE, margin: '8px 0', padding: '8px 12px', borderLeft: '3px solid var(--accent)', background: 'var(--accent-lt)', borderRadius: 4 }}>
+          {renderInlineMarkdown(trimmed.replace(/^>\s?/, ''))}
+        </div>
       );
       return;
     }
 
-    if (trimmed.startsWith('#### ')) {
+    const numerote = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
+    const puce = trimmed.match(/^([-*•✓✗])\s+(.*)$/);
+    if (numerote || puce) {
+      const niveau = niveauListe(line);
+      const marque = numerote ? `${numerote[1]}.` : puce[1] === '✓' ? '✓' : puce[1] === '✗' ? '✗' : ['•', '◦', '▪'][niveau];
+      const couleur = puce?.[1] === '✓' ? 'var(--green)' : puce?.[1] === '✗' ? 'var(--red)' : 'var(--primary)';
       elements.push(
-        <h4 key={`h4-${i}`} style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text)', margin: '10px 0 4px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-          {trimmed.slice(5)}
-        </h4>
-      );
-      return;
-    }
-
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('✓ ') || trimmed.startsWith('✗ ')) {
-      const isCheck = trimmed.startsWith('✓');
-      const isCross = trimmed.startsWith('✗');
-      elements.push(
-        <div key={`li-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', fontSize: '0.85rem', color: 'var(--text)', paddingLeft: 8, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.65 }}>
-          <span style={{ color: isCheck ? 'var(--green)' : isCross ? 'var(--red)' : 'var(--primary)', fontWeight: 800, flexShrink: 0 }}>
-            {isCheck ? '✓' : isCross ? '✗' : '•'}
-          </span>
-          <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            {renderInlineMarkdown(trimmed.replace(/^[-*•✓✗]\s*/, ''))}
-          </span>
+        <div key={`li-${i}`} style={{ ...STYLE_TEXTE, display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0', paddingLeft: 8 + niveau * 20 }}>
+          <span style={{ color: couleur, fontWeight: 800, flexShrink: 0, minWidth: numerote ? 20 : 'auto' }}>{marque}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>{renderInlineMarkdown(numerote ? numerote[2] : puce[2])}</span>
         </div>
       );
       return;
     }
 
     elements.push(
-      <p key={`p-${i}`} style={{ margin: '5px 0', fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.7, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+      <p key={`p-${i}`} style={{ ...STYLE_TEXTE, margin: '5px 0', lineHeight: 1.7 }}>
         {renderInlineMarkdown(trimmed)}
       </p>
     );
@@ -177,7 +210,19 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
   const [geminiError, setGeminiError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  useEscapeKey(showConfirmModal, () => setShowConfirmModal(false));
   const [localKey, setLocalKey] = useState(() => localStorage.getItem('finanalyze_gemini_key') || '');
+  // Relais serveur Gemini (clé gardée côté serveur) : null = vérification en cours.
+  // Une clé personnelle n'est demandée que s'il est absent.
+  const [relaisActif, setRelaisActif] = useState(null);
+  useEffect(() => {
+    let annule = false;
+    fetch('/api/gemini/status')
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => { if (!annule) setRelaisActif(Boolean(json?.configured)); })
+      .catch(() => { if (!annule) setRelaisActif(false); });
+    return () => { annule = true; };
+  }, []);
 
   const handleGenerateGeminiReport = () => setShowConfirmModal(true);
 
@@ -185,47 +230,51 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
     if (!data) return;
     setIsPdfGenerating(true);
     try {
-      await generateFullPDF(data, cur, isSimulationActive);
-    } catch (e) {
-      console.error('Erreur export PDF:', e);
-      alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));
+      await generateFullPDF(data, cur, isSimulationActive); // un échec est annoncé par le bandeau d'erreur
     } finally {
       setIsPdfGenerating(false);
     }
   };
 
-  // Identifiant unique du dossier / balance courante (anonyme)
-  const dossierId = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}` : 'default';
+  // Identifiant du dossier : empreinte de son contenu (cf. empreinteDossier). Une balance
+  // corrigée ou un profil modifié libère donc une nouvelle génération.
+  const empreinte = useMemo(() => empreinteDossier(data), [data]);
+  const dossierId = data ? `dossier_${empreinte}` : 'default';
   const reportSlotKey = `${dossierId}_${reportType}`;
+  // Clé des versions précédentes (nombre de lignes + CA + secteur) : les rapports déjà
+  // générés restent affichés, sans bloquer une nouvelle génération.
+  const ancienSlotKey = data ? `dossier_${data?.rows?.length || 0}_${Math.round(data?.sig?.chiffreAffaires || 0)}_${data?.profil?.secteurId || 'scf'}_${reportType}` : null;
 
   // Rapports sauvegardés par dossier et par type
   const [savedReports, setSavedReports] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('baiq_saved_ai_reports') || '{}');
+      const lus = JSON.parse(localStorage.getItem(CLE_RAPPORTS_IA) || '{}');
+      return lus && typeof lus === 'object' && !Array.isArray(lus) ? lus : {};
     } catch {
       return {};
     }
   });
 
-  const currentReportEntry = savedReports[reportSlotKey] || null;
+  const currentReportEntry = savedReports[reportSlotKey] || (ancienSlotKey && savedReports[ancienSlotKey]) || null;
   const localReportText    = data ? generateLocalStructuredReport(data, reportType) : '';
   const displayedReportText = currentReportEntry?.text || localReportText;
-  const hasUsedQuota       = Boolean(currentReportEntry);
+  const hasUsedQuota       = Boolean(savedReports[reportSlotKey]);
+  const [pdfRapportEnCours, setPdfRapportEnCours] = useState(false);
 
   const effectiveKey = geminiKey || localKey;
 
   // Lancement de la génération après confirmation
   const executeGeneration = async () => {
     setShowConfirmModal(false);
-    if (!effectiveKey) {
-      setGeminiError("Veuillez saisir votre clé API Google Gemini pour lancer la génération.");
+    if (!effectiveKey && relaisActif === false) {
+      setGeminiError("Le service IA du serveur n'est pas disponible : saisissez une clé API Google Gemini personnelle pour lancer la génération.");
       return;
     }
     setIsGenerating(true);
     setGeminiError('');
     try {
       const result = await generateGeminiReport(data, reportType, effectiveKey);
-      const updated = {
+      const { rapports, enregistre } = enregistrerRapportsIA({
         ...savedReports,
         [reportSlotKey]: {
           text: result,
@@ -233,9 +282,11 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
           date: new Date().toISOString(),
           isGemini: true
         }
-      };
-      setSavedReports(updated);
-      localStorage.setItem('baiq_saved_ai_reports', JSON.stringify(updated));
+      });
+      setSavedReports(rapports);
+      if (!enregistre) {
+        setGeminiError("Rapport généré, mais le stockage du navigateur est plein : il ne sera pas conservé après la fermeture de l'onglet. Exportez-le en PDF pour le garder.");
+      }
     } catch (err) {
       setGeminiError(err?.message || "Erreur lors de la génération du rapport avec Gemini.");
     } finally {
@@ -243,11 +294,58 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
     }
   };
 
+  // Imprime le seul rapport (et non toute la page) : son rendu est recopié dans un cadre
+  // invisible, en thème clair, d'où l'utilisateur peut aussi l'enregistrer en PDF.
+  const imprimerRapport = () => {
+    const source = document.querySelector('.rapport-ia-imprimable');
+    if (!source) return;
+    const cadre = document.createElement('iframe');
+    cadre.setAttribute('aria-hidden', 'true');
+    cadre.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(cadre);
+    const doc = cadre.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Rapport BAIQ</title><style>
+      :root { --text:#171d22; --text-muted:#5b6570; --primary:#1b6e8c; --accent:#c08a2e; --accent-lt:#f6e8cc;
+              --border:#d2d0c5; --surface:#ffffff; --surface-alt:#f5f5f1; --green:#059669; --red:#dc2626; }
+      @page { margin: 16mm 14mm; }
+      body { font-family: Inter, system-ui, -apple-system, sans-serif; color: var(--text); margin: 0; }
+      h1, h2, h3, h4, h5 { break-after: avoid; }
+      table, tr { break-inside: avoid; }
+    </style></head><body>${source.innerHTML}</body></html>`);
+    doc.close();
+    cadre.contentWindow.focus();
+    cadre.contentWindow.print();
+    setTimeout(() => cadre.remove(), 1000);
+  };
+
   const handleCopyReport = () => {
     if (!displayedReportText) return;
-    navigator.clipboard.writeText(displayedReportText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    // La copie peut être refusée (page non sécurisée, permission du navigateur) : on le dit.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(displayedReportText))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      })
+      .catch(() => setGeminiError("Le navigateur a refusé la copie : sélectionnez le texte du rapport et copiez-le manuellement (Ctrl+C)."));
+  };
+
+  // PDF du rapport affiché, à la charte BAIQ (page de garde, sections numérotées, folio).
+  const exporterRapportPDF = async () => {
+    if (!displayedReportText) return;
+    setPdfRapportEnCours(true);
+    try {
+      const analyse = runAIAnalysis(data);
+      await generateRapportIAPDF(displayedReportText, data, {
+        typeLabel: libelleType(reportType),
+        source: currentReportEntry?.isGemini ? 'gemini' : 'local',
+        dateGeneration: currentReportEntry?.date || null,
+        score: analyse ? { valeur: analyse.scoreGlobal, libelle: analyse.niveau?.label } : null,
+      }); // un échec est annoncé par le bandeau d'erreur
+    } finally {
+      setPdfRapportEnCours(false);
+    }
   };
 
   /* ── Garde — données manquantes ── */
@@ -477,9 +575,14 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
   const nbFaiblesses = analyse.filter(a => a.type === 'faiblesse').length;
   const nbNeutre     = analyse.filter(a => a.type === 'neutre').length;
 
-  const score = Math.max(0, Math.min(100, Math.round(50 + (nbForces * 8) - (nbFaiblesses * 10))));
-  const scoreColor = score >= 70 ? '#059669' : score >= 45 ? '#d97706' : '#dc2626';
-  const scoreLabel = score >= 70 ? 'Situation financière solide' : score >= 45 ? 'Situation financière sous surveillance' : 'Situation financière fragile — Action requise';
+  // Un seul score de santé dans toute l'application : celui du moteur d'analyse
+  // (5 piliers pondérés, normes du secteur), déjà affiché par l'Assistant IA et
+  // repris dans le rapport. Le compte forces/faiblesses ci-dessus reste un résumé
+  // qualitatif : il ne sert plus à fabriquer un second score concurrent.
+  const analyseMoteur = runAIAnalysis(data);
+  const score = analyseMoteur?.scoreGlobal ?? 0;
+  const scoreColor = analyseMoteur?.niveau?.color || '#64748b';
+  const scoreLabel = `Situation ${analyseMoteur?.niveau?.label || 'non évaluée'}`;
 
   /* ── Export Multi-Feuilles Excel via excelExporter ── */
   const handleExportExcel = () => {
@@ -615,7 +718,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {/* Badge Quota */}
             <div style={{
               display: 'flex',
@@ -644,17 +747,26 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                   {copied ? 'Copié !' : 'Copier'}
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={imprimerRapport}
                   className="btn"
                   style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.80rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>print</span>
                   Imprimer
                 </button>
+                <button
+                  onClick={exporterRapportPDF}
+                  disabled={pdfRapportEnCours}
+                  className="btn"
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 8, padding: '7px 14px', fontSize: '0.80rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6, cursor: pdfRapportEnCours ? 'wait' : 'pointer', opacity: pdfRapportEnCours ? 0.7 : 1 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{pdfRapportEnCours ? 'hourglass_top' : 'picture_as_pdf'}</span>
+                  {pdfRapportEnCours ? 'PDF...' : 'PDF'}
+                </button>
               </>
             )}
 
-            {currentReportEntry?.isGemini ? (
+            {hasUsedQuota ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   disabled
@@ -672,7 +784,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                     gap: 6,
                     cursor: 'not-allowed'
                   }}
-                  title="Quota consommé : ce dossier a déjà utilisé son unique appel IA. Importez un nouveau dossier pour relancer une analyse."
+                  title="Rapport déjà généré pour ces données. Une nouvelle génération sera possible si la balance ou le profil du dossier changent (correction, réimport, secteur)."
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>lock</span>
                   Rapport IA déjà généré (1/1)
@@ -708,7 +820,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
 
         {/* ── MODAL D'AVERTISSEMENT ET DE CONFIRMATION DU QUOTA ── */}
         {showConfirmModal && (
-          <div style={{
+          <div role="dialog" aria-modal="true" aria-label="Confirmer la génération du rapport IA" style={{
             position: 'fixed',
             inset: 0,
             background: 'rgba(15, 23, 42, 0.82)',
@@ -752,9 +864,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ color: 'var(--text-muted)' }}>Type de rapport :</span>
                     <strong style={{ color: 'var(--primary)' }}>
-                      {reportType === 'analyse_approfondie' ? '🔬 Analyse Approfondie (tous indicateurs)' :
-                       reportType === 'audit_diagnostic' ? '📊 Audit & Diagnostic Complet' :
-                       reportType === 'recommendations_plan' ? '🎯 Plan d\'Action Opérationnel' : '🏦 Note d\'Analyse Bancaire'}
+                      {libelleType(reportType)}
                     </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -800,12 +910,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
         {/* Barre de sélection du type de rapport */}
         <div style={{ padding: '10px 24px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[
-              { id: 'analyse_approfondie', label: '🔬 Analyse Approfondie (tous indicateurs)', desc: 'Tous les états, ratios, scores et contrôles analysés et croisés : incohérences, risques, plan d\'action et tableau de bord' },
-              { id: 'audit_diagnostic', label: '📊 Audit & Diagnostic Complet', desc: 'Synthèse managériale, équilibre, rentabilité & risques' },
-              { id: 'recommendations_plan', label: '🎯 Plan d\'Action & Recommandations', desc: 'Actions chiffrées 0-30j, 1-3m, 3-12m & KPIs' },
-              { id: 'banque_credit', label: '🏦 Note d\'Analyse Bancaire', desc: 'Dossier crédit, solvabilité, garanties & avis comité' },
-            ].map(tab => (
+            {TYPES_RAPPORT.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setReportType(tab.id)}
@@ -827,12 +932,13 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
             ))}
           </div>
 
-          {/* Saisie rapide clé Gemini si absente */}
-          {!effectiveKey && (
+          {/* Saisie rapide d'une clé Gemini personnelle, seulement si le relais serveur est absent */}
+          {!effectiveKey && relaisActif === false && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '0.74rem', color: '#dc2626', fontWeight: 800 }}>⚠️ Clé Gemini requise :</span>
               <input
                 type="password"
+                aria-label="Clé API Google Gemini personnelle"
                 placeholder="Coller clé AI Studio..."
                 value={localKey}
                 onChange={e => {
@@ -862,7 +968,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
                 Gemini analyse votre balance et vos états financiers...
               </h4>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                Diagnostic approfondi de l'équilibre financier (FRNG/BFR/TN), calcul des ratios SCF et formulation des recommandations stratégiques.
+                {reportType === 'analyse_approfondie'
+                  ? "Analyse croisée de l'ensemble des indicateurs (13 sections) : comptez environ une minute."
+                  : "Diagnostic approfondi de l'équilibre financier (FRNG/BFR/TN), calcul des ratios SCF et formulation des recommandations stratégiques."}
               </p>
               <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
@@ -881,7 +989,9 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
               maxWidth: '100%',
               boxSizing: 'border-box'
             }}>
-              <MarkdownReportViewer content={displayedReportText} />
+              <div className="rapport-ia-imprimable">
+                <MarkdownReportViewer content={displayedReportText} />
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-alt)', borderRadius: 10, border: '1px dashed var(--border)' }}>
@@ -906,6 +1016,7 @@ export function ReportsView({ data, fmt: propFmt, formatCurrency, cur, geminiKey
               <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.06em', color: scoreColor, marginBottom: 4 }}>Score de Santé Financière</div>
               <div style={{ fontSize: '2rem', fontWeight: 900, color: scoreColor, lineHeight: 1 }} className="mono">{score} / 100</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>{scoreLabel}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>Rentabilité, liquidité, structure, activité et productivité pondérées selon les normes du secteur</div>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {[

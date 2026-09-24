@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { runAIAnalysis, buildGeminiContext, restaurerNomEntreprise } from '../utils/aiEngine';
+import { syntheseAudit } from '../utils/financeCalculations';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Assistant & Diagnostic IA Financier Approfondi
@@ -97,12 +98,16 @@ export function AIView({ data, geminiKey }) {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  /* ── Call Gemini API ── */
+  /* ── Call Gemini API ──
+     Renvoie { texte } en cas de succès, { erreur } sinon : le chat doit pouvoir dire
+     pourquoi il répond avec le moteur local au lieu de basculer en silence. */
   const callGemini = async (userMessage) => {
     const context = buildGeminiContext(data, analysis);
     const prompt  = context + `\n\n## QUESTION DE L'UTILISATEUR\n${userMessage}\n\nRéponds de manière structurée, hautement professionnelle et en français d'affaires. Utilise des titres, des calculs chiffrés en DZD, des listes à puces et cite les comptes SCF appropriés.`;
     const requestBody = { contents: [{ parts: [{ text: prompt }] }] };
     const modelName = 'gemini-2.5-flash';
+    const nomEntreprise = data?.profil?.nomEntreprise;
+    let erreur = null;
 
     // 1. Voie recommandée : relais serveur /api/gemini (clé Gemini gardée côté serveur, cf. server.js)
     try {
@@ -114,16 +119,20 @@ export function AIView({ data, geminiKey }) {
       if (proxyRes.ok) {
         const json = await proxyRes.json();
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return restaurerNomEntreprise(text, data?.profil?.nomEntreprise);
+        if (text) return { texte: restaurerNomEntreprise(text, nomEntreprise) };
+        erreur = 'réponse vide du service Gemini';
       } else if (proxyRes.status !== 404) {
-        return null; // le relais existe mais a échoué (ex: clé serveur manquante) → pas la peine de tenter le mode direct
+        // Le relais existe mais a refusé ou échoué (quota, clé serveur, délai) : son message
+        // est déjà rédigé pour l'utilisateur. Pas la peine de tenter le mode direct.
+        const json = await proxyRes.json().catch(() => null);
+        return { erreur: json?.error || `erreur ${proxyRes.status} du relais IA` };
       }
     } catch {
-      // relais injoignable → on tente le mode direct ci-dessous si une clé locale existe
+      erreur = 'relais IA injoignable';
     }
 
     // 2. Repli : appel direct depuis le navigateur avec une clé saisie localement (moins sûr, cf. Paramètres)
-    if (!geminiKey) return null;
+    if (!geminiKey) return { erreur: erreur || 'aucun accès Gemini configuré' };
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
@@ -136,10 +145,12 @@ export function AIView({ data, geminiKey }) {
           body: JSON.stringify(requestBody)
         }
       );
-      const json = await res.json();
-      return restaurerNomEntreprise(json?.candidates?.[0]?.content?.parts?.[0]?.text, data?.profil?.nomEntreprise) || null;
+      const json = await res.json().catch(() => null);
+      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return { texte: restaurerNomEntreprise(text, nomEntreprise) };
+      return { erreur: json?.error?.message || `erreur ${res.status} de l'API Gemini` };
     } catch {
-      return null;
+      return { erreur: 'API Gemini injoignable' };
     }
   };
 
@@ -158,10 +169,12 @@ export function AIView({ data, geminiKey }) {
       return `**Capacité d'Autofinancement (CAF) & Désendettement**\n\n- CAF brute générée : **${fmt(diag.caf)}** (${pct(diag.tauxCAF)} du CA)\n- Ratio Dettes Financières / CAF : **${diag.ratioDetteSurCAF ? diag.ratioDetteSurCAF.toFixed(2) + ' an(s)' : 'N/D'}**\n- Appréciation : **${diag.capaciteRemboursementLabel}**\n\n${diag.ratioDetteSurCAF <= 3.5 ? '✅ L\'entreprise dispose d\'une capacité de remboursement saine auprès des banques.' : '🚨 Endettement excessif face à la CAF actuelle. Priorité à l\'autofinancement et au désendettement.'}`;
 
     if (m.includes('banque') || m.includes('score') || m.includes('altman') || m.includes('crédit'))
-      return `**Notation Bancaire & Score de Solvabilité**\n\n🏦 **Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA || 14} / 20** — Profil : **${solv.bancaire?.ratingBA || 'Favorable'}**\n\n- Autonomie financière (CP / Dettes LT) : ${solv.bancaire?.detailsBA?.autonomie?.score || 4}/5 pts\n- Marge d'EBE : ${solv.bancaire?.detailsBA?.rentabilite?.score || 4}/5 pts\n- Liquidité générale : ${solv.bancaire?.detailsBA?.liquidite?.score || 4}/5 pts\n- Couverture des intérêts : ${solv.bancaire?.detailsBA?.couverture?.score || 4}/5 pts\n\n📊 **Modèle Altman Z'' (EM-Score) : ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'Zone Sûre'})\n- Risque de défaillance : **${solv.risqueDefaillance || 'Faible'}**`;
+      return `**Notation Bancaire & Score de Solvabilité**\n\n🏦 **Score Banque d'Algérie (Centrale des Risques) : ${solv.bancaire?.scoreBA ?? 'N/D'} / 20** — Profil : **${solv.bancaire?.ratingBA || 'N/D'}**\n\n- Autonomie financière (CP / Dettes LT) : ${solv.bancaire?.detailsBA?.autonomie?.score ?? 'N/D'}/5 pts\n- Marge d'EBE : ${solv.bancaire?.detailsBA?.rentabilite?.score ?? 'N/D'}/5 pts\n- Liquidité générale : ${solv.bancaire?.detailsBA?.liquidite?.score ?? 'N/D'}/5 pts\n- Couverture des intérêts : ${solv.bancaire?.detailsBA?.couverture?.score ?? 'N/D'}/5 pts\n\n📊 **Modèle Altman Z'' (EM-Score) : ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}** (${solv.zoneLabel || 'N/D'})\n- Risque de défaillance : **${solv.risqueDefaillance || 'N/D'}**`;
 
-    if (m.includes('audit') || m.includes('anomalie') || m.includes('scf') || m.includes('compte'))
-      return `**Audit de Conformité des Comptes SCF (Loi 07-11)**\n\n- Nombre d'irrégularités détectées : **${diag.anomaliesComptablesCount || 0}**\n- Caisse créditrice (53x) : ${diag.caisseCreditrice ? '🔴 **OUI — Anomalie matérielle critique**' : '🟢 **NON — Conforme**'}\n\n**Points de contrôle réguliers :**\n1. Vérifier l'apurement complet des comptes d'attente (471 à 478)\n2. Reclasser les fournisseurs débiteurs en 409 et clients créditeurs en 419\n3. Contrôler la concordance entre dotations 68x et amortissements 28x`;
+    if (m.includes('audit') || m.includes('anomalie') || m.includes('scf') || m.includes('compte')) {
+      const audit = syntheseAudit(data?.rows || []);
+      return `**Audit de Conformité des Comptes SCF (Loi 07-11)**\n\n- Conclusion : **${audit.libelleVerdict}**\n- Sens des soldes : ${audit.natures.conformes} / ${audit.natures.total} comptes conformes (${audit.natures.atypiques} atypique(s), ${audit.natures.anomalies} anomalie(s))\n- Flux croisés : ${audit.flux.totalConformesFlux} / ${audit.flux.totalActifsFlux} contrôles conformes, ${audit.flux.totalAnomaliesFlux} anomalie(s)\n- Caisse créditrice (53x) : ${diag.caisseCreditrice ? '🔴 **OUI — Anomalie matérielle critique**' : '🟢 **NON — Conforme**'}\n\n**Points de contrôle réguliers :**\n1. Vérifier l'apurement complet des comptes d'attente (471 à 478)\n2. Reclasser les fournisseurs débiteurs en 409 et clients créditeurs en 419\n3. Contrôler la concordance entre dotations 68x et amortissements 28x`;
+    }
 
     // Réponse générale
     return `**Synthèse Financière Exécutive BAIQ**\n\n🎯 Score Global : **${analysis.scoreGlobal} / 100 — ${analysis.niveau.emoji} ${analysis.niveau.label}**\n\n${analysis.resume}\n\n💡 Pour une réponse approfondie sur mesure, formulez votre question ou utilisez les suggestions thématiques.`;
@@ -178,8 +191,13 @@ export function AIView({ data, geminiKey }) {
     setChatMessages(newMessages);
 
     let response = null;
-    if (!geminiQuotaExceeded) {
-      response = await callGemini(userMsg);
+    let echecGemini = null;
+    // En mode local (ni relais ni clé), le badge « IA Locale » annonce déjà la couleur :
+    // inutile d'envoyer une requête vouée à l'échec.
+    if (!geminiQuotaExceeded && geminiMode !== 'local') {
+      const resultat = await callGemini(userMsg);
+      response = resultat.texte || null;
+      echecGemini = resultat.erreur || null;
       if (response && dossierKey) {
         const next = geminiCallCount + 1;
         setGeminiCallCount(next);
@@ -189,7 +207,9 @@ export function AIView({ data, geminiKey }) {
     if (!response) {
       response = buildLocalResponse(userMsg);
       if (geminiQuotaExceeded) {
-        response += `\\n\\n*— Quota d'appels IA (${MAX_GEMINI_CHAT_CALLS}/${MAX_GEMINI_CHAT_CALLS}) atteint pour ce dossier : réponse générée par le moteur local (hors ligne), sans appel à Gemini.*`;
+        response += `\n\n*— Quota d'appels IA (${MAX_GEMINI_CHAT_CALLS}/${MAX_GEMINI_CHAT_CALLS}) atteint pour ce dossier : réponse générée par le moteur local (hors ligne), sans appel à Gemini.*`;
+      } else if (echecGemini) {
+        response += `\n\n*— Gemini n'a pas pu répondre (${echecGemini}) : réponse générée par le moteur local BAIQ, à partir des mêmes données mais sans analyse rédigée sur mesure.*`;
       }
     }
 
@@ -215,8 +235,8 @@ export function AIView({ data, geminiKey }) {
     content += `Valeur Ajoutée (VA): ${fmt(analysis?.metriques?.va)} (${pct(analysis?.metriques?.tauxVA)})\n`;
     content += `Part du Personnel dans la VA: ${pct(diag.partPersonnel)}\n`;
     content += `Cash mobilisable sur BFR: ${fmt(diag.totalCashLibérable)}\n`;
-    content += `Score Banque d'Algérie: ${solv.bancaire?.scoreBA || 14}/20 (${solv.bancaire?.ratingBA || 'Favorable'})\n`;
-    content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'Zone Sûre'})\n`;
+    content += `Score Banque d'Algérie: ${solv.bancaire?.scoreBA ?? 'N/D'}/20 (${solv.bancaire?.ratingBA || 'N/D'})\n`;
+    content += `Altman Z''-Score: ${solv.zScore ? solv.zScore.toFixed(2) : 'N/D'} (${solv.zoneLabel || 'N/D'})\n`;
     if (solv.estimationPartielle) content += `⚠️ ${solv.estimationPartielleMessage}\n`;
     content += `\n`;
 
@@ -450,7 +470,7 @@ export function AIView({ data, geminiKey }) {
                 </div>
 
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  💡 <strong>Rentabilité des Capitaux :</strong> ROE (Rentabilité financière) : <strong>{pct(diag.roe)}</strong> · ROA (Rentabilité économique) : <strong>{pct(diag.roa)}</strong>.
+                  💡 <strong>Rentabilité des Capitaux :</strong> ROE (Rentabilité financière) : <strong>{diag.roeSignificatif === false ? 'non significatif (capitaux propres ≤ 0)' : pct(diag.roe)}</strong> · ROA (Rentabilité économique) : <strong>{pct(diag.roa)}</strong>.
                 </div>
               </div>
             </div>
@@ -555,7 +575,7 @@ export function AIView({ data, geminiKey }) {
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#92400e', textTransform: 'uppercase' }}>Score Banque d'Algérie & Risque</span>
                 </div>
                 <span style={{ background: solv.bancaire?.ratingBAColor || '#059669', color: '#fff', fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: 12 }}>
-                  {solv.bancaire?.scoreBA || 14} / 20 ({solv.bancaire?.ratingBA || 'Favorable'})
+                  {solv.bancaire?.scoreBA ?? 'N/D'} / 20 ({solv.bancaire?.ratingBA || 'N/D'})
                 </span>
               </div>
               <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -563,11 +583,11 @@ export function AIView({ data, geminiKey }) {
                   <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Altman Z''-Score</div>
                     <div className="mono" style={{ fontSize: '1rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.zScore ? solv.zScore.toFixed(2) : 'N/D'}</div>
-                    <div style={{ fontSize: '0.58rem', color: solv.zoneColor || '#059669' }}>{solv.zoneLabel || 'Zone Sûre'}</div>
+                    <div style={{ fontSize: '0.58rem', color: solv.zoneColor || '#059669' }}>{solv.zoneLabel || 'N/D'}</div>
                   </div>
                   <div style={{ background: 'var(--surface-alt)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>Risque de Défaillance</div>
-                    <div className="mono" style={{ fontSize: '0.95rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.risqueDefaillance || 'Faible'}</div>
+                    <div className="mono" style={{ fontSize: '0.95rem', fontWeight: 900, color: solv.zoneColor || '#059669' }}>{solv.risqueDefaillance || 'N/D'}</div>
                     <div style={{ fontSize: '0.58rem', color: 'var(--text-sub)' }}>Modèle EM-Score</div>
                   </div>
                 </div>
@@ -577,10 +597,10 @@ export function AIView({ data, geminiKey }) {
                     Détail des 4 Piliers Banque d'Algérie :
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    <div>• Autonomie : <strong>{solv.bancaire?.detailsBA?.autonomie?.score || 4}/5</strong></div>
-                    <div>• Marge EBE : <strong>{solv.bancaire?.detailsBA?.rentabilite?.score || 4}/5</strong></div>
-                    <div>• Liquidité : <strong>{solv.bancaire?.detailsBA?.liquidite?.score || 4}/5</strong></div>
-                    <div>• Couverture : <strong>{solv.bancaire?.detailsBA?.couverture?.score || 4}/5</strong></div>
+                    <div>• Autonomie : <strong>{solv.bancaire?.detailsBA?.autonomie?.score ?? 'N/D'}/5</strong></div>
+                    <div>• Marge EBE : <strong>{solv.bancaire?.detailsBA?.rentabilite?.score ?? 'N/D'}/5</strong></div>
+                    <div>• Liquidité : <strong>{solv.bancaire?.detailsBA?.liquidite?.score ?? 'N/D'}/5</strong></div>
+                    <div>• Couverture : <strong>{solv.bancaire?.detailsBA?.couverture?.score ?? 'N/D'}/5</strong></div>
                   </div>
                 </div>
 
@@ -865,6 +885,7 @@ export function AIView({ data, geminiKey }) {
             )}
             <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
               <input
+                aria-label="Question à poser au conseiller financier IA"
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
                 onKeyDown={handleKey}

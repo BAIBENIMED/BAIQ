@@ -39,6 +39,8 @@ import {
   calculateVariationCapitauxPropres,
   calculateTFT,
   calculateTotalActifNet,
+  syntheseAudit,
+  appliquerRegimeTva,
 } from '../src/utils/financeCalculations.js';
 import { calculateAltmanZScore } from '../src/utils/solvabiliteEngine.js';
 import { SECTEUR_DEFAUT } from '../src/utils/secteurs.js';
@@ -859,4 +861,142 @@ test('l\'analyse approfondie transmet tous les indicateurs et demande une répon
   }
   assert.equal(corps.body.generationConfig.maxOutputTokens, 16384);
   assert.match(corps.body.contents[0].parts[0].text, /ANALYSE FINANCIÈRE APPROFONDIE ET INTÉGRALE/);
+});
+
+test('le nom de l\'entreprise est rendu au titre et à la 1re mention, puis « l\'entreprise »', async () => {
+  const { restaurerNomEntreprise } = await import('../src/utils/aiEngine.js');
+  const texte = "# Analyse — ZETACORP\nZETACORP est rentable. Le bilan de ZETACORP est solide.\nZETACORP n'a pas de dette : ZETACORP peut investir.";
+  assert.equal(
+    restaurerNomEntreprise(texte, 'SARL Test'),
+    "# Analyse — SARL Test\nSARL Test est rentable. Le bilan de l'entreprise est solide.\nL'entreprise n'a pas de dette : L'entreprise peut investir."
+  );
+  assert.equal(restaurerNomEntreprise('Le résultat de ZETACORP.', ''), "Le résultat de l'entreprise.");
+});
+
+test('le taux de conformité n\'affiche jamais 100 % tant qu\'un compte est atypique', () => {
+  // 300 comptes de charges conformes + un fournisseur débiteur (atypique) : l'ancienne
+  // formule pondérée arrondissait à 100 %.
+  const rows = Array.from({ length: 300 }, (_, i) => L(`601${String(i).padStart(3, '0')}`, 'Achats', 100, 0));
+  rows.push(L('401', 'Fournisseur débiteur', 5_000, 0));
+  const audit = auditBalanceAccounts(rows);
+  assert.equal(audit.atypiques + audit.anomalies, 1);
+  assert.equal(audit.scoreCoherence, 99);
+  assert.equal(auditBalanceAccounts([L('601', 'Achats', 100, 0)]).scoreCoherence, 100);
+});
+
+test('la synthèse d\'audit compte aussi les anomalies de flux croisés', () => {
+  // Soldes tous dans le bon sens, mais dotation 68 sans contrepartie en 28 : le cycle est rompu.
+  const dotation = { ...L('681', 'Dotations aux amortissements', 50_000, 0), mouvementDebit: 50_000 };
+  const banque = { ...L('512', 'Banque', 0, 50_000), mouvementCredit: 50_000 };
+  const synthese = syntheseAudit([dotation, banque]);
+  assert.equal(synthese.natures.anomalies, 0);
+  assert.ok(synthese.flux.totalAnomaliesFlux >= 1);
+  assert.equal(synthese.verdict, 'ANOMALIES');
+  assert.equal(synthese.anomalies, synthese.natures.anomalies + synthese.flux.totalAnomaliesFlux);
+});
+
+test('le DPO ne compte pas les fournisseurs d\'immobilisations (404/405)', () => {
+  const rows = [
+    L('601', 'Achats de matières', 3_600_000, 0),
+    L('401', 'Fournisseurs de stocks et services', 0, 600_000),
+    L('404', "Fournisseurs d'immobilisations", 0, 5_000_000),
+    L('405', "Fournisseurs d'immobilisations - effets à payer", 0, 1_000_000),
+    L('215', 'Installations techniques', 6_000_000, 0),
+    L('512', 'Banque', 600_000, 0),
+    L('101', 'Capital', 0, 3_600_000),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { ratios } = analyser(rows);
+  assert.equal(ratios.dettesFournisseurs, 600_000);
+  assert.equal(Math.round(ratios.delaiFournisseurs), 60);
+});
+
+test('une perte sur capitaux propres négatifs ne donne pas un ROE positif', () => {
+  const rows = [
+    L('101', 'Capital', 0, 1_000_000),
+    L('119', 'Report à nouveau débiteur', 3_000_000, 0),
+    L('164', 'Emprunt', 0, 4_000_000),
+    L('512', 'Banque', 1_500_000, 0),
+    L('611', 'Sous-traitance', 500_000, 0),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const { ratios, sig } = analyser(rows);
+  assert.ok(sig.resultatNet < 0);
+  assert.ok(ratios.capitauxPropres < 0);
+  assert.equal(ratios.roeSignificatif, false);
+  assert.equal(ratios.roe, 0);
+});
+
+test('le simulateur applique la même correction TVA des délais que le mode réel', async () => {
+  const { recalculateSimulatedDataset } = await import('../src/utils/simulationEngine.js');
+  const rows = [
+    L('411', 'Clients', 1_190_000, 0),
+    L('700', 'Ventes', 0, 6_000_000),
+    L('601', 'Achats', 3_000_000, 0),
+    L('512', 'Banque', 1_810_000, 0),
+  ];
+  assert.equal(checkBalanceEquilibre(rows).equilibre, true);
+  const reel = appliquerRegimeTva({ ...analyserBalance(rows), profil: { tvaRegime: { tauxTva: 19 } } });
+  assert.equal(Math.round(reel.ratios.delaiRecouvrement), 60, '1 190 000 TTC / 1,19 / 6 000 000 x 360');
+  // Écriture neutre pour les délais : le DSO simulé doit rester le DSO réel corrigé.
+  const sim = recalculateSimulatedDataset(reel, [
+    { label: 'Apport en banque', montant: 100_000, debitCompte: '512', creditCompte: '101' },
+  ]);
+  assert.equal(Math.round(sim.ratios.delaiRecouvrement), 60);
+  // Idempotence : réappliquer la correction ne la cumule pas.
+  assert.equal(appliquerRegimeTva(sim).ratios.delaiRecouvrement, sim.ratios.delaiRecouvrement);
+});
+
+test('corriger une balance change l\'empreinte du dossier (nouveau rapport IA possible)', async () => {
+  const { empreinteDossier } = await import('../src/utils/aiEngine.js');
+  const dossier = { ...analyserBalance(BALANCE_SAINE), profil: { nomEntreprise: 'SARL Test', secteurId: 'industrie' } };
+  const identique = { ...analyserBalance(BALANCE_SAINE.map(r => ({ ...r }))), profil: { nomEntreprise: 'SARL Test', secteurId: 'industrie' } };
+  assert.equal(empreinteDossier(dossier), empreinteDossier(identique));
+
+  // Même nombre de lignes et même CA : seule une écriture de bilan est corrigée.
+  const corrigee = BALANCE_SAINE.map(r => {
+    if (r.compte === '512') return L('512', 'Banque', 2_900_000, 0);
+    if (r.compte === '411') return L('411', 'Clients', 1_600_000, 0);
+    return r;
+  });
+  assert.equal(checkBalanceEquilibre(corrigee).equilibre, true);
+  const dossierCorrige = { ...analyserBalance(corrigee), profil: dossier.profil };
+  assert.equal(dossierCorrige.sig.chiffreAffaires, dossier.sig.chiffreAffaires);
+  assert.notEqual(empreinteDossier(dossierCorrige), empreinteDossier(dossier));
+
+  // Un changement de secteur change aussi l'empreinte.
+  assert.notEqual(empreinteDossier({ ...dossier, profil: { ...dossier.profil, secteurId: 'services' } }), empreinteDossier(dossier));
+});
+
+test('le Markdown du rapport IA est découpé en titres, listes et tableaux', async () => {
+  const { decouperMarkdown, segmentsEnLigne } = await import('../src/utils/markdownIA.js');
+  const blocs = decouperMarkdown([
+    '# Titre du rapport',
+    '### 1. Synthèse',
+    '*   **Marge :** 28 % $\\ge$ norme',
+    '    *   détail',
+    '2) Deuxième point',
+    '| Indicateur | Valeur |',
+    '|---|---|',
+    '| **DSO** | 2 j |',
+    '> Citation',
+  ].join('\n'));
+  assert.deepEqual(blocs.map(b => b.type), ['titre', 'titre', 'liste', 'liste', 'liste', 'tableau', 'citation']);
+  assert.equal(blocs[2].niveau, 0);
+  assert.equal(blocs[3].niveau, 1);
+  assert.equal(blocs[4].marque, '2.');
+  assert.deepEqual(blocs[5].entete, ['Indicateur', 'Valeur']);
+  assert.deepEqual(blocs[5].lignes, [['**DSO**', '2 j']]);
+  assert.deepEqual(segmentsEnLigne(blocs[2].texte), [
+    { texte: 'Marge :', gras: true, italique: false },
+    { texte: ' 28 % ≥ norme', gras: false, italique: false },
+  ]);
+});
+
+test('le texte du PDF ne garde que des caractères que sa police sait dessiner', async () => {
+  const { versWinAnsi } = await import('../src/utils/markdownIA.js');
+  assert.equal(versWinAnsi('🔬 Marge ≥ 20 % → objectif'), ' Marge >= 20 % -> objectif');
+  assert.equal(versWinAnsi('Coût — 1 000 € « net »'), 'Coût — 1 000 € « net »');
+  // L'espace entre un passage en gras et la suite n'est pas retiré.
+  assert.equal(versWinAnsi(' suite'), ' suite');
 });

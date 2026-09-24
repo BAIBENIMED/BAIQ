@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Upload, File, Download, Play, Sparkles, FolderOpen } from 'lucide-react';
 import { parseFile, construireDossier, rouvrirDossier, checkBalanceEquilibre } from '../utils/financeCalculations';
 import { SECTEURS } from '../utils/secteurs';
-import { SAMPLE_BALANCES, downloadSampleExcel } from '../utils/sampleBalances';
+import { SAMPLE_BALANCES, chargerExemple, downloadSampleExcel } from '../utils/sampleBalances';
+import { signalerErreur } from '../utils/erreurs';
 import { useEscapeKey } from '../utils/useEscapeKey';
 
 // Zone d'import d'une balance : ouverture par un vrai bouton (clavier, lecteur d'écran)
@@ -94,24 +95,41 @@ export function ImportData({ onDataImported }) {
   const DUREE_RETENTION_MS = DUREE_RETENTION_JOURS * 24 * 60 * 60 * 1000;
 
   // ── Multi-Dossiers localStorage ──
-  const [savedDossiers, setSavedDossiers] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('finanalyze_saved_dossiers') || '[]');
-      const maintenant = Date.now();
-      // Purge silencieuse des dossiers expirés (au-delà de DUREE_RETENTION_JOURS) et
-      // rétro-compatibilité : un dossier sauvegardé avant l'introduction de `savedAtTs`
-      // se voit attribuer un horodatage "maintenant" pour ne pas être supprimé abusivement.
-      const withTimestamps = stored.map(d => ({ ...d, savedAtTs: d.savedAtTs || maintenant }));
-      const nonExpires = withTimestamps.filter(d => (maintenant - d.savedAtTs) < DUREE_RETENTION_MS);
-      if (nonExpires.length !== stored.length) {
-        try { localStorage.setItem('finanalyze_saved_dossiers', JSON.stringify(nonExpires)); } catch { /* silencieux */ }
-      }
-      return nonExpires;
-    } catch {
-      return [];
+  // Lecture tolérante : un contenu illisible (modifié à la main, écriture interrompue...)
+  // est mis de côté sous une autre clé au lieu d'être écrasé à la sauvegarde suivante,
+  // et un dossier incomplet est écarté de la liste plutôt que de faire échouer l'écran.
+  const [chargementDossiers] = useState(() => {
+    const CLE = 'finanalyze_saved_dossiers';
+    let brut;
+    try { brut = localStorage.getItem(CLE); } catch { return { dossiers: [], alerte: null }; }
+    if (!brut) return { dossiers: [], alerte: null };
+
+    let lus;
+    try { lus = JSON.parse(brut); } catch { lus = null; }
+    if (!Array.isArray(lus)) {
+      try { localStorage.setItem(`${CLE}_illisible`, brut); localStorage.removeItem(CLE); } catch { /* stockage indisponible */ }
+      return { dossiers: [], alerte: "Les dossiers enregistrés dans ce navigateur étaient illisibles : leur contenu brut a été mis de côté et la liste repart de zéro. Réimportez vos balances pour les retrouver." };
     }
+
+    const maintenant = Date.now();
+    const valides = lus.filter(d => d && typeof d === 'object' && d.id && Array.isArray(d.data?.rows));
+    // Purge des dossiers expirés (au-delà de DUREE_RETENTION_JOURS) et rétro-compatibilité :
+    // un dossier sauvegardé avant l'introduction de `savedAtTs` se voit attribuer un
+    // horodatage "maintenant" pour ne pas être supprimé abusivement.
+    const nonExpires = valides
+      .map(d => ({ ...d, savedAtTs: d.savedAtTs || maintenant }))
+      .filter(d => (maintenant - d.savedAtTs) < DUREE_RETENTION_MS);
+    if (nonExpires.length !== lus.length) {
+      try { localStorage.setItem(CLE, JSON.stringify(nonExpires)); } catch { /* stockage indisponible */ }
+    }
+    const ecartes = lus.length - valides.length;
+    return {
+      dossiers: nonExpires,
+      alerte: ecartes > 0 ? `${ecartes} dossier(s) enregistré(s) incomplet(s) ont été retirés de la liste : réimportez les balances concernées.` : null,
+    };
   });
-  const [saveError, setSaveError] = useState(null);
+  const [savedDossiers, setSavedDossiers] = useState(chargementDossiers.dossiers);
+  const [saveError, setSaveError] = useState(chargementDossiers.alerte);
 
   const saveDossierToStorage = (payloadData) => {
     const dDate = new Date().toLocaleDateString('fr-FR');
@@ -163,11 +181,26 @@ export function ImportData({ onDataImported }) {
   };
 
   const loadSavedDossier = (dossier) => {
-    onDataImported(rouvrirDossier(dossier));
+    let rouvert;
+    try {
+      rouvert = rouvrirDossier(dossier);
+    } catch (err) {
+      console.error('Dossier enregistré illisible :', err);
+      setSaveError(`Le dossier « ${dossier?.nom || 'sans nom'} » n'a pas pu être rouvert (données incomplètes ou corrompues). Supprimez-le puis réimportez la balance.`);
+      return;
+    }
+    onDataImported(rouvert);
   };
 
   // ── Handlers Exemples de Démonstration ──
-  const handleLoadSample = (sample) => {
+  const handleLoadSample = async (exemple) => {
+    let sample;
+    try {
+      sample = await chargerExemple(exemple);
+    } catch (err) {
+      signalerErreur("L'exemple n'a pas pu être chargé", err);
+      return;
+    }
     setProfil({
       nomEntreprise: sample.title,
       secteurId: sample.secteurId,
@@ -187,7 +220,14 @@ export function ImportData({ onDataImported }) {
     }
   };
 
-  const handleQuickLaunchSample = (sample) => {
+  const handleQuickLaunchSample = async (exemple) => {
+    let sample;
+    try {
+      sample = await chargerExemple(exemple);
+    } catch (err) {
+      signalerErreur("L'exemple n'a pas pu être chargé", err);
+      return;
+    }
     const prof = {
       nomEntreprise: sample.title,
       secteurId: sample.secteurId,
@@ -297,16 +337,17 @@ export function ImportData({ onDataImported }) {
       </div>
 
       {saveError && (
-        <div style={{
+        <div role="alert" style={{
           display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10,
-          background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.80rem', marginBottom: 4
+          background: 'color-mix(in srgb, var(--red) 9%, var(--surface))', border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
+          color: 'var(--text)', fontSize: '0.80rem', marginBottom: 4
         }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>warning</span>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0, color: 'var(--red)' }} aria-hidden="true">warning</span>
           <span style={{ flex: 1 }}>{saveError}</span>
           <button
             onClick={() => setSaveError(null)}
-            style={{ border: 'none', background: 'transparent', color: '#991b1b', cursor: 'pointer', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1, padding: 0 }}
-            aria-label="Fermer"
+            style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1, padding: 0 }}
+            aria-label="Fermer le message"
           >×</button>
         </div>
       )}
@@ -384,8 +425,8 @@ export function ImportData({ onDataImported }) {
             </h3>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Nom de l'Entreprise / Code Dossier</label>
-              <input
+              <label htmlFor="import-nom-de-l-entreprise" style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Nom de l'Entreprise / Code Dossier</label>
+              <input id="import-nom-de-l-entreprise"
                 type="text"
                 value={profil.nomEntreprise}
                 onChange={e => handleProfilChange('nomEntreprise', e.target.value)}
@@ -394,8 +435,8 @@ export function ImportData({ onDataImported }) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Effectif (Optionnel)</label>
-              <input
+              <label htmlFor="import-effectif-optionnel" style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Effectif (Optionnel)</label>
+              <input id="import-effectif-optionnel"
                 type="number"
                 placeholder="Ex: 45"
                 value={profil.effectif}
@@ -405,8 +446,8 @@ export function ImportData({ onDataImported }) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Secteur d'Activité (Benchmarks SCF)</label>
-              <select
+              <label htmlFor="import-secteur-d-activite-benchmarks" style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-sub)', marginBottom: 6 }}>Secteur d'Activité (Benchmarks SCF)</label>
+              <select id="import-secteur-d-activite-benchmarks"
                 value={profil.secteurId}
                 onChange={e => handleProfilChange('secteurId', e.target.value)}
                 style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.80rem', background: 'var(--surface)', color: 'var(--text)', outline: 'none', cursor: 'pointer' }}
@@ -471,7 +512,7 @@ export function ImportData({ onDataImported }) {
                     <Play size={12} fill="currentColor" />
                   </button>
                   <button
-                    onClick={() => downloadSampleExcel(s.id)}
+                    onClick={() => downloadSampleExcel(s.id).catch(err => signalerErreur("Le téléchargement de l'exemple a échoué", err))}
                     title="Télécharger cet exemple au format Excel"
                     aria-label={`Télécharger l'exemple ${s.badge} au format Excel`}
                     style={{

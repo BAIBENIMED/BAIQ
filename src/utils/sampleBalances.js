@@ -7,8 +7,9 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import realDataAlgerie2026 from './realDataAlgerie2026.json';
-import realDataIbai2025 from './realDataIbai2025.json';
+// Les deux balances réelles (≈ 170 Ko) ne sont téléchargées qu'au clic sur l'exemple
+// correspondant (cf. chargerExemple) : elles alourdissaient le chargement initial de
+// l'application pour tous les visiteurs.
 
 export const SAMPLE_BALANCES = [
   {
@@ -21,7 +22,7 @@ export const SAMPLE_BALANCES = [
     description: 'Balance réelle de production industrielle algérienne (IBS 19% - SCF 2026) avec comptes de liaison (181), investissements d\'équipements (215/218), stocks de matières (310), clients et fournisseurs.',
     badge: '🏭 Production Réelle 2026',
     badgeColor: '#7c3aed',
-    rowsN: realDataAlgerie2026
+    chargerLignesN: () => import('./realDataAlgerie2026.json').then(m => m.default)
   },
   {
     id: 'balance_ibaiben_2025',
@@ -33,7 +34,7 @@ export const SAMPLE_BALANCES = [
     description: 'Balance réelle complète de grand groupe de production (IBS 19%) : parcs d\'usines, lignes de production, dépréciations, impôts différés (133) et sous-traitances industrielles.',
     badge: '🏭 Production Groupe IBAIBEN',
     badgeColor: '#059669',
-    rowsN: realDataIbai2025
+    chargerLignesN: () => import('./realDataIbai2025.json').then(m => m.default)
   },
   {
     id: 'special_audit_scf',
@@ -75,13 +76,19 @@ export const SAMPLE_BALANCES = [
   }
 ];
 
+/** Renvoie l'exemple avec ses lignes de balance (N et N-1), chargées au besoin. */
+export async function chargerExemple(sample) {
+  const rowsN = sample.rowsN || (sample.chargerLignesN ? await sample.chargerLignesN() : []);
+  return { ...sample, rowsN, rowsN1: sample.rowsN1 || null };
+}
+
 /**
  * Génère et télécharge un fichier Excel réel (.xlsx) pour un exemple donné.
  * xlsx est chargé dynamiquement (cf. parseFile) : cette fonction n'est appelée qu'au
  * clic sur « Télécharger cet exemple », il serait inutile d'en peser le bundle initial.
  */
 export async function downloadSampleExcel(sampleId) {
-  const sample = SAMPLE_BALANCES.find(s => s.id === sampleId) || SAMPLE_BALANCES[0];
+  const sample = await chargerExemple(SAMPLE_BALANCES.find(s => s.id === sampleId) || SAMPLE_BALANCES[0]);
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 

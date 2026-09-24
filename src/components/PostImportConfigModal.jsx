@@ -71,10 +71,10 @@ export function PostImportConfigModal({ isOpen, onClose, data, cur, setCur, onUp
 
           {/* Nom entreprise */}
           <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+            <label htmlFor="config-nom-de-l-entreprise" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
               Nom de l'entreprise (pour l'en-tête des documents)
             </label>
-            <input
+            <input id="config-nom-de-l-entreprise"
               value={nom}
               onChange={e => setNom(e.target.value)}
               placeholder="Dossier Anonyme"
@@ -85,10 +85,10 @@ export function PostImportConfigModal({ isOpen, onClose, data, cur, setCur, onUp
           {/* Effectif + Devise + Arrondi */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
             <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="config-effectif" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
                 Effectif
               </label>
-              <input
+              <input id="config-effectif"
                 type="number" min="0" value={effectif}
                 onChange={e => setEffectif(e.target.value)}
                 placeholder="Ex: 45"
@@ -96,19 +96,19 @@ export function PostImportConfigModal({ isOpen, onClose, data, cur, setCur, onUp
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="config-devise-affichee" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
                 Devise affichée
               </label>
-              <input
+              <input id="config-devise-affichee"
                 value={cur} onChange={e => setCur(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="config-arrondi-des-montants" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
                 Arrondi des montants
               </label>
-              <select
+              <select id="config-arrondi-des-montants"
                 value={rounding} onChange={e => setRounding(Number(e.target.value))}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontWeight: 600, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
               >

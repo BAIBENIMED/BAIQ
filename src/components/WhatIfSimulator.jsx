@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { MODEL_TEMPLATES, MAX_SCENARIOS, createScenario, createSimulationEntryFromLines, recalculateSimulatedDataset } from '../utils/simulationEngine';
 import { generateFullPDF } from '../utils/lazyExporters';
+import { signalerErreur } from '../utils/erreurs';
 import { useEscapeKey } from '../utils/useEscapeKey';
 
 const SCENARIO_COLORS = ['#1b6e8c', '#c08a2e', '#7c3aed'];
@@ -82,10 +83,9 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
     setPrintingId(scenario.id);
     try {
       const scenarioResult = recalculateSimulatedDataset(data, scenario.entries);
-      await generateFullPDF(scenarioResult, cur, true, scenario.name);
+      await generateFullPDF(scenarioResult, cur, true, scenario.name); // un échec d'export est annoncé par le bandeau d'erreur
     } catch (e) {
-      console.error('Erreur export PDF du scénario:', e);
-      alert('Erreur lors de la génération du PDF : ' + (e?.message || 'Erreur inconnue'));
+      signalerErreur('Le recalcul du scénario a échoué', e);
     } finally {
       setPrintingId(null);
     }
@@ -516,10 +516,10 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
                   <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{pendingTemplate.description}</p>
 
                   <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>
+                    <label htmlFor="simulateur-montant-de-la-piece" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6, display: 'block' }}>
                       Montant de la pièce
                     </label>
-                    <input
+                    <input id="simulateur-montant-de-la-piece"
                       type="number"
                       autoFocus
                       value={templateAmount}
@@ -573,10 +573,10 @@ export function WhatIfSimulator({ data, scenarios = [], setScenarios, activeScen
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
+                <label htmlFor="simulateur-libelle-motif-de-l" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, display: 'block' }}>
                   Libellé / Motif de l'Écriture
                 </label>
-                <input
+                <input id="simulateur-libelle-motif-de-l"
                   type="text"
                   value={opLabel}
                   onChange={e => setOpLabel(e.target.value)}

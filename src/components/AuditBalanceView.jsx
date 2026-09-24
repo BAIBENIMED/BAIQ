@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { auditBalanceAccounts, auditCrossAccountMovements, autoMatchAccounts, safeNum } from '../utils/financeCalculations';
 import { EmptyState } from './EmptyState';
+import { useEscapeKey } from '../utils/useEscapeKey';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -823,6 +824,7 @@ function AccountTable({
 }
 
 function CrossAuditDetailModal({ rule, onClose, fmt }) {
+  useEscapeKey(true, onClose);
   const [layoutMode, setLayoutMode] = useState('sideBySide');
   const [filterText, setFilterText] = useState('');
   const [showZeroInModal, setShowZeroInModal] = useState(true);
@@ -1001,7 +1003,7 @@ function CrossAuditDetailModal({ rule, onClose, fmt }) {
 
   // ── Rendu modal ──────────────────────────────────────────────────────────
   return (
-    <div style={{
+    <div role="dialog" aria-modal="true" aria-label={`Détail du contrôle : ${rule?.titre || 'flux croisés'}`} style={{
       position: 'fixed', inset: 0,
       background: 'rgba(15, 23, 42, 0.88)',
       backdropFilter: 'blur(8px)',

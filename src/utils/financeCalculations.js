@@ -610,9 +610,11 @@ export function auditBalanceAccounts(rows = []) {
   const atypiques = comptesAudit.filter(c => c.verification.statut === 'ATYPIQUE').length;
   const anomalies = comptesAudit.filter(c => c.verification.statut === 'ANOMALIE').length;
 
-  const scoreCoherence = total > 0
-    ? Math.max(0, Math.round(100 - (anomalies * 15 + atypiques * 5) / (total / 10)))
-    : 100;
+  // Taux de conformité des soldes : part des comptes dont le sens du solde est normal.
+  // Arrondi à l'entier inférieur pour ne jamais afficher 100 % tant qu'un seul compte
+  // reste atypique ou anormal (l'ancienne formule pondérée donnait 100 % avec 3 comptes
+  // atypiques sur 780).
+  const scoreCoherence = total > 0 ? Math.floor((conformes / total) * 100) : 100;
 
   return {
     total,
@@ -1070,8 +1072,28 @@ export function auditCrossAccountMovements(rows = []) {
     totalAnomaliesFlux,
     totalAtypiquesFlux,
     totalConformesFlux,
-    totalNonMouvFlux
+    totalNonMouvFlux,
+    totalActifsFlux: reglesActives.length
   };
+}
+
+/**
+ * Synthèse unique de l'audit : sens des soldes ET flux croisés. C'est elle que lisent
+ * le PDF, le classeur Excel et le contexte de l'IA, pour qu'aucun support n'annonce
+ * « conforme » en ignorant l'une des deux familles de contrôles.
+ */
+export function syntheseAudit(rows = []) {
+  const natures = auditBalanceAccounts(rows);
+  const flux = auditCrossAccountMovements(rows);
+  const anomalies = natures.anomalies + flux.totalAnomaliesFlux;
+  const aVerifier = natures.atypiques + flux.totalAtypiquesFlux;
+  const verdict = anomalies > 0 ? 'ANOMALIES' : aVerifier > 0 ? 'A_VERIFIER' : 'CONFORME';
+  const libelleVerdict = {
+    ANOMALIES: `${anomalies} anomalie${anomalies > 1 ? 's' : ''} à régulariser`,
+    A_VERIFIER: `${aVerifier} point${aVerifier > 1 ? 's' : ''} à vérifier`,
+    CONFORME: 'Aucune anomalie détectée',
+  }[verdict];
+  return { natures, flux, anomalies, aVerifier, verdict, libelleVerdict };
 }
 
 export function calculateStockEvolution(rows) {
@@ -2225,6 +2247,21 @@ export function applyTvaRegimeToRatios(ratios = {}, tvaRegime = {}) {
   };
 }
 
+export const REGIME_TVA_DEFAUT = { ventesFranchisees: false, achatsFranchises: false, tauxTva: 19 };
+
+/**
+ * Applique le régime TVA du dossier aux ratios de N et de N-1. Point de passage unique
+ * pour l'application, le simulateur et les exports de scénario : sans lui, le simulateur
+ * affichait des délais clients/fournisseurs bruts quand le reste de l'application les
+ * affichait corrigés de la TVA. Idempotent (cf. applyTvaRegimeToRatios).
+ */
+export function appliquerRegimeTva(dossier) {
+  if (!dossier) return dossier;
+  const regime = dossier.profil?.tvaRegime || REGIME_TVA_DEFAUT;
+  const corriger = (d) => (d?.ratios ? { ...d, ratios: applyTvaRegimeToRatios(d.ratios, regime) } : d);
+  return { ...corriger(dossier), dataN1: corriger(dossier.dataN1) };
+}
+
 /**
  * Total de l'actif en valeurs NETTES, dénominateur « total bilan » des ratios (autonomie,
  * ROA, solvabilité, Altman) : un numérateur net (capitaux propres, résultat) rapporté à un
@@ -2288,9 +2325,11 @@ export const calculateRatios = (bilan, sig, rows) => {
         if (soldeNet > 0) stocks += soldeNet;
       }
 
-      // Dettes Fournisseurs (Compte 40x hors 409 et 406) — même logique : un solde débiteur
-      // atypique (avance fournisseur) est exclu du ratio plutôt que reclassé.
-      if (c.startsWith('40') && !c.startsWith('409') && !c.startsWith('406')) {
+      // Dettes Fournisseurs d'exploitation (Compte 40x hors 404/405 et 406/409) — même
+      // logique : un solde débiteur atypique (avance fournisseur) est exclu du ratio plutôt
+      // que reclassé. Les fournisseurs d'immobilisations (404, 405) sont exclus : le DPO
+      // rapporte ces dettes aux consommations (60-62), où les investissements n'entrent pas.
+      if (c.startsWith('40') && !/^40[4569]/.test(c)) {
         const soldeNet = solde < 0 ? -solde : (cred - deb);
         if (soldeNet > 0) dettesFournisseurs += soldeNet;
       }
@@ -2354,7 +2393,10 @@ export const calculateRatios = (bilan, sig, rows) => {
   const rentabiliteNette = ca === 0 ? 0 : rn / ca;
   const margeEBE = ca === 0 ? 0 : ebe / ca;
   const tauxVA = ca === 0 ? 0 : va / ca;
-  const roe = capitauxPropres === 0 ? 0 : rn / capitauxPropres;
+  // ROE : n'a de sens qu'avec des capitaux propres positifs. Sinon une perte divisée par
+  // des capitaux propres négatifs afficherait une « rentabilité » positive flatteuse.
+  const roeSignificatif = capitauxPropres > 0;
+  const roe = roeSignificatif ? rn / capitauxPropres : 0;
   const roa = totalBilan === 0 ? 0 : re / totalBilan;
 
   // Structure et solvabilité
@@ -2377,6 +2419,7 @@ export const calculateRatios = (bilan, sig, rows) => {
     margeEBE,
     tauxVA,
     roe,
+    roeSignificatif,
     roa,
     poidsPersonnel,
     couvertureChargesFin,

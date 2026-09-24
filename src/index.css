@@ -104,11 +104,39 @@ html, body {
 
 #root { height: 100%; }
 
-/* Focus clavier visible partout (accessibilité) */
-button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid var(--primary);
+/* Focus clavier visible partout (accessibilité). !important : de nombreux champs
+   portent un style en ligne « outline: none » qui, sinon, masquait l'anneau de focus. */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--primary) !important;
   outline-offset: 2px;
-  border-radius: 4px;
+}
+button:focus-visible, a:focus-visible { border-radius: 4px; }
+
+/* Bandeau des erreurs d'action (export, génération...) — cf. utils/erreurs.js */
+.bandeau-erreurs {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(440px, calc(100vw - 32px));
+}
+.bandeau-erreurs-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--red);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -829,6 +857,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
   .top-header    { padding: 0 12px; gap: 8px; }
   .header-title  { display: none; }
   .header-secteur { display: none !important; }
+  .bandeau-erreurs { left: 16px; right: 16px; width: auto; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -16,7 +16,7 @@
 import * as XLSX from 'xlsx';
 import { getSecteur } from './secteurs';
 import { calculateAltmanZScore } from './solvabiliteEngine';
-import { auditBalanceAccounts, auditCrossAccountMovements, calculateVariationCapitauxPropres, buildTCRRows, buildRatiosBenchmarkRows, calculateTFT } from './financeCalculations';
+import { syntheseAudit, calculateVariationCapitauxPropres, buildTCRRows, buildRatiosBenchmarkRows, calculateTFT } from './financeCalculations';
 
 export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financiere_SCF.xlsx', cur) {
   if (!data) return false;
@@ -28,8 +28,9 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
   const secteur = getSecteur(profil.secteurId);
   const bm = secteur.benchmarks;
   const solv = calculateAltmanZScore(bilan, sig, rows);
-  const auditNatures = auditBalanceAccounts(rows);
-  const auditFlux = auditCrossAccountMovements(rows);
+  const synthese = syntheseAudit(rows);
+  const auditNatures = synthese.natures;
+  const auditFlux = synthese.flux;
   const tvcp = calculateVariationCapitauxPropres(rows, dataN1, sig);
   const tft = calculateTFT(data);
 
@@ -308,7 +309,9 @@ export function exportFinancialWorkbook(data, filename = 'BAIQ_Analyse_Financier
      ────────────────────────────────────────────────────────── */
   const ws5Data = [
     ['AUDIT DE CONFORMITÉ SCF & CONTRÔLE DES FLUX CROISÉS'],
-    ['Score Global de Conformité :', `${auditNatures.scoreCoherence} %`],
+    ['Conclusion de l\'audit :', synthese.libelleVerdict],
+    ['Conformité des soldes :', `${auditNatures.scoreCoherence} % (${auditNatures.conformes} / ${auditNatures.total} comptes — ${auditNatures.atypiques} atypique(s), ${auditNatures.anomalies} anomalie(s))`],
+    ['Flux croisés :', `${auditFlux.totalConformesFlux} / ${auditFlux.totalActifsFlux} contrôles conformes — ${auditFlux.totalAnomaliesFlux} anomalie(s)`],
     [],
     ['1. CONTRÔLE DES JEUX D\'ÉCRITURES ET FLUX CROISÉS (7 RÈGLES SCF)'],
     ['Cycle', 'Règle de Contrôle', 'Statut', `Montant Source (${currency})`, `Montant Cible (${currency})`, `Écart (${currency})`, 'Diagnostic'],

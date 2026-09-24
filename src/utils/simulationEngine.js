@@ -1,5 +1,5 @@
 // Extension .js explicite : permet aussi d'exécuter ce moteur en Node pur (tests).
-import { analyserBalance } from './financeCalculations.js';
+import { analyserBalance, appliquerRegimeTva } from './financeCalculations.js';
 
 /* ═══════════════════════════════════════════════════════════
    BAIQ — Moteur de Simulation Comptable en Partie Double
@@ -387,11 +387,13 @@ export function recalculateSimulatedDataset(originalData, simulationEntries = []
 
   const simRows = applySimulationToRows(originalData.rows, simulationEntries);
 
-  return {
+  // Même correction TVA des délais que le mode réel : un scénario se compare à la
+  // situation réelle sur la même base, à l'écran comme dans son PDF.
+  return appliquerRegimeTva({
     ...analyserBalance(simRows),
     profil: originalData.profil,
     dataN1: originalData.dataN1,
     isSimulationMode: true,
     simulationEntriesCount: simulationEntries.length,
-  };
+  });
 }

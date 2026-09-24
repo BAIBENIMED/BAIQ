@@ -82,7 +82,9 @@ export function runAIAnalysis(data) {
   // Mêmes ratios que l'écran Ratios (calculateRatios : total actif net, capitaux propres du bilan SCF).
   const roe = r.roe || 0;                 // Return on Equity (Rentabilité Financière)
   const roa = r.roa || 0;                 // Return on Assets (Rentabilité Économique)
-  const effetLevier = roe - roa;          // Effet de levier financier
+  // Capitaux propres ≤ 0 : ROE et effet de levier n'ont pas de sens (cf. calculateRatios).
+  const roeSignificatif = r.roeSignificatif !== false;
+  const effetLevier = roeSignificatif ? roe - roa : 0;
 
   // ── 6. Équilibre Fonctionnel & Trésorerie ──
   const liq    = r.liquiditeGenerale    || 0;
@@ -416,6 +418,7 @@ export function runAIAnalysis(data) {
       partEntreprise,
       partActionnaires,
       roe,
+      roeSignificatif,
       roa,
       effetLevier,
       totalCashLibérable,
@@ -556,9 +559,9 @@ La Valeur Ajoutée créée de **${fmtDZD(s.valeurAjoutee)}** se répartit entre 
 | Entreprise (Autofinancement & Renouvellement) | Capacité d'Autofinancement (CAF) | ${fmtDZD(diag.caf)} | ${pct(diag.partEntreprise)} | Richesse conservée |
 | Actionnaires (Rendement net distribuable) | Résultat net de l'exercice | ${fmtDZD(s.resultatNet)} | ${pct(diag.partActionnaires)} | Rémunération des associés |
 
-- **Rentabilité Financière des Capitaux Propres (ROE)** : **${pct(diag.roe)}**
+- **Rentabilité Financière des Capitaux Propres (ROE)** : **${diag.roeSignificatif ? pct(diag.roe) : 'non significative (capitaux propres négatifs ou nuls)'}**
 - **Rentabilité Économique de l'Actif (ROA)** : **${pct(diag.roa)}**
-- **Effet de Levier Financier ($ROE - ROA$)** : **${pct(diag.effetLevier)}** (${diag.effetLevier >= 0 ? '✓ Positif : l\'endettement améliore la rentabilité des actionnaires.' : '✗ Négatif : le coût des intérêts dégrade la rentabilité.'})
+- **Effet de Levier Financier ($ROE - ROA$)** : ${diag.roeSignificatif ? `**${pct(diag.effetLevier)}** (${diag.effetLevier >= 0 ? '✓ Positif : l\'endettement améliore la rentabilité des actionnaires.' : '✗ Négatif : le coût des intérêts dégrade la rentabilité.'})` : '**non mesurable** : les capitaux propres ne sont pas positifs, la priorité est de les reconstituer.'}
 
 ---
 
@@ -783,9 +786,36 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 
     return '';
   } catch (err) {
+    // Un rapport vide laissait l'écran blanc sans explication : l'échec est écrit à sa place.
     console.error('Erreur generateLocalStructuredReport:', err);
-    return '';
+    return `> **Le rapport local n'a pas pu être rédigé** (${err?.message || 'erreur inconnue'}). Les autres écrans (états financiers, ratios, audit) restent utilisables. Si le problème persiste avec ce dossier, réimportez la balance.`;
   }
+}
+
+/**
+ * Empreinte du contenu d'un dossier : balances N et N-1 (soldes et mouvements) et profil.
+ * Sert de clé aux rapports IA enregistrés : corriger une écriture, réimporter une balance
+ * rectifiée ou changer de secteur donne une autre empreinte, donc un nouveau rapport
+ * possible — alors qu'un identifiant « nombre de lignes + CA » restait identique.
+ */
+export function empreinteDossier(data) {
+  if (!data) return '';
+  const ligne = (r) => [r.compte, r.soldeDebutDebit, r.soldeDebutCredit, r.mouvementDebit, r.mouvementCredit,
+    r.soldeFinDebit, r.soldeFinCredit, r.ignore ? 1 : 0]
+    .map(v => (typeof v === 'number' ? Math.round(v * 100) : (v ?? ''))).join(':');
+  const p = data.profil || {};
+  const source = [
+    (data.rows || []).map(ligne).join('|'),
+    (data.dataN1?.rows || []).map(ligne).join('|'),
+    p.nomEntreprise || '', p.secteurId || '', p.effectif || '', JSON.stringify(p.tvaRegime || {}),
+  ].join('#');
+  // FNV-1a 32 bits : rapide, sans dépendance, largement suffisant pour distinguer deux dossiers.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < source.length; i++) {
+    h ^= source.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${(data.rows || []).length}-${h.toString(36)}`;
 }
 
 // Le nom de l'entreprise n'est jamais transmis à Gemini : le prompt la désigne par ce nom
@@ -793,8 +823,20 @@ ${(r.etapes || []).map(e => `  * ${e}`).join('\n')}
 // Un nom propre est repris tel quel par le modèle, ce qui n'est pas le cas d'un repère
 // entre crochets (« [ENTREPRISE] » revenait sous la forme « l'ENTREPRISE »).
 export const REPERE_ENTREPRISE = 'ZETACORP';
-export const restaurerNomEntreprise = (texte, nom) =>
-  typeof texte === 'string' ? texte.replace(/zetacorp/gi, nom || "l'entreprise") : texte;
+// Le vrai nom est rendu au titre et à la première mention ; ensuite « l'entreprise », car le
+// modèle répète sinon la dénomination complète à chaque paragraphe.
+const MENTIONS_NOMINATIVES = 2;
+export const restaurerNomEntreprise = (texte, nom) => {
+  if (typeof texte !== 'string') return texte;
+  let rang = 0;
+  return texte.replace(/zetacorp/gi, (_, position, chaine) => {
+    rang += 1;
+    if (nom && rang <= MENTIONS_NOMINATIVES) return nom;
+    const avant = chaine.slice(0, position).replace(/[ \t*#>-]+$/, '');
+    const debutPhrase = avant === '' || /[.!?:]\s*$/.test(avant) || /\n\s*$/.test(avant);
+    return debutPhrase ? "L'entreprise" : "l'entreprise";
+  });
+};
 
 /* ─── Construction du Contexte pour Gemini ─── */
 // Dossier complet transmis à l'IA : tous les indicateurs calculés par BAIQ (états officiels,
@@ -896,7 +938,11 @@ export function buildGeminiContext(data, analysisResult) {
 
   // ── Ratios, avec normes sectorielles ──
   const ratio = (libelle, v, v1, fmt, cleNorme) => cellulesN1([libelle, fmt(v)], fmt(v1)).concat(norme(cleNorme));
-  const couverture = (v) => (v >= 99 ? 'sans charges financières' : `${x(v)} x`);
+  // 99 est la valeur conventionnelle de calculateRatios en l'absence de charges financières :
+  // on se fie donc aux charges elles-mêmes, pas à la valeur du ratio (qui peut dépasser 99).
+  const couverture = (v) => ((s.chargesFinancieres || 0) > 0 ? `${x(v)} x` : 'sans charges financières');
+  // null = capitaux propres ≤ 0 (cf. calculateRatios.roeSignificatif) ; undefined = pas de N-1.
+  const roeFmt = (v) => (v === null ? 'non significatif (capitaux propres ≤ 0)' : pc(v));
   const lignesRatios = [
     ratio('Liquidité générale', r.liquiditeGenerale, r1?.liquiditeGenerale, x, 'liquiditeGenerale'),
     ratio('Liquidité réduite', r.liquiditeReduite, r1?.liquiditeReduite, x),
@@ -908,9 +954,9 @@ export function buildGeminiContext(data, analysisResult) {
     ratio('Marge EBE (EBE / CA)', r.margeEBE, r1?.margeEBE, pc, 'margeEBE'),
     ratio("Marge d'exploitation (RE / CA)", m.margeOper, null, pc),
     ratio('Marge nette (RN / CA)', r.rentabiliteNette, r1?.rentabiliteNette, pc, 'margeNette'),
-    ratio('ROE (RN / capitaux propres)', r.roe, r1?.roe, pc),
+    ratio('ROE (RN / capitaux propres)', r.roeSignificatif === false ? null : r.roe, r1?.roeSignificatif === false ? null : r1?.roe, roeFmt),
     ratio('ROA (RE / total actif net)', r.roa, r1?.roa, pc),
-    ratio('Effet de levier (ROE - ROA)', diag.effetLevier, null, pc),
+    ratio('Effet de levier (ROE - ROA)', diag.roeSignificatif ? diag.effetLevier : null, null, roeFmt),
     ratio('Poids du personnel (charges de personnel / VA)', r.poidsPersonnel, r1?.poidsPersonnel, pc),
     ratio('Productivité (VA / charges de personnel)', m.productivite, null, (v) => `${x(v)} x`, 'productivite'),
     ratio('DSO — délai clients', r.delaiRecouvrement, r1?.delaiRecouvrement, jours, 'dso'),
@@ -939,7 +985,7 @@ export function buildGeminiContext(data, analysisResult) {
 Voici le dossier financier COMPLET calculé par BAIQ à partir de la balance. Tous les montants sont en ${devise}. Toutes les valeurs sont déjà calculées : ne les recalcule pas, exploite-les et croise-les.
 
 ## I. FICHE SIGNALÉTIQUE
-- Entité : ${REPERE_ENTREPRISE} (nom d'emprunt de l'entité : utilise-le toujours pour la désigner)
+- Entité : ${REPERE_ENTREPRISE} (nom d'emprunt de l'entité : écris-le dans le titre et à sa première mention, puis désigne-la simplement par « l'entreprise »)
 - Secteur : ${sec.label || 'Non spécifié'} (IBS applicable : ${sec.tauxIBS || '19 %'}) — ${sec.description || ''}
 - Effectif : ${p.effectif || 'non communiqué'}
 - Régime TVA : ventes ${tva?.ventesFranchisees ? 'en franchise' : 'soumises à TVA'}, achats ${tva?.achatsFranchises ? 'en franchise' : 'soumis à TVA'}${tva ? ` (taux ${tva.tauxTva} %, délais clients/fournisseurs calculés TTC)` : ''}
@@ -975,22 +1021,22 @@ ${tableau(['Critère', 'Valeur observée', 'Points / 5'], Object.values(ba.detai
 - TVCP : ouverture ${nombre(tvcp.totalDebut)} → clôture ${nombre(tvcp.totalFin)} (variation ${nombre(tvcp.variationNette)}) ; résultat antérieur ${nombre(tvcp.resultatNetAnterieur)} dont mis en réserve ${nombre(tvcp.affectationReserves)}, reporté ${nombre(tvcp.affectationRAN)}, encore en instance ${nombre(tvcp.resultatEnInstance)}, dividendes estimés ${nombre(tvcp.dividendesEstimes)} ; variation de capital ${nombre(tvcp.varCapital)} ; résultat de l'exercice ${nombre(tvcp.resultatNetN)}
 - TFT : ${tft.hasN1
   ? `flux d'activité ${nombre(tft.activite.total)} (CAF ${nombre(tft.activite.caf)}, variation BFR ${nombre(tft.activite.variationBFR)}), flux d'investissement ${nombre(tft.investissement.total)}, flux de financement ${nombre(tft.financement.total)} (capital ${nombre(tft.financement.augmentationCapital)}, dette ${nombre(tft.financement.variationDette)}, dividendes ${nombre(-tft.financement.dividendesVerses)}) ; variation de trésorerie ${nombre(tft.variationTresorerie)}, trésorerie ${nombre(tft.tresorerieOuverture)} → ${nombre(tft.tresorerieClotureReelle)} (écart de rapprochement ${nombre(tft.ecartRapprochement)})`
-  : 'non calculable sans exercice N-1'}`,
+  : "non calculable sans exercice N-1 (il suffit d'importer la balance N-1 dans BAIQ pour l'obtenir)"}`,
 
 `## IX. ÉVOLUTION DES STOCKS
 - Global : ${nombre(stocks.totalInitial)} → ${nombre(stocks.totalFinal)} (${nombre(stocks.totalVariation)}, ${x(stocks.totalPctVariation, 1)} %) — ${stocks.globalMouvement || 'N/D'}
 ${(stocks.categories || []).length ? tableau(['Catégorie', 'Début', 'Fin', 'Variation', 'Mouvement'], stocks.categories.map(c => [c.label, nombre(c.stockInitial), nombre(c.stockFinal), `${nombre(c.variation)} (${x(c.pctVariation, 1)} %)`, c.mouvement])) : ''}`,
 
 `## X. QUALITÉ DES COMPTES (AUDIT DE LA BALANCE)
-- Comptes audités : ${audit.total} — conformes ${audit.conformes}, atypiques ${audit.atypiques}, anomalies ${audit.anomalies} — score de cohérence ${audit.scoreCoherence} / 100 (seuil de matérialité : 100 ${devise})
+- Comptes audités : ${audit.total} — conformes ${audit.conformes}, atypiques ${audit.atypiques}, anomalies ${audit.anomalies} — taux de conformité des soldes ${audit.scoreCoherence} % (seuil de matérialité : 100 ${devise})
 ${nonConformes.length ? tableau(['Compte', 'Statut', 'Nature', 'Montant', 'Diagnostic'], nonConformes.map(c => [c.compte, c.verification.statut, c.verification.nature, nombre(Math.abs(c.netSolde)), c.verification.diagnostic])) : '- Aucun solde anormal significatif.'}
-- Contrôles de flux croisés : score ${flux.scoreFlux ?? 'N/D'} / 100 — ${flux.totalConformesFlux ?? 0} conformes, ${flux.totalAtypiquesFlux ?? 0} atypiques, ${flux.totalAnomaliesFlux ?? 0} anomalies
+- Contrôles de flux croisés : ${flux.totalConformesFlux ?? 0} conformes sur ${flux.totalActifsFlux ?? 0} contrôles mouvementés, ${flux.totalAtypiquesFlux ?? 0} en tolérance, ${flux.totalAnomaliesFlux ?? 0} anomalies
 ${reglesFlux.length ? tableau(['Cycle', 'Contrôle', 'Statut', 'Écart'], reglesFlux.map(regle => [regle.cycle, regle.titre, regle.statut, nombre(regle.ecart)])) : ''}`,
 
 `## XI. ÉVOLUTION N / N-1
 ${evol
   ? `- CA ${evol.caGrowth === null ? 'N/D' : pc(evol.caGrowth)}, EBE ${evol.ebeGrowth === null ? 'N/D' : pc(evol.ebeGrowth)}, résultat net ${evol.rnetGrowth === null ? 'N/D' : pc(evol.rnetGrowth)} ; FRNG ${nombre(evol.frngDelta)}, BFR ${nombre(evol.bfrDelta)}, trésorerie nette ${nombre(evol.tnDelta)}`
-  : "- Exercice N-1 non fourni : aucune comparaison possible. Ne fais aucune hypothèse sur l'évolution."}`,
+  : "- Exercice N-1 non fourni : aucune comparaison possible. Ne fais aucune hypothèse sur l'évolution. Pour l'obtenir (ainsi que le TFT), il suffit d'importer la balance N-1 dans BAIQ."}`,
 
 `## XII. PRÉ-DIAGNOSTIC DU MOTEUR BAIQ (à confirmer ou à contredire)
 - Score global : ${a.scoreGlobal} / 100 (${a.niveau?.label || 'N/D'}) — par pilier : ${Object.entries(a.scores || {}).map(([k, v]) => `${k} ${Math.round(v)}`).join(', ')}
@@ -1023,6 +1069,7 @@ Pour chaque indicateur : cite la valeur exacte, compare-la à la norme du secteu
 Croise systématiquement les indicateurs entre eux pour détecter les incohérences et les signaux faibles (exemples : marge élevée mais CAF faible, délais clients courts mais BFR lourd, rentabilité hors normes sur des actifs très amortis, écarts de flux croisés, soldes atypiques qui faussent un ratio).
 Si un chiffre paraît anormal ou peu plausible, dis-le explicitement, indique sa cause probable (y compris une erreur de saisie ou d'imputation) et son effet sur la fiabilité de l'analyse.
 Vérifie chaque affirmation contre le dossier (par exemple, la rubrique exacte où figure un montant) avant de l'écrire.
+Ne recommande jamais de « mettre en place » un état ou un ratio que BAIQ calcule déjà (TFT, TVCP, ratios, audit) : si une donnée manque, indique quelle balance importer dans BAIQ pour l'obtenir.
 
 Règles de longueur, pour que le rapport tienne en entier :
 - Traite obligatoirement les 13 sections, dans l'ordre, sans en sauter.

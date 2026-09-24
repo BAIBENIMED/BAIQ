@@ -1,7 +1,4 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { 
-  BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie 
-} from 'recharts';
 
 // Vues lourdes chargées à la demande : elles ne sont pas affichées au premier
 // écran et représentent une part importante du bundle (tableaux d'audit, rapports,
@@ -13,14 +10,19 @@ const AIView = lazy(() => import('./components/AIView').then(m => ({ default: m.
 const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator').then(m => ({ default: m.WhatIfSimulator })));
 const CalculationsIndexView = lazy(() => import('./components/CalculationsIndexView').then(m => ({ default: m.CalculationsIndexView })));
 const PresentationView = lazy(() => import('./components/PresentationView').then(m => ({ default: m.PresentationView })));
+// Écrans et graphiques qui s'appuient sur recharts : chargés à la demande eux aussi, pour
+// que l'écran d'import (premier affiché) n'attende pas cette bibliothèque.
+const BilanView = lazy(() => import('./components/BilanView').then(m => ({ default: m.BilanView })));
+const SIGView = lazy(() => import('./components/SIGView').then(m => ({ default: m.SIGView })));
+const CapitauxPropresView = lazy(() => import('./components/CapitauxPropresView').then(m => ({ default: m.CapitauxPropresView })));
+const RatiosView = lazy(() => import('./components/RatiosView').then(m => ({ default: m.RatiosView })));
+const GraphiqueProduitsCharges = lazy(() => import('./components/GraphiquesTableauDeBord').then(m => ({ default: m.GraphiqueProduitsCharges })));
+const DonutCharges = lazy(() => import('./components/GraphiquesTableauDeBord').then(m => ({ default: m.DonutCharges })));
+const GraphiqueStocks = lazy(() => import('./components/GraphiquesTableauDeBord').then(m => ({ default: m.GraphiqueStocks })));
 
 import { ImportData } from './components/ImportData';
-import { BilanView } from './components/BilanView';
-import { SIGView } from './components/SIGView';
 import { EtatsFinanciersView } from './components/EtatsFinanciersView';
-import { CapitauxPropresView } from './components/CapitauxPropresView';
 import { TableauFluxTresorerieView } from './components/TableauFluxTresorerieView';
-import { RatiosView } from './components/RatiosView';
 import { BalanceView } from './components/BalanceView';
 
 
@@ -30,9 +32,12 @@ import { BalanceView } from './components/BalanceView';
 
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { PostImportConfigModal } from './components/PostImportConfigModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { EVENEMENT_ERREUR } from './utils/erreurs';
+import { useEscapeKey } from './utils/useEscapeKey';
 
 import { exportFinancialWorkbook, generateFullPDF } from './utils/lazyExporters';
-import { calculateStockEvolution, applyTvaRegimeToRatios, calculateTotauxProduitsCharges, auditBalanceAccounts } from './utils/financeCalculations';
+import { calculateStockEvolution, appliquerRegimeTva, calculateTotauxProduitsCharges, auditBalanceAccounts } from './utils/financeCalculations';
 import { recalculateSimulatedDataset } from './utils/simulationEngine';
 import { SECTEURS } from './utils/secteurs';
 import { clickable } from './utils/clickable';
@@ -72,6 +77,16 @@ export default function App() {
   const [theme, setTheme]   = useState(() => localStorage.getItem('finanalyze_theme') || 'light');
   const [showContactModal, setShowContactModal] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  useEscapeKey(showContactModal, () => setShowContactModal(false));
+  useEscapeKey(showMobileMore, () => setShowMobileMore(false));
+
+  // Erreurs d'action signalées par signalerErreur() (utils/erreurs.js) : 3 au plus à l'écran.
+  const [erreursAction, setErreursAction] = useState([]);
+  useEffect(() => {
+    const surErreur = (e) => setErreursAction(prev => [...prev.slice(-2), { id: `${Date.now()}-${Math.random()}`, texte: e.detail }]);
+    window.addEventListener(EVENEMENT_ERREUR, surErreur);
+    return () => window.removeEventListener(EVENEMENT_ERREUR, surErreur);
+  }, []);
   const [showPostImportConfig, setShowPostImportConfig] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(() => parseInt(localStorage.getItem('baiq_analysis_count') || '0', 10));
   
@@ -117,20 +132,14 @@ export default function App() {
     const base = (activeScenario && activeScenario.entries.length > 0 && data)
       ? recalculateSimulatedDataset(data, activeScenario.entries)
       : data;
-    if (!base) return base;
-
     // Applique le régime TVA (ventes/achats franchisés ou non, cf. Paramètres) aux
     // délais clients/fournisseurs, de façon réactive et sans réimporter la balance.
-    const tvaRegime = base.profil?.tvaRegime || { ventesFranchisees: false, achatsFranchises: false, tauxTva: 19 };
-    return {
-      ...base,
-      ratios: base.ratios ? applyTvaRegimeToRatios(base.ratios, tvaRegime) : base.ratios,
-      dataN1: base.dataN1 ? {
-        ...base.dataN1,
-        ratios: base.dataN1.ratios ? applyTvaRegimeToRatios(base.dataN1.ratios, tvaRegime) : base.dataN1.ratios
-      } : base.dataN1
-    };
+    return appliquerRegimeTva(base);
   }, [data, activeScenario]);
+
+  // Situation réelle corrigée de la TVA : la référence du simulateur, pour qu'il compare
+  // ses scénarios à ce que montrent les autres écrans (et non aux délais bruts).
+  const donneesReelles = useMemo(() => appliquerRegimeTva(data), [data]);
 
   const onToggleSimulation = () => {
     if (activeScenarioId) {
@@ -252,15 +261,20 @@ export default function App() {
         const c = r.compte.toString().trim();
         const deb = Number(r.soldeFinDebit !== undefined ? r.soldeFinDebit : r.debit) || 0;
         const cred = Number(r.soldeFinCredit !== undefined ? r.soldeFinCredit : r.credit) || 0;
+        // Solde signé : un compte créditeur de la classe 6 (rabais, remises et ristournes
+        // obtenus 609/619/629) vient en déduction de son poste, comme dans le TCR. En valeur
+        // absolue, il s'ajoutait aux charges et le total de l'anneau dépassait celui des
+        // « Charges (Cl. 6) » affiché juste au-dessus.
         const v = r.solde !== undefined && r.solde !== null ? r.solde : (deb - cred);
-        const absV = Math.abs(v);
-        if (c.startsWith('60')) a += absV;
-        else if (c.startsWith('61') || c.startsWith('62')) s += absV;
-        else if (c.startsWith('63')) p += absV; // SCF : 63 = Personnel
-        else if (c.startsWith('64')) i += absV; // SCF : 64 = Impôts et taxes
-        else if (c.startsWith('6'))  o += absV;
+        if (c.startsWith('60')) a += v;
+        else if (c.startsWith('61') || c.startsWith('62')) s += v;
+        else if (c.startsWith('63')) p += v; // SCF : 63 = Personnel
+        else if (c.startsWith('64')) i += v; // SCF : 64 = Impôts et taxes
+        else if (c.startsWith('6'))  o += v;
       });
     }
+    // Un poste net négatif (rabais supérieurs aux charges) ne peut pas former une part d'anneau.
+    [a, s, p, i, o] = [a, s, p, i, o].map(x => Math.max(0, x));
 
     const tot = a + s + p + i + o;
     if (tot > 0) {
@@ -269,41 +283,20 @@ export default function App() {
         { label: 'Services extérieurs (61/62)', val: s, color: '#059669' },
         { label: 'Charges de personnel (63)',   val: p, color: '#d97706' },
         { label: 'Impôts & taxes (64)',          val: i, color: '#7c3aed' },
-        { label: 'Autres charges (65/68)',      val: o, color: '#94a3b8' },
+        { label: 'Autres charges (65 à 69)',    val: o, color: '#94a3b8' },
       ].map(x => ({ ...x, pct: Number(((x.val / tot) * 100).toFixed(1)) }));
     }
 
-    // Fallback démo équilibré si aucune balance chargée
-    return [
-      { label: 'Achats consommés (60)',       val: 342000, color: '#1b6e8c', pct: 39.1 },
-      { label: 'Services extérieurs (61/62)', val: 156000, color: '#059669', pct: 17.8 },
-      { label: 'Charges de personnel (63)',   val: 289000, color: '#d97706', pct: 33.1 },
-      { label: 'Impôts & taxes (64)',          val: 42000,  color: '#7c3aed', pct: 4.8 },
-      { label: 'Autres charges (65/68)',      val: 45000,  color: '#94a3b8', pct: 5.1 },
-    ];
+    // Aucune charge dans la balance : pas de graphique plutôt que des montants inventés.
+    return [];
   }, [activeData]);
 
   /* ── Évolution des stocks par catégorie ── */
   const stockData = useMemo(() => {
     const computed = calculateStockEvolution(activeData?.rows);
-    if (computed && computed.categories && computed.categories.length > 0) {
-      return computed;
-    }
-    // Données par défaut pour démonstration / vue d'ensemble
-    const demoCats = [
-      { code: '30', label: '30 — Stock de Marchandises', icon: 'inventory_2', stockInitial: 450000, stockFinal: 520000, variation: 70000, pctVariation: 15.6, mouvement: 'STOCKAGE', badgeCls: 'badge-green', impactSCF: 'Réduction des charges consommées (Compte 603)' },
-      { code: '31', label: '31 — Matières Premières', icon: 'category', stockInitial: 310000, stockFinal: 280000, variation: -30000, pctVariation: -9.7, mouvement: 'DÉSTOCKAGE', badgeCls: 'badge-red', impactSCF: 'Augmentation des charges consommées (Compte 603)' },
-      { code: '35', label: '35 — Stocks de Produits Finis', icon: 'widgets', stockInitial: 180000, stockFinal: 215000, variation: 35000, pctVariation: 19.4, mouvement: 'STOCKAGE', badgeCls: 'badge-green', impactSCF: 'Augmentation de la production (Compte 72)' },
-      { code: '32', label: '32 — Autres Approvisionnements', icon: 'box', stockInitial: 45000, stockFinal: 48000, variation: 3000, pctVariation: 6.7, mouvement: 'STOCKAGE', badgeCls: 'badge-green', impactSCF: 'Réduction des charges consommées (Compte 603)' }
-    ];
-    return {
-      categories: demoCats,
-      totalInitial: 985000,
-      totalFinal: 1063000,
-      totalVariation: 78000,
-      totalPctVariation: 7.9,
-      globalMouvement: 'STOCKAGE'
-    };
+    // Pas de compte de stock (entreprise de services, par exemple) : la carte est masquée
+    // au lieu d'afficher des stocks de démonstration comme s'ils étaient ceux du dossier.
+    return computed?.categories?.length > 0 ? computed : null;
   }, [activeData]);
 
   /* ── Alertes — soldes anormaux (même moteur et même seuil que l'écran Audit, le PDF et l'Excel) ── */
@@ -337,7 +330,7 @@ export default function App() {
     if (tab === 'tft')      return <TableauFluxTresorerieView data={activeData} formatCurrency={fmt} profil={activeData?.profil} />;
     if (tab === 'stocks')   return <StockView rows={activeData?.rows} ratios={activeData?.ratios} formatCurrency={fmt} />;
     if (tab === 'ratios')   return <RatiosView data={activeData?.ratios} bilan={activeData?.bilan} sig={activeData?.sig} rows={activeData?.rows} formatCurrency={fmt} profil={activeData?.profil} cur={cur} />;
-    if (tab === 'whatif')      return <WhatIfSimulator data={data} scenarios={scenarios} setScenarios={setScenarios} activeScenarioId={activeScenarioId} setActiveScenarioId={setActiveScenarioId} formatCurrency={fmt} cur={cur} />;
+    if (tab === 'whatif')      return <WhatIfSimulator data={donneesReelles} scenarios={scenarios} setScenarios={setScenarios} activeScenarioId={activeScenarioId} setActiveScenarioId={setActiveScenarioId} formatCurrency={fmt} cur={cur} />;
     if (tab === 'methodology') return <CalculationsIndexView />;
     if (tab === 'reports')     return <ReportsView data={activeData} fmt={fmt} formatCurrency={fmt} cur={cur} geminiKey={geminiKey} isSimulationActive={isSimulationActive} />;
     if (tab === 'ai')          return <AIView data={activeData} geminiKey={geminiKey} />;
@@ -538,19 +531,9 @@ export default function App() {
 
           <div className="card-body">
             <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={annualTotals.bars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={80} />
-                  <Tooltip formatter={(val) => fmt(val)} contentStyle={{ fontSize: 12, borderRadius: 10 }} />
-                  <Bar dataKey="Montant" radius={[6, 6, 0, 0]} maxBarSize={90}>
-                    {annualTotals.bars.map((entry, index) => (
-                      <Cell key={`cell-annual-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={null}>
+                <GraphiqueProduitsCharges barres={annualTotals.bars} fmt={fmt} />
+              </Suspense>
             </div>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, fontSize: '0.80rem' }}>
               <span>Produits : <strong className="mono" style={{ color: '#1b6e8c' }}>{fmt(annualTotals.totP)}</strong></span>
@@ -561,6 +544,7 @@ export default function App() {
         </div>
 
         {/* Structure des Charges (Classe 6 — Cercle Fragmenté / Donut Chart) */}
+        {expenses.length > 0 && (
         <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -581,29 +565,9 @@ export default function App() {
           <div className="card-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, alignItems: 'center' }}>
             {/* Donut Chart (Cercle Fragmenté) avec total au centre */}
             <div style={{ position: 'relative', width: '100%', height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12, color: 'var(--text)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                    formatter={(val, name, entry) => [`${fmt(val)} (${entry.payload.pct}%)`, name]}
-                  />
-                  <Pie
-                    data={expenses}
-                    dataKey="val"
-                    nameKey="label"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={105}
-                    paddingAngle={4}
-                    cornerRadius={5}
-                  >
-                    {expenses.map((entry, index) => (
-                      <Cell key={`cell-expense-${index}`} fill={entry.color} stroke="var(--surface)" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              <Suspense fallback={null}>
+                <DonutCharges postes={expenses} fmt={fmt} />
+              </Suspense>
               
               {/* Centre du Donut avec Total des Charges */}
               <div style={{ position: 'absolute', textAlign: 'center', pointerEvents: 'none' }}>
@@ -642,8 +606,10 @@ export default function App() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Évolution des Stocks par Catégorie (Nouveau cadre Vue d'ensemble) */}
+        {stockData && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -668,27 +634,9 @@ export default function App() {
           <div className="card-body">
             {/* Graphique à barres comparatif initial vs final */}
             <div style={{ height: 230, marginBottom: 20 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={stockData.categories.map(c => ({
-                    name: c.code + ' ' + (c.label.split('—')[1]?.trim()?.split(' ')[0] || c.label),
-                    'Stock Initial': c.stockInitial,
-                    'Stock Final': c.stockFinal,
-                  }))} 
-                  margin={{ top:10, right:10, left:-15, bottom:5 }}
-                  barGap={4}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={v => `${Math.round(v/1000)}k`} />
-                  <Tooltip 
-                    contentStyle={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, fontSize:12, color:'var(--text)', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }}
-                    formatter={(v, n) => [fmt(v), n]}
-                  />
-                  <Bar dataKey="Stock Initial" fill="#94a3b8" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="Stock Final" fill="#1b6e8c" radius={[5, 5, 0, 0]} maxBarSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={null}>
+                <GraphiqueStocks categories={stockData.categories} fmt={fmt} />
+              </Suspense>
             </div>
 
             {/* Cartes par catégorie de stock */}
@@ -720,6 +668,7 @@ export default function App() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Notable Table — Alertes Soldes Anormaux */}
         <div className="card" style={{ marginTop: 0 }}>
@@ -947,14 +896,18 @@ export default function App() {
           )}
           {/* Les vues lourdes sont chargées à la demande (cf. lazy() en haut de fichier) :
               ce Suspense couvre le court instant de téléchargement du module de l'onglet. */}
-          <Suspense fallback={
-            <div className="card fade-in" style={{ maxWidth: 420, margin: '60px auto', padding: '40px 32px', textAlign: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--primary)', display: 'block', marginBottom: 12 }}>hourglass_top</span>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>Chargement du module…</p>
-            </div>
-          }>
-            {renderContent()}
-          </Suspense>
+          {/* Une erreur dans un écran reste confinée à cet écran : le menu reste utilisable
+              et l'encart d'erreur disparaît au changement d'onglet. */}
+          <ErrorBoundary variante="vue" resetKey={tab} actionSecondaire={tab !== 'dashboard' ? { libelle: 'Tableau de bord', onClick: () => setTab('dashboard') } : null}>
+            <Suspense fallback={
+              <div className="card fade-in" style={{ maxWidth: 420, margin: '60px auto', padding: '40px 32px', textAlign: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--primary)', display: 'block', marginBottom: 12 }}>hourglass_top</span>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>Chargement du module…</p>
+              </div>
+            }>
+              {renderContent()}
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -1036,7 +989,7 @@ export default function App() {
 
       {/* ── MODALE DE CONTACT & ASSISTANCE ── */}
       {showContactModal && (
-        <div style={{
+        <div role="dialog" aria-modal="true" aria-label="Contact" style={{
           position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(5px)',
           zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
         }}>
@@ -1149,12 +1102,41 @@ export default function App() {
       />
 
       {/* ── MODE PRÉSENTATION DAF (Plein Écran) ── */}
+      {/* PresentationView est chargée à la demande : sans Suspense, toute l'application
+          disparaissait le temps du téléchargement du module. */}
       {isPresentationOpen && (
-        <PresentationView
-          data={activeData}
-          onClose={() => setIsPresentationOpen(false)}
-          formatCurrency={fmt}
-        />
+        <ErrorBoundary variante="vue" actionSecondaire={{ libelle: 'Quitter la présentation', onClick: () => setIsPresentationOpen(false) }}>
+          <Suspense fallback={
+            <div role="status" style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(11, 20, 28, 0.72)', color: '#fff', fontWeight: 700 }}>
+              Ouverture de la présentation…
+            </div>
+          }>
+            <PresentationView
+              data={activeData}
+              onClose={() => setIsPresentationOpen(false)}
+              formatCurrency={fmt}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+
+      {/* ── Erreurs d'action (export, génération...) : annoncées ici, cf. utils/erreurs.js ── */}
+      {erreursAction.length > 0 && (
+        <div className="bandeau-erreurs" role="alert" aria-live="assertive">
+          {erreursAction.map(erreur => (
+            <div key={erreur.id} className="bandeau-erreurs-message">
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--red)', flexShrink: 0 }} aria-hidden="true">error</span>
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{erreur.texte}</span>
+              <button
+                onClick={() => setErreursAction(prev => prev.filter(e => e.id !== erreur.id))}
+                aria-label="Fermer ce message"
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'flex' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }} aria-hidden="true">close</span>
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1199,8 +1181,8 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
           </h3>
         </div>
         <div className="card-body">
-          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Libellé affiché après les montants</label>
-          <input
+          <label htmlFor="parametres-libelle-affiche-apres-les" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Libellé affiché après les montants</label>
+          <input id="parametres-libelle-affiche-apres-les"
             value={cur}
             onChange={e => setCur(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
@@ -1225,8 +1207,8 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
             </h3>
           </div>
           <div className="card-body">
-            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Référentiel sectoriel actif</label>
-            <select
+            <label htmlFor="parametres-referentiel-sectoriel-actif" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Référentiel sectoriel actif</label>
+            <select id="parametres-referentiel-sectoriel-actif"
               value={data?.profil?.secteurId || 'commerce_gros'}
               onChange={e => onUpdateSecteur(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
@@ -1277,8 +1259,8 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
               <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Achats en franchise de TVA (exonérés)</span>
             </label>
 
-            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Taux de TVA applicable (si non franchisé)</label>
-            <select
+            <label htmlFor="parametres-taux-de-tva-applicable" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Taux de TVA applicable (si non franchisé)</label>
+            <select id="parametres-taux-de-tva-applicable"
               value={tvaRegime.tauxTva}
               onChange={e => onUpdateTvaRegime({ tauxTva: Number(e.target.value) })}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.92rem', fontWeight: 700, outline: 'none', background: 'var(--surface)', color: 'var(--text)' }}
@@ -1338,10 +1320,10 @@ function SettingsView({ cur, setCur, geminiKey, setGeminiKey, data, onUpdateSect
 
           <div style={{ opacity: serverProxyConfigured ? 0.5 : 1, pointerEvents: serverProxyConfigured ? 'none' : 'auto' }}>
           <div>
-            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini {serverProxyConfigured ? '(non nécessaire — relais serveur actif)' : '(mode local de repli)'}</label>
+            <label htmlFor="parametres-cle-api-gemini" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>Clé API Gemini {serverProxyConfigured ? '(non nécessaire — relais serveur actif)' : '(mode local de repli)'}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1, position: 'relative' }}>
-                <input
+                <input id="parametres-cle-api-gemini"
                   type={showKey ? 'text' : 'password'}
                   value={geminiKey}
                   onChange={e => setGeminiKey(e.target.value)}

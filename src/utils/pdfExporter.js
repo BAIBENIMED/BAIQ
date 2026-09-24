@@ -8,7 +8,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { calculateAltmanZScore } from './solvabiliteEngine';
-import { buildTCRRows, auditBalanceAccounts } from './financeCalculations';
+import { buildTCRRows, syntheseAudit } from './financeCalculations';
+import { decouperMarkdown, segmentsEnLigne, texteBrut, versWinAnsi } from './markdownIA';
 
 const MARGIN = 17;
 
@@ -123,7 +124,10 @@ function drawBaiqMark(doc, x, y, badgeSize = 12, align = 'left', badgeImg = null
 }
 
 // ── En-tête / pied de page : bandeaux à filets, folio encadré ──────────
-function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N', badgeImg = null) {
+function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N', badgeImg = null, {
+  bandeau = 'RAPPORT D\'ANALYSE FINANCIÈRE — SYSTÈME COMPTABLE FINANCIER (SCF)',
+  mentionPied = 'BAIQ · Traitement local sécurisé — aucune donnée transmise à un tiers.',
+} = {}) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const m = MARGIN;
@@ -162,7 +166,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.4);
-    doc.text('RAPPORT D\'ANALYSE FINANCIÈRE — SYSTÈME COMPTABLE FINANCIER (SCF)', m + 1.6 + badgeSize + 12, 11.9);
+    doc.text(bandeau, m + 1.6 + badgeSize + 12, 11.9);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.4);
@@ -186,7 +190,7 @@ function applyLatexHeaderFooter(doc, totalPages, dossierName, exerciceYear = 'N'
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.2);
     doc.setTextColor(...T.inkMuted);
-    doc.text('BAIQ · Traitement local sécurisé — aucune donnée transmise à un tiers.', m, H - 9.6);
+    doc.text(mentionPied, m, H - 9.6);
 
     const folio = `${p} / ${totalPages}`;
     doc.setFont('helvetica', 'bold');
@@ -1243,19 +1247,19 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       label: "SCORE ALTMAN Z''",
       val: solv.zScore.toFixed(2),
       sub: solv.zoneLabel.split('—')[0].trim(),
-      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'warn'
+      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'caution'
     },
     {
       label: 'RATING SYNTHÉTIQUE',
       val: solv.rating,
       sub: `Niveau de risque : ${solv.risqueDefaillance}`,
-      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'warn'
+      status: solv.zone === 'safe' ? 'ok' : solv.zone === 'distress' ? 'danger' : 'caution'
     },
     {
       label: "SCORE BANQUE D'ALGÉRIE",
       val: `${solv.bancaire.scoreBA.toFixed(1)} / 20`,
       sub: solv.bancaire.ratingBA,
-      status: solv.bancaire.scoreBA >= 16 ? 'ok' : solv.bancaire.scoreBA >= 8 ? 'warn' : 'danger'
+      status: solv.bancaire.scoreBA >= 16 ? 'ok' : solv.bancaire.scoreBA >= 8 ? 'caution' : 'danger'
     }
   ], y);
 
@@ -1304,7 +1308,9 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   // quelques dizaines de dinars pouvait apparaître dans le PDF alors qu'il n'apparaissait
   // plus dans l'application ni dans le classeur Excel, et certaines anomalies réelles de
   // ces autres comptes n'apparaissaient jamais dans le PDF.
-  const auditResult = auditBalanceAccounts(rows);
+  const synthese = syntheseAudit(rows);
+  const auditResult = synthese.natures;
+  const auditFlux = synthese.flux;
   const anomaliesList = auditResult.comptesAudit
     .filter(c => c.verification.statut !== 'CONFORME')
     .map(c => [
@@ -1317,10 +1323,21 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
 
   const conformiteScore = auditResult.scoreCoherence;
 
+  const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
   y = latexKpiRow(doc, [
-    { label: 'Lignes de Balance Contrôlées', val: `${rows.length} comptes`, sub: 'Périmètre exhaustif SCF', status: 'normal' },
-    { label: 'Anomalies Détectées', val: `${anomaliesList.length} anomalies`, sub: anomaliesList.length === 0 ? 'Aucune anomalie' : 'À régulariser', status: anomaliesList.length === 0 ? 'ok' : 'danger' },
-    { label: 'Taux de Conformité SCF', val: `${conformiteScore} %`, sub: conformiteScore >= 95 ? 'Excellente régularité' : 'Contrôle approfondi', status: conformiteScore >= 95 ? 'ok' : 'danger' },
+    { label: 'Comptes Contrôlés', val: `${auditResult.total} comptes`, sub: `${auditResult.conformes} au sens de solde normal`, status: 'normal' },
+    {
+      label: 'Conformité des Soldes',
+      val: `${conformiteScore} %`,
+      sub: anomaliesList.length === 0 ? 'Tous les soldes sont conformes' : `${pluriel(auditResult.atypiques, 'atypique')} · ${pluriel(auditResult.anomalies, 'anomalie')}`,
+      status: auditResult.anomalies > 0 ? 'danger' : auditResult.atypiques > 0 ? 'caution' : 'ok',
+    },
+    {
+      label: 'Flux Croisés',
+      val: `${auditFlux.totalConformesFlux} / ${auditFlux.totalActifsFlux} conformes`,
+      sub: auditFlux.totalAnomaliesFlux > 0 ? `${pluriel(auditFlux.totalAnomaliesFlux, 'anomalie')} de flux` : 'Aucune anomalie de flux',
+      status: auditFlux.totalAnomaliesFlux > 0 ? 'danger' : auditFlux.totalAtypiquesFlux > 0 ? 'caution' : 'ok',
+    },
   ], y);
 
   if (anomaliesList.length === 0) {
@@ -1351,7 +1368,45 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
       doc.setTextColor(...T.inkMuted);
-      doc.text(`... et ${anomaliesList.length - 30} autres anomalies supplémentaires consultables dans l'onglet Audit Balance de la plateforme.`, margin, y, { maxWidth: W - margin * 2 });
+      doc.text(`... et ${anomaliesList.length - 30} autres comptes non conformes, consultables dans l'onglet Audit Balance de la plateforme.`, margin, y, { maxWidth: W - margin * 2 });
+      y += 8;
+    }
+  }
+
+  // 8.2 — Flux croisés : les jeux d'écritures entre comptes (achats → stocks,
+  // dotations → amortissements, virements internes...). Un solde peut être dans le bon
+  // sens alors que le cycle qui l'a produit est rompu : ces contrôles sont donc
+  // présentés à côté du sens des soldes, jamais fondus dans un seul « 100 % ».
+  const reglesActives = auditFlux.regles.filter(r => r.statut !== 'NON_MOUVEMENTE');
+  if (reglesActives.length > 0) {
+    y = latexSubSection(doc, '8.2. Contrôle des Flux Croisés entre Comptes', y + 2);
+    const libelleStatut = { CONFORME: 'Conforme', TOLERANCE: 'Tolérance', ATYPIQUE: 'Atypique', ANOMALIE: 'Anomalie' };
+    y = drawBooktabsTable(
+      doc,
+      [['CYCLE', 'CONTRÔLE', 'STATUT', `ÉCART (${docCurrency})`]],
+      reglesActives.map(r => [r.cycle, r.titre, libelleStatut[r.statut] || r.statut, fmtDZDTable(r.ecart)]),
+      y,
+      {
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 30 },
+          1: { cellWidth: 88 },
+          2: { fontStyle: 'bold', cellWidth: 24 },
+          3: { halign: 'right', cellWidth: 34 },
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const statut = reglesActives[data.row.index]?.statut;
+            data.cell.styles.textColor = statut === 'ANOMALIE' ? T.darkRed : statut === 'CONFORME' ? T.darkGreen : T.darkAmber;
+          }
+        },
+      }
+    );
+    const nonMouvementes = auditFlux.regles.length - reglesActives.length;
+    if (nonMouvementes > 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...T.inkMuted);
+      doc.text(`${pluriel(nonMouvementes, 'contrôle')} sans mouvement sur la période, non évalué${nonMouvementes > 1 ? 's' : ''}.`, margin, y);
     }
   }
 
@@ -1381,6 +1436,282 @@ export async function generateFullPDF(data, cur, isSimulated = false, scenarioLa
   // Téléchargement du fichier
   const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
   const fileName = `BAIQ_Rapport_Financier_${cleanName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  doc.save(fileName);
+  return fileName;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RAPPORT IA — PDF à la charte BAIQ
+   Le texte Markdown du rapport (Gemini ou moteur local) est mis en page avec
+   les mêmes éléments que le rapport financier : page de garde, cartouches de
+   section numérotés, tableaux à filets, bandeau et folio.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const STYLE_POLICE = (gras, italique) => (gras && italique ? 'bolditalic' : gras ? 'bold' : italique ? 'italic' : 'normal');
+
+/**
+ * Écrit un texte à mise en forme mixte (**gras**, *italique*) en le coupant à la largeur
+ * donnée, avec saut de page automatique. y est la ligne de base de la première ligne ;
+ * la valeur rendue est celle de la ligne suivante.
+ */
+function ecrireTexteRiche(doc, texte, x, y, largeur, {
+  taille = 8.8, interligne = 4.3, couleur = T.inkSecondary, couleurGras = T.inkPrimary, italique = false,
+} = {}) {
+  doc.setFontSize(taille);
+  const mots = [];
+  segmentsEnLigne(texte).forEach((seg) => {
+    versWinAnsi(seg.texte).split(/(\s+)/).forEach((morceau) => {
+      if (morceau) mots.push({ t: /^\s+$/.test(morceau) ? ' ' : morceau, gras: seg.gras, italique: seg.italique || italique });
+    });
+  });
+
+  const lignes = [[]];
+  let largeurLigne = 0;
+  mots.forEach((mot) => {
+    doc.setFont('helvetica', STYLE_POLICE(mot.gras, mot.italique));
+    const w = doc.getTextWidth(mot.t);
+    const ligne = lignes[lignes.length - 1];
+    if (mot.t === ' ') {
+      if (ligne.length) { ligne.push({ ...mot, w }); largeurLigne += w; }
+      return;
+    }
+    if (largeurLigne + w > largeur && ligne.length) {
+      while (ligne.length && ligne[ligne.length - 1].t === ' ') largeurLigne -= ligne.pop().w;
+      lignes.push([]);
+      largeurLigne = 0;
+    }
+    lignes[lignes.length - 1].push({ ...mot, w });
+    largeurLigne += w;
+  });
+
+  // Chaque suite de mots de même style est écrite d'un seul tenant : l'espacement entre
+  // les mots vient alors de la police elle-même, et reste juste même si le lecteur PDF
+  // remplace Helvetica par une police aux chasses légèrement différentes.
+  lignes.forEach((ligne) => {
+    if (!ligne.length) return;
+    y = ensurePageSpace(doc, y, interligne);
+    let cx = x;
+    let suite = '';
+    let style = null;
+    let gras = false;
+    const ecrireSuite = () => {
+      if (!suite) return;
+      doc.setFont('helvetica', style);
+      doc.setTextColor(...(gras ? couleurGras : couleur));
+      doc.text(suite, cx, y);
+      cx += doc.getTextWidth(suite);
+      suite = '';
+    };
+    ligne.forEach((mot) => {
+      const styleMot = STYLE_POLICE(mot.gras, mot.italique);
+      if (styleMot !== style) {
+        ecrireSuite();
+        style = styleMot;
+        gras = mot.gras;
+      }
+      suite += mot.t;
+    });
+    ecrireSuite();
+    y += interligne;
+  });
+  return y;
+}
+
+// Cartouche de section numéroté (même dessin que latexSection), sur deux lignes si le
+// titre rédigé par l'IA est long.
+function sectionRapportIA(doc, numero, titre, y) {
+  const W = doc.internal.pageSize.getWidth();
+  const m = MARGIN;
+  const cote = 9.6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.6);
+  const lignes = doc.splitTextToSize(versWinAnsi(titre).trim().toUpperCase(), W - m * 2 - cote - 8).slice(0, 2);
+  const h = lignes.length > 1 ? 13.6 : cote;
+  y = ensurePageSpace(doc, y, h + 20);
+
+  doc.setFillColor(...T.navy);
+  doc.rect(m, y, cote, h, 'F');
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(String(numero), m + cote / 2, y + h / 2 + 1.6, { align: 'center' });
+
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(0.4);
+  doc.rect(m + cote, y, W - m * 2 - cote, h, 'S');
+  doc.setFontSize(9.6);
+  doc.setTextColor(...T.navyDeep);
+  doc.text(lignes, m + cote + 4, y + (lignes.length > 1 ? 5.4 : h / 2 + 1.7), { lineHeightFactor: 1.25 });
+  return y + h + 6;
+}
+
+/**
+ * @param {string} texte     Rapport au format Markdown (tel qu'affiché à l'écran)
+ * @param {object} data      Dossier courant (profil pour l'en-tête)
+ * @param {object} options   { typeLabel, source: 'gemini' | 'local', dateGeneration, score: { valeur, libelle } }
+ */
+export async function generateRapportIAPDF(texte, data, { typeLabel = 'Rapport d\'analyse', source = 'gemini', dateGeneration = null, score = null } = {}) {
+  const profil = data?.profil || {};
+  const dossierName = profil.nomEntreprise || 'Entité Anonyme';
+  const exercice = new Date().getFullYear();
+  const parGemini = source === 'gemini';
+  const badgeImg = await captureBaiqBadge();
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const m = MARGIN;
+  const largeur = W - m * 2;
+  const blocs = decouperMarkdown(texte);
+
+  // Le titre « # … » du rapport devient celui de la page de garde.
+  const indexTitre = blocs.findIndex(b => b.type === 'titre' && b.niveau === 1);
+  const titreRapport = indexTitre >= 0 ? versWinAnsi(texteBrut(blocs[indexTitre].texte)).trim() : '';
+  const corps = indexTitre >= 0 ? blocs.filter((_, i) => i !== indexTitre) : blocs;
+
+  // ── Page de garde ──
+  let y = 30;
+  drawBaiqMark(doc, W / 2, y, 16, 'center', badgeImg);
+  y += 20;
+  doc.setDrawColor(...T.navy);
+  doc.setLineWidth(1.0);
+  doc.line(m + 20, y, W - m - 20, y);
+  doc.setDrawColor(...T.gold);
+  doc.setLineWidth(0.6);
+  doc.line(m + 20, y + 1.6, W - m - 20, y + 1.6);
+  y += 16;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...T.navy);
+  doc.text(parGemini ? 'RAPPORT D\'ANALYSE RÉDIGÉ PAR IA' : 'RAPPORT D\'ANALYSE BAIQ', W / 2, y, { align: 'center' });
+  y += 7.5;
+  doc.setFontSize(12);
+  doc.text(versWinAnsi(typeLabel).trim().toUpperCase(), W / 2, y, { align: 'center', maxWidth: largeur });
+  y += 6;
+  if (titreRapport) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...T.inkSecondary);
+    const lignesTitre = doc.splitTextToSize(titreRapport, largeur - 20);
+    doc.text(lignesTitre, W / 2, y, { align: 'center' });
+    y += lignesTitre.length * 4.4;
+  }
+  y += 10;
+
+  const dateTexte = new Date(dateGeneration || Date.now()).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+  y = drawBooktabsTable(doc, [['PARAMÈTRE DU RAPPORT', 'VALEUR']], [
+    ['Entité / Raison sociale', versWinAnsi(dossierName)],
+    ['Secteur d\'activité', profil.secteurId ? profil.secteurId.replace(/_/g, ' ').toUpperCase() : 'NON SPÉCIFIÉ'],
+    ['Type de rapport', versWinAnsi(typeLabel).trim()],
+    ['Rédaction', parGemini ? 'Gemini 2.5 Flash (Google), à partir des calculs BAIQ' : 'Moteur d\'analyse local BAIQ'],
+    ['Date de génération', dateTexte],
+    ...(score ? [['Score de santé financière BAIQ', `${score.valeur} / 100 — ${versWinAnsi(score.libelle || '')}`]] : []),
+  ], y, {
+    columnStyles: { 0: { fontStyle: 'bold', textColor: T.navy, cellWidth: 70 }, 1: { cellWidth: largeur - 70 } },
+  });
+  y += 4;
+
+  // Avertissement : qui a rédigé, ce qui a été transmis, ce qui reste à vérifier.
+  const avertissement = parGemini
+    ? 'Ce rapport a été rédigé par un modèle d\'intelligence artificielle (Gemini) à partir des états financiers, ratios et contrôles calculés par BAIQ. Le nom de l\'entité a été remplacé par un pseudonyme avant l\'envoi. Les montants cités proviennent de BAIQ ; les interprétations et recommandations doivent être relues par un professionnel avant toute diffusion ou décision.'
+    : 'Ce rapport a été produit par le moteur d\'analyse local de BAIQ, sans transmission de données à un tiers. Il applique des règles d\'analyse fixes aux états et ratios calculés : il doit être relu par un professionnel avant toute diffusion ou décision.';
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const lignesAvert = doc.splitTextToSize(avertissement, largeur - 10);
+  const hAvert = lignesAvert.length * 3.9 + 9;
+  doc.setFillColor(...T.accentBg);
+  doc.setDrawColor(...T.gold);
+  doc.setLineWidth(0.3);
+  doc.rect(m, y, largeur, hAvert, 'FD');
+  fieldLabel(doc, 'Avertissement', m + 5, y + 5, 6.4, T.gold);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...T.inkSecondary);
+  doc.text(lignesAvert, m + 5, y + 9.4, { lineHeightFactor: 1.4 });
+
+  // ── Corps du rapport ──
+  doc.addPage();
+  y = 26;
+  let dernierBlocVide = true;
+  corps.forEach((bloc) => {
+    if (bloc.type === 'vide') {
+      if (!dernierBlocVide) y += 1.6;
+      dernierBlocVide = true;
+      return;
+    }
+    dernierBlocVide = false;
+
+    if (bloc.type === 'titre') {
+      const numero = texteBrut(bloc.texte).match(/^(\d+)[.)]\s+(.*)$/);
+      if (numero && bloc.niveau <= 3) {
+        y = sectionRapportIA(doc, numero[1], texteBrut(numero[2]), y + 2);
+      } else if (bloc.niveau <= 3) {
+        y = latexSubSection(doc, versWinAnsi(texteBrut(bloc.texte)).trim(), y + 3);
+      } else {
+        y = ensurePageSpace(doc, y + 2, 14);
+        y = ecrireTexteRiche(doc, `**${texteBrut(bloc.texte)}**`, m, y, largeur, { taille: 9, couleurGras: T.navyDeep });
+        y += 0.8;
+      }
+      return;
+    }
+
+    if (bloc.type === 'separateur') {
+      y = ensurePageSpace(doc, y, 6);
+      doc.setDrawColor(...T.ruleLight);
+      doc.setLineWidth(0.3);
+      doc.line(m, y, W - m, y);
+      y += 5;
+      return;
+    }
+
+    if (bloc.type === 'citation') {
+      const debut = ensurePageSpace(doc, y, 10);
+      const pageDebut = doc.internal.getNumberOfPages();
+      const fin = ecrireTexteRiche(doc, bloc.texte, m + 5, debut + 3.6, largeur - 8, { italique: true });
+      // Filet d'accent tracé après coup, à la hauteur réelle de la citation — seulement
+      // si elle tient sur une page (sinon son début est resté sur la page précédente).
+      if (doc.internal.getNumberOfPages() === pageDebut) {
+        doc.setDrawColor(...T.gold);
+        doc.setLineWidth(0.9);
+        doc.line(m + 1, debut, m + 1, fin - 2.4);
+      }
+      y = fin + 1.6;
+      return;
+    }
+
+    if (bloc.type === 'liste') {
+      const retrait = m + 2 + bloc.niveau * 5;
+      const marque = bloc.ordonnee ? bloc.marque : bloc.marque === '✓' ? '+' : bloc.marque === '✗' ? 'x' : bloc.niveau === 0 ? '•' : '-';
+      y = ensurePageSpace(doc, y, 4.3);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.8);
+      doc.setTextColor(...(bloc.marque === '✗' ? T.darkRed : bloc.marque === '✓' ? T.darkGreen : T.navy));
+      doc.text(marque, retrait, y);
+      const decalage = bloc.ordonnee ? 5.5 : 4;
+      y = ecrireTexteRiche(doc, bloc.texte, retrait + decalage, y, W - m - retrait - decalage) + 0.6;
+      return;
+    }
+
+    if (bloc.type === 'tableau') {
+      const nbColonnes = bloc.entete.length;
+      const corpsTableau = bloc.lignes.map(l => Array.from({ length: nbColonnes }, (_, i) => versWinAnsi(texteBrut(l[i] ?? '')).trim()));
+      y = drawBooktabsTable(doc, [bloc.entete.map(c => versWinAnsi(texteBrut(c)).trim())], corpsTableau, ensurePageSpace(doc, y, 20) + 1, {
+        columnStyles: { 0: { fontStyle: 'bold' } },
+      });
+      y += 1;
+      return;
+    }
+
+    y = ecrireTexteRiche(doc, bloc.texte, m, ensurePageSpace(doc, y, 4.3), largeur) + 1.4;
+  });
+
+  const totalPages = doc.internal.getNumberOfPages();
+  applyLatexHeaderFooter(doc, totalPages, dossierName, exercice, badgeImg, {
+    bandeau: parGemini ? 'RAPPORT D\'ANALYSE RÉDIGÉ PAR IA — SYSTÈME COMPTABLE FINANCIER (SCF)' : undefined,
+    mentionPied: parGemini ? 'BAIQ · Rédigé par IA (Gemini) à partir de données pseudonymisées — à relire avant diffusion.' : undefined,
+  });
+
+  const cleanName = dossierName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+  const fileName = `BAIQ_Rapport_IA_${cleanName}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(fileName);
   return fileName;
 }
