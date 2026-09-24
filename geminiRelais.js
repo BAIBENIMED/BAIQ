@@ -9,9 +9,8 @@
  */
 
 // Modèles réellement appelés par l'application (aiEngine.js, AIView.jsx).
+// gemini-2.0-flash et gemini-1.5-flash ont été retirés par Google.
 export const MODELES_GEMINI_AUTORISES = new Set([
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
   'gemini-2.5-flash',
 ]);
 
@@ -70,6 +69,9 @@ export function preparerRequeteGemini(requete) {
       Number.isInteger(config.maxOutputTokens) && config.maxOutputTokens > 0 ? config.maxOutputTokens : MAX_JETONS_REPONSE,
       MAX_JETONS_REPONSE
     ),
+    // gemini-2.5-flash « réfléchit » par défaut et ces jetons sont pris sur
+    // maxOutputTokens : sans cela, un rapport pourrait être tronqué.
+    thinkingConfig: { thinkingBudget: 0 },
   };
   if (typeof config.temperature === 'number' && config.temperature >= 0 && config.temperature <= 2) {
     generationConfig.temperature = config.temperature;

@@ -14,7 +14,7 @@ import {
 
 /** Requête telle qu'envoyée par aiEngine.js (rapports). */
 const requeteRapport = (texte = 'Analyse financière de la SARL Test…') => ({
-  modelName: 'gemini-2.0-flash',
+  modelName: 'gemini-2.5-flash',
   body: {
     contents: [{ parts: [{ text: texte }] }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 4000 },
@@ -24,18 +24,19 @@ const requeteRapport = (texte = 'Analyse financière de la SARL Test…') => ({
 test('les requêtes de l\'application traversent le relais telles quelles', () => {
   const rapport = preparerRequeteGemini(requeteRapport());
   assert.equal(rapport.erreur, undefined);
-  assert.equal(rapport.modelName, 'gemini-2.0-flash');
-  assert.deepEqual(rapport.corps, requeteRapport().body);
+  assert.equal(rapport.modelName, 'gemini-2.5-flash');
+  assert.deepEqual(rapport.corps.contents, requeteRapport().body.contents);
+  assert.deepEqual(rapport.corps.generationConfig, { temperature: 0.2, maxOutputTokens: 4000, thinkingConfig: { thinkingBudget: 0 } });
 
   // Chat (AIView.jsx) : aucune generationConfig envoyée → plafond de réponse appliqué.
-  const chat = preparerRequeteGemini({ modelName: 'gemini-2.0-flash', body: { contents: [{ parts: [{ text: 'Question ?' }] }] } });
-  assert.deepEqual(chat.corps.generationConfig, { maxOutputTokens: MAX_JETONS_REPONSE });
+  const chat = preparerRequeteGemini({ modelName: 'gemini-2.5-flash', body: { contents: [{ parts: [{ text: 'Question ?' }] }] } });
+  assert.deepEqual(chat.corps.generationConfig, { maxOutputTokens: MAX_JETONS_REPONSE, thinkingConfig: { thinkingBudget: 0 } });
 });
 
 test('une requête vide ou mal formée est refusée (et ne passe donc pas le limiteur)', () => {
-  for (const requete of [undefined, {}, { modelName: 'gemini-2.0-flash' }, { modelName: 'gemini-2.0-flash', body: {} },
-    { modelName: 'gemini-2.0-flash', body: { contents: [] } },
-    { modelName: 'gemini-2.0-flash', body: { contents: [{ parts: [{ text: '' }] }] } }]) {
+  for (const requete of [undefined, {}, { modelName: 'gemini-2.5-flash' }, { modelName: 'gemini-2.5-flash', body: {} },
+    { modelName: 'gemini-2.5-flash', body: { contents: [] } },
+    { modelName: 'gemini-2.5-flash', body: { contents: [{ parts: [{ text: '' }] }] } }]) {
     const resultat = preparerRequeteGemini(requete);
     assert.equal(resultat.statut, 400, JSON.stringify(requete));
     assert.equal(typeof resultat.erreur, 'string');
@@ -43,7 +44,7 @@ test('une requête vide ou mal formée est refusée (et ne passe donc pas le lim
 });
 
 test('les modèles que l\'application n\'utilise pas sont refusés', () => {
-  for (const modelName of ['gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-ultra', '../autre']) {
+  for (const modelName of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-ultra', '../autre']) {
     assert.equal(preparerRequeteGemini({ ...requeteRapport(), modelName }).statut, 400, modelName);
   }
 });
@@ -59,7 +60,7 @@ test('pièces jointes, instructions système et outils ne traversent pas le rela
   avecExtras.body.generationConfig.responseMimeType = 'application/json';
   const { corps } = preparerRequeteGemini(avecExtras);
   assert.deepEqual(Object.keys(corps).sort(), ['contents', 'generationConfig']);
-  assert.deepEqual(Object.keys(corps.generationConfig).sort(), ['maxOutputTokens', 'temperature']);
+  assert.deepEqual(Object.keys(corps.generationConfig).sort(), ['maxOutputTokens', 'temperature', 'thinkingConfig']);
 });
 
 test('la taille du prompt et de la réponse est plafonnée', () => {

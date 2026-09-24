@@ -102,7 +102,7 @@ export function AIView({ data, geminiKey }) {
     const context = buildGeminiContext(data, analysis);
     const prompt  = context + `\n\n## QUESTION DE L'UTILISATEUR\n${userMessage}\n\nRéponds de manière structurée, hautement professionnelle et en français d'affaires. Utilise des titres, des calculs chiffrés en DZD, des listes à puces et cite les comptes SCF appropriés.`;
     const requestBody = { contents: [{ parts: [{ text: prompt }] }] };
-    const modelName = 'gemini-2.0-flash';
+    const modelName = 'gemini-2.5-flash';
 
     // 1. Voie recommandée : relais serveur /api/gemini (clé Gemini gardée côté serveur, cf. server.js)
     try {

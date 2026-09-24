@@ -955,7 +955,7 @@ Structure impérative :
 
   const fullPrompt = `${context}\n\n${promptFocus}\n\n---\nRègles de rédaction strictes : Rédige avec un ton d'expert financier de haut niveau, sans fioritures, avec des tableaux comparatifs en markdown clairs, des formules mathématiques, des montants précis chiffrés en DZD et des recommandations immédiatement exploitables.`;
 
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+  const models = ['gemini-2.5-flash'];
   let lastError = null;
   let proxyUnavailable = false; // évite de re-tester le relais serveur à chaque modèle s'il est absent (déploiement statique)
 
